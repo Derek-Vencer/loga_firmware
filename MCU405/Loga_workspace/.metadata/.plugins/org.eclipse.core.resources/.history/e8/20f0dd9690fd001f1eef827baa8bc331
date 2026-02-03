@@ -1,0 +1,257 @@
+#ifndef CONFIG_H
+#define CONFIG_H
+
+#define AT32F405RCT7
+
+/* USB Device descriptor parameter */
+#define VENDOR_ID       0x195d
+#define PRODUCT_ID      0x2092
+#define DEVICE_VER      0x0003
+/* in python2: list(u"whatever".encode('utf-16-le')) */
+/*   at most 32 characters or the ugly hack in usb_main.c borks */
+#define MANUFACTURER "iOne Innovation"
+#define USBSTR_MANUFACTURER    'i', '\x00', 'O', '\x00', 'n', '\x00',  'e', '\x00'
+#define PRODUCT "Loga TMK Sensor Test"
+#define USBSTR_PRODUCT         'L', '\x00', 'O', '\x00', 'G', '\x00', 'A', '\x00', ' ', '\x00', 'T', '\x00', 'M', '\x00', 'R', '\x00', ' ', '\x00', 'K', '\x00', 'e', '\x00', 'y', '\x00', 'b', '\x00', 'o', '\x00', 'a', '\x00', 'r', '\x00', 'd', '\x00'
+#define DESCRIPTION "LOGA TMR Keyboard"
+#define USBSTR_SERIAL 		   '0', '\x00', '1', '\x00', '2', '\x00', '3', '\x00'
+
+//#define minTriggerCheck
+#define DEFAULT_TRIGGER_LEVEL	100
+#define DEFAULT_RELEASE_LEVEL	0
+
+/* key matrix size */
+#define MATRIX_ROWS 6
+#define MATRIX_COLS 15
+
+#define LED_MATRIX_ROWS 7
+#define LED_MATRIX_COLS 26
+
+/* keymap in eeprom */
+#define FN_ACTIONS_COUNT 10
+#define KEYMAPS_COUNT 3
+#define RAPID_TRIGGER_COUNT 24
+#define RAPID_TRIGGER_LEVELS 6
+
+#define MATRIX_SIZE (matrix_rows() * matrix_cols())
+
+#define KEYS_COUNT (KEYMAPS_COUNT * MATRIX_SIZE)
+
+#define DYNAMIC_MACRO_COUNT 12
+#define DYNAMIC_MACRO_SIZE 48
+#define DYNAMIC_MACRO_EEPROM_STORAGE
+
+#define EECONFIG_Start (uint8_t *)(0)
+#define EECONFIG_ModelName (uint8_t *)(EECONFIG_Start)
+#define EECONFIG_SerialNo (uint32_t *)(EECONFIG_ModelName + 25)
+#define EECONFIG_kbColor (uint8_t *)(EECONFIG_SerialNo + 11)
+
+#define KEYMAP_SIZE (sizeof(uint16_t) * FN_ACTIONS_COUNT + sizeof(uint16_t) * KEYS_COUNT)
+
+#define EECONFIG_KEYMAP_OFFSET_CALIBRATION	(uint16_t *)(0x80)
+#define EECONFIG_KEYMAP_TRAVEL_CALIBRATION	(uint16_t *)(EECONFIG_KEYMAP_OFFSET_CALIBRATION + (ADC_NUM_CHANNELS*ADC_BUF_DEPTH*2))
+#define EECONFIG_KEYMAP_TRIGGER_LEVEL       (uint16_t *)(EECONFIG_KEYMAP_TRAVEL_CALIBRATION + (ADC_NUM_CHANNELS*ADC_BUF_DEPTH*2))
+#define EECONFIG_KEYMAP_RELEASE_LEVEL       (uint16_t *)(EECONFIG_KEYMAP_TRIGGER_LEVEL+2)
+
+#define EECONFIG_KEYMAP_IN_EEPROM 			(uint16_t *)(EECONFIG_KEYMAP_RELEASE_LEVEL+2)
+#define EECONFIG_END						(uint16_t *)(EECONFIG_KEYMAP_IN_EEPROM + KEYMAP_SIZE)
+
+#define EECONFIG_TRIGGER_LEVEL				(uint16_t *)(EECONFIG_END)
+#define EECONFIG_TRIGGER_END				(uint16_t *)(EECONFIG_TRIGGER_LEVEL + (KEYS_COUNT*2))
+
+#define EECONFIG_RELEASE_LEVEL				(uint16_t *)(EECONFIG_TRIGGER_END)
+#define EECONFIG_RELEASE_END				(uint16_t *)(EECONFIG_RELEASE_LEVEL + (KEYS_COUNT*2))
+
+#define EECONFIG_RAPID_TRIGGER				(uint16_t *)(EECONFIG_RELEASE_END)
+#define EECONFIG_RAPID_TRIGGER_END			(uint16_t *)(EECONFIG_RAPID_TRIGGER + (24*RAPID_TRIGGER_COUNT))
+
+#define DYNAMIC_MACRO_EEPROM_MAGIC_ADDR 	(uint16_t*)(EECONFIG_RAPID_TRIGGER_END)
+#define DYNAMIC_MACRO_EEPROM_BLOCK0_ADDR 	(uint16_t*)(DYNAMIC_MACRO_EEPROM_MAGIC_ADDR+2)
+
+
+//#define EECONFIG_KEYMAP_CHECKSUM   (uint16_t *)(EECONFIG_KEYMAP_IN_EEPROM)
+
+#define EXTRAKEY_ENABLE
+#define COMMAND_ENABLE
+#define ENCODER_ENABLE
+//#define CONSOLE_ENABLE
+#define LAMP_ARRAY_ENABLE
+#define MOUSE_ENABLE
+#define CONTROL_ENABLE
+#define RAW_ENABLE
+#define NKRO_ENABLE
+#define KEYMAP_IN_EEPROM_ENABLE
+
+#define ADC_NUM_CHANNELS   	7
+#define ADC_BUF_DEPTH      16
+
+/* Locking resynchronize hack */
+#define LOCKING_RESYNC_ENABLE
+
+/* key combination for command */
+#define IS_COMMAND() ( \
+    keyboard_report->mods == (MOD_BIT(KC_LSHIFT) | MOD_BIT(KC_RSHIFT)) \
+)
+
+#define ENCODERS_PAD_A { D2}
+#define ENCODERS_PAD_B { B13}
+#define ENCODERS_PAD_BTN { A15}
+
+
+//#define ENCODER_RESOLUTION {1}
+
+#define TAP_HOLD_CAPS_DELAY 350
+#define TAP_CODE_DELAY 1
+
+#define EEPROM_DRIVER
+#define EEPROM_I2C
+#define EEPROM_USE_I2C
+
+//#define EXTERNAL_EEPROM_I2C_BASE_ADDRESS 0xA0
+#define EXTERNAL_EEPROM_I2C_BASE_ADDRESS 0b10101000		//non_OP
+//#define EXTERNAL_EEPROM_I2C_BASE_ADDRESS 0b10100000
+#define EXTERNAL_EEPROM_BYTE_COUNT 65536 - EXTERNAL_EEPROM_PAGE_SIZE
+#define EXTERNAL_EEPROM_PAGE_SIZE 128
+#define EXTERNAL_EEPROM_ADDRESS_SIZE 2
+#define EXTERNAL_EEPROM_WRITE_TIME 5
+#define EXTERNAL_EEPROM_WP_PIN B7
+
+#define AT32_I2C_USE_DMA TRUE
+#define I2C_DRIVER I2CD1
+#define I2C1_SCL_PIN B8
+#define I2C1_SDA_PIN B9
+#define I2C1_SCL_PAL_MODE 4
+#define I2C1_SDA_PAL_MODE 4
+#define I2C_START_RETRY_COUNT 10
+#define I2C_TIMEOUT 1000 // milliseconds
+#define I2C1_CLOCK_SPEED 1000000 /* 400000 */
+
+//#define CRC_USE_DMA	TRUE
+
+// I2C ADJ
+#define I2C1_TIMINGR_PRESC 0U
+#define I2C1_TIMINGR_SCLDEL 7U
+#define I2C1_TIMINGR_SDADEL 0U
+
+//591Khz
+//#define I2C1_TIMINGR_SCLH 120U
+//#define I2C1_TIMINGR_SCLL 138U
+
+//1000Khz
+#define I2C1_TIMINGR_SCLH 45U
+#define I2C1_TIMINGR_SCLL 50U
+
+
+// I2C ADJ
+//#define I2C1_TIMINGR_PRESC 2U
+//#define I2C1_TIMINGR_SCLDEL 4U
+//#define I2C1_TIMINGR_SDADEL 4U
+//
+////400k		//1.21ms
+////#define I2C1_TIMINGR_SCLH 50U
+////#define I2C1_TIMINGR_SCLL 60U
+//
+////800k
+////#define I2C1_TIMINGR_SCLH 25U
+////#define I2C1_TIMINGR_SCLL 25U
+//
+////1000k		//488uS
+//#define I2C1_TIMINGR_SCLH 18U
+//#define I2C1_TIMINGR_SCLL 18U
+
+//====
+
+
+
+
+// 400K
+//   #define I2C1_TIMINGR_SCLH   55U
+//   #define I2C1_TIMINGR_SCLL   55U
+
+// 368K
+//   #define I2C1_TIMINGR_SCLH   60U
+//   #define I2C1_TIMINGR_SCLL   100U
+
+// 368K v2
+//   #define I2C1_TIMINGR_SCLH   45U
+//   #define I2C1_TIMINGR_SCLL   90u
+
+// 368K v3
+
+
+//??K
+//  #define I2C1_TIMINGR_SCLH   43U
+//  #define I2C1_TIMINGR_SCLL   63U
+// END OF 400k ADJ
+
+
+
+
+//====
+
+
+//#define I2C1_TIMINGR_PRESC 15U
+//#define I2C1_TIMINGR_SCLDEL 4U
+//#define I2C1_TIMINGR_SDADEL 2U
+//
+//#define I2C1_TIMINGR_SCLH 15U
+//#define I2C1_TIMINGR_SCLL 21U
+
+//  .timingr          = AT32_TIMINGR_PRESC(15U) | AT32_TIMINGR_SCLDEL(4U) |
+//                      AT32_TIMINGR_SDADEL(2U) | AT32_TIMINGR_SCLH(15U) |
+//                      AT32_TIMINGR_SCLL(21U),
+
+
+
+
+/*
+ * Feature disable options
+ *  These options are also useful to firmware size reduction.
+ */
+
+/* disable debug print */
+//#define NO_DEBUG
+
+/* disable print */
+//#define NO_PRINT
+
+/* disable action features */
+//#define NO_ACTION_LAYER
+//#define NO_ACTION_TAPPING
+//#define NO_ACTION_ONESHOT
+//#define NO_ACTION_MACRO
+//#define NO_ACTION_FUNCTION
+
+
+
+#define SPI_LED_DRIVER			SPID2
+#define SPI_LED_SDB_PIN			B4
+#define SPI_LED_SCK_PIN			A9
+#define SPI_LED_MOSI_PIN		A10
+#define SPI_LED_MISO_PIN		A12
+//#define SPI_LED_MISO_PIN		C2
+
+//#define SPI_LED_CS1_PIN			F6
+//#define SPI_LED_CS1_PORT		GPIOF
+//#define SPI_LED_CS1_PAD			6U
+
+#define SPI_LED_CS1_PIN			A8
+#define SPI_LED_CS1_PORT		GPIOA
+#define SPI_LED_CS1_PAD			8U
+
+
+#define SPI_LED_CS2_PIN			A11
+#define SPI_LED_CS2_PORT		GPIOA
+#define SPI_LED_CS2_PAD			11U
+
+#define SPI_LED_CS3_PIN			F7
+#define SPI_LED_CS3_PORT		GPIOF
+#define SPI_LED_CS3_PAD			7U
+
+#define SPI_LED_SCK_PAL_MODE	5
+#define SPI_LED_MOSI_PAL_MODE	5
+#define SPI_LED_MISO_PAL_MODE	5
+
+
+
+#endif

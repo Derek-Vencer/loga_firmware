@@ -1,0 +1,1157 @@
+/*
+    ChibiOS - Copyright (C) 2006..2018 Giovanni Di Sirio
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+*/
+
+/**
+ * @file    USARTv1/hal_uart_lld.h
+ * @brief   STM32 low level UART driver header.
+ *
+ * @addtogroup UART
+ * @{
+ */
+
+#ifndef HAL_UART_LLD_H
+#define HAL_UART_LLD_H
+
+#if HAL_USE_UART || defined(__DOXYGEN__)
+
+/*===========================================================================*/
+/* Driver constants.                                                         */
+/*===========================================================================*/
+
+/*===========================================================================*/
+/* Driver pre-compile time settings.                                         */
+/*===========================================================================*/
+
+/**
+ * @name    Configuration options
+ * @{
+ */
+/**
+ * @brief   UART driver on USART1 enable switch.
+ * @details If set to @p TRUE the support for USART1 is included.
+ * @note    The default is @p FALSE.
+ */
+#if !defined(STM32_UART_USE_USART1) || defined(__DOXYGEN__)
+#define STM32_UART_USE_USART1               FALSE
+#endif
+
+/**
+ * @brief   UART driver on USART2 enable switch.
+ * @details If set to @p TRUE the support for USART2 is included.
+ * @note    The default is @p FALSE.
+ */
+#if !defined(STM32_UART_USE_USART2) || defined(__DOXYGEN__)
+#define STM32_UART_USE_USART2               FALSE
+#endif
+
+/**
+ * @brief   UART driver on USART3 enable switch.
+ * @details If set to @p TRUE the support for USART3 is included.
+ * @note    The default is @p FALSE.
+ */
+#if !defined(STM32_UART_USE_USART3) || defined(__DOXYGEN__)
+#define STM32_UART_USE_USART3               FALSE
+#endif
+
+/**
+ * @brief   UART driver on UART4 enable switch.
+ * @details If set to @p TRUE the support for UART4 is included.
+ * @note    The default is @p FALSE.
+ */
+#if !defined(STM32_UART_USE_UART4) || defined(__DOXYGEN__)
+#define STM32_UART_USE_UART4                FALSE
+#endif
+
+/**
+ * @brief   UART driver on UART5 enable switch.
+ * @details If set to @p TRUE the support for UART5 is included.
+ * @note    The default is @p FALSE.
+ */
+#if !defined(STM32_UART_USE_UART5) || defined(__DOXYGEN__)
+#define STM32_UART_USE_UART5                FALSE
+#endif
+
+/**
+ * @brief   UART driver on USART6 enable switch.
+ * @details If set to @p TRUE the support for USART6 is included.
+ * @note    The default is @p FALSE.
+ */
+#if !defined(STM32_UART_USE_USART6) || defined(__DOXYGEN__)
+#define STM32_UART_USE_USART6               FALSE
+#endif
+
+/**
+ * @brief   UART driver on UART7 enable switch.
+ * @details If set to @p TRUE the support for UART7 is included.
+ * @note    The default is @p FALSE.
+ */
+#if !defined(STM32_UART_USE_UART7) || defined(__DOXYGEN__)
+#define STM32_UART_USE_UART7                FALSE
+#endif
+
+/**
+ * @brief   UART driver on UART8 enable switch.
+ * @details If set to @p TRUE the support for UART8 is included.
+ * @note    The default is @p FALSE.
+ */
+#if !defined(STM32_UART_USE_UART8) || defined(__DOXYGEN__)
+#define STM32_UART_USE_UART8                FALSE
+#endif
+
+/**
+ * @brief   UART driver on UART9 enable switch.
+ * @details If set to @p TRUE the support for UART9 is included.
+ * @note    The default is @p FALSE.
+ */
+#if !defined(STM32_UART_USE_UART9) || defined(__DOXYGEN__)
+#define STM32_UART_USE_UART9                FALSE
+#endif
+
+/**
+ * @brief   UART driver on UART10 enable switch.
+ * @details If set to @p TRUE the support for UART10 is included.
+ * @note    The default is @p FALSE.
+ */
+#if !defined(STM32_UART_USE_UART10) || defined(__DOXYGEN__)
+#define STM32_UART_USE_UART10               FALSE
+#endif
+
+/**
+ * @brief   USART1 interrupt priority level setting.
+ */
+#if !defined(STM32_UART_USART1_IRQ_PRIORITY) || defined(__DOXYGEN__)
+#define STM32_UART_USART1_IRQ_PRIORITY      12
+#endif
+
+/**
+ * @brief   USART2 interrupt priority level setting.
+ */
+#if !defined(STM32_UART_USART2_IRQ_PRIORITY) || defined(__DOXYGEN__)
+#define STM32_UART_USART2_IRQ_PRIORITY      12
+#endif
+
+/**
+ * @brief   USART3 interrupt priority level setting.
+ */
+#if !defined(STM32_UART_USART3_IRQ_PRIORITY) || defined(__DOXYGEN__)
+#define STM32_UART_USART3_IRQ_PRIORITY      12
+#endif
+
+/**
+ * @brief   UART4 interrupt priority level setting.
+ */
+#if !defined(STM32_UART_UART4_IRQ_PRIORITY) || defined(__DOXYGEN__)
+#define STM32_UART_UART4_IRQ_PRIORITY       12
+#endif
+
+/**
+ * @brief   UART5 interrupt priority level setting.
+ */
+#if !defined(STM32_UART_UART5_IRQ_PRIORITY) || defined(__DOXYGEN__)
+#define STM32_UART_UART5_IRQ_PRIORITY       12
+#endif
+
+/**
+ * @brief   USART6 interrupt priority level setting.
+ */
+#if !defined(STM32_UART_USART6_IRQ_PRIORITY) || defined(__DOXYGEN__)
+#define STM32_UART_USART6_IRQ_PRIORITY      12
+#endif
+
+/**
+ * @brief   UART7 interrupt priority level setting.
+ */
+#if !defined(STM32_UART_UART7_IRQ_PRIORITY) || defined(__DOXYGEN__)
+#define STM32_UART_UART7_IRQ_PRIORITY       12
+#endif
+
+/**
+ * @brief   UART8 interrupt priority level setting.
+ */
+#if !defined(STM32_UART_UART8_IRQ_PRIORITY) || defined(__DOXYGEN__)
+#define STM32_UART_UART8_IRQ_PRIORITY       12
+#endif
+
+/**
+ * @brief   UART9 interrupt priority level setting.
+ */
+#if !defined(STM32_UART_UART9_IRQ_PRIORITY) || defined(__DOXYGEN__)
+#define STM32_UART_UART9_IRQ_PRIORITY       12
+#endif
+
+/**
+ * @brief   UART10 interrupt priority level setting.
+ */
+#if !defined(STM32_UART_UART10_IRQ_PRIORITY) || defined(__DOXYGEN__)
+#define STM32_UART_UART10_IRQ_PRIORITY      12
+#endif
+
+/**
+ * @brief   USART1 DMA priority (0..3|lowest..highest).
+ * @note    The priority level is used for both the TX and RX DMA channels but
+ *          because of the channels ordering the RX channel has always priority
+ *          over the TX channel.
+ */
+#if !defined(STM32_UART_USART1_DMA_PRIORITY) || defined(__DOXYGEN__)
+#define STM32_UART_USART1_DMA_PRIORITY      0
+#endif
+
+/**
+ * @brief   USART2 DMA priority (0..3|lowest..highest).
+ * @note    The priority level is used for both the TX and RX DMA channels but
+ *          because of the channels ordering the RX channel has always priority
+ *          over the TX channel.
+ */
+#if !defined(STM32_UART_USART2_DMA_PRIORITY) || defined(__DOXYGEN__)
+#define STM32_UART_USART2_DMA_PRIORITY      0
+#endif
+
+/**
+ * @brief   USART3 DMA priority (0..3|lowest..highest).
+ * @note    The priority level is used for both the TX and RX DMA channels but
+ *          because of the channels ordering the RX channel has always priority
+ *          over the TX channel.
+ */
+#if !defined(STM32_UART_USART3_DMA_PRIORITY) || defined(__DOXYGEN__)
+#define STM32_UART_USART3_DMA_PRIORITY      0
+#endif
+
+/**
+ * @brief   UART4 DMA priority (0..3|lowest..highest).
+ * @note    The priority level is used for both the TX and RX DMA channels but
+ *          because of the channels ordering the RX channel has always priority
+ *          over the TX channel.
+ */
+#if !defined(STM32_UART_UART4_DMA_PRIORITY) || defined(__DOXYGEN__)
+#define STM32_UART_UART4_DMA_PRIORITY       0
+#endif
+
+/**
+ * @brief   UART5 DMA priority (0..3|lowest..highest).
+ * @note    The priority level is used for both the TX and RX DMA channels but
+ *          because of the channels ordering the RX channel has always priority
+ *          over the TX channel.
+ */
+#if !defined(STM32_UART_UART5_DMA_PRIORITY) || defined(__DOXYGEN__)
+#define STM32_UART_UART5_DMA_PRIORITY       0
+#endif
+
+/**
+ * @brief   USART6 DMA priority (0..3|lowest..highest).
+ * @note    The priority level is used for both the TX and RX DMA channels but
+ *          because of the channels ordering the RX channel has always priority
+ *          over the TX channel.
+ */
+#if !defined(STM32_UART_USART6_DMA_PRIORITY) || defined(__DOXYGEN__)
+#define STM32_UART_USART6_DMA_PRIORITY      0
+#endif
+
+/**
+ * @brief   UART7 DMA priority (0..3|lowest..highest).
+ * @note    The priority level is used for both the TX and RX DMA channels but
+ *          because of the channels ordering the RX channel has always priority
+ *          over the TX channel.
+ */
+#if !defined(STM32_UART_UART7_DMA_PRIORITY) || defined(__DOXYGEN__)
+#define STM32_UART_UART7_DMA_PRIORITY       0
+#endif
+
+/**
+ * @brief   UART8 DMA priority (0..3|lowest..highest).
+ * @note    The priority level is used for both the TX and RX DMA channels but
+ *          because of the channels ordering the RX channel has always priority
+ *          over the TX channel.
+ */
+#if !defined(STM32_UART_UART8_DMA_PRIORITY) || defined(__DOXYGEN__)
+#define STM32_UART_UART8_DMA_PRIORITY       0
+#endif
+
+/**
+ * @brief   UART9 DMA priority (0..3|lowest..highest).
+ * @note    The priority level is used for both the TX and RX DMA channels but
+ *          because of the channels ordering the RX channel has always priority
+ *          over the TX channel.
+ */
+#if !defined(STM32_UART_UART9_DMA_PRIORITY) || defined(__DOXYGEN__)
+#define STM32_UART_UART9_DMA_PRIORITY       0
+#endif
+
+/**
+ * @brief   UART10 DMA priority (0..3|lowest..highest).
+ * @note    The priority level is used for both the TX and RX DMA channels but
+ *          because of the channels ordering the RX channel has always priority
+ *          over the TX channel.
+ */
+#if !defined(STM32_UART_UART10_DMA_PRIORITY) || defined(__DOXYGEN__)
+#define STM32_UART_UART10_DMA_PRIORITY      0
+#endif
+
+/**
+ * @brief   USART DMA error hook.
+ * @note    The default action for DMA errors is a system halt because DMA
+ *          error can only happen because programming errors.
+ */
+#if !defined(STM32_UART_DMA_ERROR_HOOK) || defined(__DOXYGEN__)
+#define STM32_UART_DMA_ERROR_HOOK(uartp)    osalSysHalt("DMA failure")
+#endif
+/** @} */
+
+/*===========================================================================*/
+/* Derived constants and error checks.                                       */
+/*===========================================================================*/
+
+#if STM32_UART_USE_USART1 && !STM32_HAS_USART1
+#error "USART1 not present in the selected device"
+#endif
+
+#if STM32_UART_USE_USART2 && !STM32_HAS_USART2
+#error "USART2 not present in the selected device"
+#endif
+
+#if STM32_UART_USE_USART3 && !STM32_HAS_USART3
+#error "USART3 not present in the selected device"
+#endif
+
+#if STM32_UART_USE_UART4
+#if !STM32_HAS_UART4
+#error "UART4 not present in the selected device"
+#endif
+
+#if 0
+#if !defined(STM32F2XX) && !defined(STM32F4XX) && !defined(STM32L151xE)  && \
+    !defined(STM32L152xE) && !defined(STM32L162xE)
+#error "UART4 DMA access not supported in this platform"
+#endif
+#endif
+#endif /* STM32_UART_USE_UART4 */
+
+#if STM32_UART_USE_UART5
+#if !STM32_HAS_UART5
+#error "UART5 not present in the selected device"
+#endif
+#if 0
+#if !defined(STM32F2XX) && !defined(STM32F4XX) && !defined(STM32L151xE)  && \
+    !defined(STM32L152xE) && !defined(STM32L162xE)
+#error "UART5 DMA access not supported in this platform"
+#endif
+#endif
+#endif /* STM32_UART_USE_UART5 */
+
+#if STM32_UART_USE_USART6 && !STM32_HAS_USART6
+#error "USART6 not present in the selected device"
+#endif
+
+#if STM32_UART_USE_UART7 && !STM32_HAS_UART7
+#error "UART7 not present in the selected device"
+#endif
+
+#if STM32_UART_USE_UART8 && !STM32_HAS_UART8
+#error "UART8 not present in the selected device"
+#endif
+
+#if STM32_UART_USE_UART9 && !STM32_HAS_UART9
+#error "UART9 not present in the selected device"
+#endif
+
+#if STM32_UART_USE_UART10 && !STM32_HAS_UART10
+#error "UART10 not present in the selected device"
+#endif
+
+#if !STM32_UART_USE_USART1 && !STM32_UART_USE_USART2 &&                     \
+    !STM32_UART_USE_USART3 && !STM32_UART_USE_UART4 &&                      \
+    !STM32_UART_USE_UART5  && !STM32_UART_USE_USART6 &&                     \
+    !STM32_UART_USE_UART7  && !STM32_UART_USE_UART8 &&                      \
+    !STM32_UART_USE_UART9  && !STM32_UART_USE_UART10
+#error "UART driver activated but no USART/UART peripheral assigned"
+#endif
+
+#if STM32_UART_USE_USART1 &&                                                \
+    !OSAL_IRQ_IS_VALID_PRIORITY(STM32_UART_USART1_IRQ_PRIORITY)
+#error "Invalid IRQ priority assigned to USART1"
+#endif
+
+#if STM32_UART_USE_USART2 &&                                                \
+    !OSAL_IRQ_IS_VALID_PRIORITY(STM32_UART_USART2_IRQ_PRIORITY)
+#error "Invalid IRQ priority assigned to USART2"
+#endif
+
+#if STM32_UART_USE_USART3 &&                                                \
+    !OSAL_IRQ_IS_VALID_PRIORITY(STM32_UART_USART3_IRQ_PRIORITY)
+#error "Invalid IRQ priority assigned to USART3"
+#endif
+
+#if STM32_UART_USE_UART4 &&                                                 \
+    !OSAL_IRQ_IS_VALID_PRIORITY(STM32_UART_UART4_IRQ_PRIORITY)
+#error "Invalid IRQ priority assigned to UART4"
+#endif
+
+#if STM32_UART_USE_UART5 &&                                                 \
+    !OSAL_IRQ_IS_VALID_PRIORITY(STM32_UART_UART5_IRQ_PRIORITY)
+#error "Invalid IRQ priority assigned to UART5"
+#endif
+
+#if STM32_UART_USE_USART6 &&                                                \
+    !OSAL_IRQ_IS_VALID_PRIORITY(STM32_UART_USART6_IRQ_PRIORITY)
+#error "Invalid IRQ priority assigned to USART6"
+#endif
+
+#if STM32_UART_USE_UART7 &&                                                 \
+    !OSAL_IRQ_IS_VALID_PRIORITY(STM32_UART_UART7_IRQ_PRIORITY)
+#error "Invalid IRQ priority assigned to UART7"
+#endif
+
+#if STM32_UART_USE_UART8 &&                                                 \
+    !OSAL_IRQ_IS_VALID_PRIORITY(STM32_UART_UART8_IRQ_PRIORITY)
+#error "Invalid IRQ priority assigned to UART8"
+#endif
+
+#if STM32_UART_USE_UART9 &&                                                 \
+    !OSAL_IRQ_IS_VALID_PRIORITY(STM32_UART_UART9_IRQ_PRIORITY)
+#error "Invalid IRQ priority assigned to UART9"
+#endif
+
+#if STM32_UART_USE_UART10 &&                                                \
+    !OSAL_IRQ_IS_VALID_PRIORITY(STM32_UART_UART10_IRQ_PRIORITY)
+#error "Invalid IRQ priority assigned to UART10"
+#endif
+
+#if STM32_UART_USE_USART1 &&                                                \
+    !STM32_DMA_IS_VALID_PRIORITY(STM32_UART_USART1_DMA_PRIORITY)
+#error "Invalid DMA priority assigned to USART1"
+#endif
+
+#if STM32_UART_USE_USART2 &&                                                \
+    !STM32_DMA_IS_VALID_PRIORITY(STM32_UART_USART2_DMA_PRIORITY)
+#error "Invalid DMA priority assigned to USART2"
+#endif
+
+#if STM32_UART_USE_USART3 &&                                                \
+    !STM32_DMA_IS_VALID_PRIORITY(STM32_UART_USART3_DMA_PRIORITY)
+#error "Invalid DMA priority assigned to USART3"
+#endif
+
+#if STM32_UART_USE_UART4 &&                                                 \
+    !STM32_DMA_IS_VALID_PRIORITY(STM32_UART_UART4_DMA_PRIORITY)
+#error "Invalid DMA priority assigned to UART4"
+#endif
+
+#if STM32_UART_USE_UART5 &&                                                 \
+    !STM32_DMA_IS_VALID_PRIORITY(STM32_UART_UART5_DMA_PRIORITY)
+#error "Invalid DMA priority assigned to UART5"
+#endif
+
+#if STM32_UART_USE_USART6 &&                                                \
+    !STM32_DMA_IS_VALID_PRIORITY(STM32_UART_USART6_DMA_PRIORITY)
+#error "Invalid DMA priority assigned to USART6"
+#endif
+
+#if STM32_UART_USE_UART7 &&                                                 \
+    !STM32_DMA_IS_VALID_PRIORITY(STM32_UART_UART7_DMA_PRIORITY)
+#error "Invalid DMA priority assigned to UART7"
+#endif
+
+#if STM32_UART_USE_UART8 &&                                                 \
+    !STM32_DMA_IS_VALID_PRIORITY(STM32_UART_UART8_DMA_PRIORITY)
+#error "Invalid DMA priority assigned to UART8"
+#endif
+
+#if STM32_UART_USE_UART9 &&                                                 \
+    !STM32_DMA_IS_VALID_PRIORITY(STM32_UART_UART9_DMA_PRIORITY)
+#error "Invalid DMA priority assigned to UART9"
+#endif
+
+#if STM32_UART_USE_UART10 &&                                                \
+    !STM32_DMA_IS_VALID_PRIORITY(STM32_UART_UART10_DMA_PRIORITY)
+#error "Invalid DMA priority assigned to UART10"
+#endif
+
+/* The following checks are only required when there is a DMA able to
+   reassign streams to different channels.*/
+#if STM32_ADVANCED_DMA
+/* Check on the presence of the DMA streams settings in mcuconf.h.*/
+#if STM32_UART_USE_USART1 && (!defined(STM32_UART_USART1_RX_DMA_STREAM) ||  \
+                              !defined(STM32_UART_USART1_TX_DMA_STREAM))
+#error "USART1 DMA streams not defined"
+#endif
+
+#if STM32_UART_USE_USART2 && (!defined(STM32_UART_USART2_RX_DMA_STREAM) ||  \
+                              !defined(STM32_UART_USART2_TX_DMA_STREAM))
+#error "USART2 DMA streams not defined"
+#endif
+
+#if STM32_UART_USE_USART3 && (!defined(STM32_UART_USART3_RX_DMA_STREAM) ||  \
+                              !defined(STM32_UART_USART3_TX_DMA_STREAM))
+#error "USART3 DMA streams not defined"
+#endif
+
+#if STM32_UART_USE_UART4 && (!defined(STM32_UART_UART4_RX_DMA_STREAM) ||    \
+                             !defined(STM32_UART_UART4_TX_DMA_STREAM))
+#error "UART4 DMA streams not defined"
+#endif
+
+#if STM32_UART_USE_UART5 && (!defined(STM32_UART_UART5_RX_DMA_STREAM) ||    \
+                             !defined(STM32_UART_UART5_TX_DMA_STREAM))
+#error "UART5 DMA streams not defined"
+#endif
+
+#if STM32_UART_USE_USART6 && (!defined(STM32_UART_USART6_RX_DMA_STREAM) ||  \
+                              !defined(STM32_UART_USART6_TX_DMA_STREAM))
+#error "USART6 DMA streams not defined"
+#endif
+
+#if STM32_UART_USE_UART7 && (!defined(STM32_UART_UART7_RX_DMA_STREAM) ||    \
+                             !defined(STM32_UART_UART7_TX_DMA_STREAM))
+#error "UART7 DMA streams not defined"
+#endif
+
+#if STM32_UART_USE_UART8 && (!defined(STM32_UART_UART8_RX_DMA_STREAM) ||    \
+                             !defined(STM32_UART_UART8_TX_DMA_STREAM))
+#error "UART8 DMA streams not defined"
+#endif
+
+#if STM32_UART_USE_UART9 && (!defined(STM32_UART_UART9_RX_DMA_STREAM) ||    \
+                             !defined(STM32_UART_UART9_TX_DMA_STREAM))
+#error "UART9 DMA streams not defined"
+#endif
+
+#if STM32_UART_USE_UART10 && (!defined(STM32_UART_UART10_RX_DMA_STREAM) ||   \
+                              !defined(STM32_UART_UART10_TX_DMA_STREAM))
+#error "UART10 DMA streams not defined"
+#endif
+
+/* Check on the validity of the assigned DMA channels.*/
+#if STM32_UART_USE_USART1 &&                                                \
+    !STM32_DMA_IS_VALID_ID(STM32_UART_USART1_RX_DMA_STREAM,                 \
+                           STM32_USART1_RX_DMA_MSK)
+#error "invalid DMA stream associated to USART1 RX"
+#endif
+
+#if STM32_UART_USE_USART1 &&                                                \
+    !STM32_DMA_IS_VALID_ID(STM32_UART_USART1_TX_DMA_STREAM,                 \
+                           STM32_USART1_TX_DMA_MSK)
+#error "invalid DMA stream associated to USART1 TX"
+#endif
+
+#if STM32_UART_USE_USART2 &&                                                \
+    !STM32_DMA_IS_VALID_ID(STM32_UART_USART2_RX_DMA_STREAM,                 \
+                           STM32_USART2_RX_DMA_MSK)
+#error "invalid DMA stream associated to USART2 RX"
+#endif
+
+#if STM32_UART_USE_USART2 &&                                                \
+    !STM32_DMA_IS_VALID_ID(STM32_UART_USART2_TX_DMA_STREAM,                 \
+                           STM32_USART2_TX_DMA_MSK)
+#error "invalid DMA stream associated to USART2 TX"
+#endif
+
+#if STM32_UART_USE_USART3 &&                                                \
+    !STM32_DMA_IS_VALID_ID(STM32_UART_USART3_RX_DMA_STREAM,                 \
+                           STM32_USART3_RX_DMA_MSK)
+#error "invalid DMA stream associated to USART3 RX"
+#endif
+
+#if STM32_UART_USE_USART3 &&                                                \
+    !STM32_DMA_IS_VALID_ID(STM32_UART_USART3_TX_DMA_STREAM,                 \
+                           STM32_USART3_TX_DMA_MSK)
+#error "invalid DMA stream associated to USART3 TX"
+#endif
+
+#if STM32_UART_USE_UART4 &&                                                 \
+    !STM32_DMA_IS_VALID_ID(STM32_UART_UART4_RX_DMA_STREAM,                  \
+                           STM32_UART4_RX_DMA_MSK)
+#error "invalid DMA stream associated to UART4 RX"
+#endif
+
+#if STM32_UART_USE_UART4 &&                                                 \
+    !STM32_DMA_IS_VALID_ID(STM32_UART_UART4_TX_DMA_STREAM,                  \
+                           STM32_UART4_TX_DMA_MSK)
+#error "invalid DMA stream associated to UART4 TX"
+#endif
+
+#if STM32_UART_USE_UART5 &&                                                 \
+    !STM32_DMA_IS_VALID_ID(STM32_UART_UART5_RX_DMA_STREAM,                  \
+                           STM32_UART5_RX_DMA_MSK)
+#error "invalid DMA stream associated to UART5 RX"
+#endif
+
+#if STM32_UART_USE_UART5 &&                                                 \
+    !STM32_DMA_IS_VALID_ID(STM32_UART_UART5_TX_DMA_STREAM,                  \
+                           STM32_UART5_TX_DMA_MSK)
+#error "invalid DMA stream associated to UART5 TX"
+#endif
+
+#if STM32_UART_USE_USART6 &&                                                \
+    !STM32_DMA_IS_VALID_ID(STM32_UART_USART6_RX_DMA_STREAM,                 \
+                           STM32_USART6_RX_DMA_MSK)
+#error "invalid DMA stream associated to USART6 RX"
+#endif
+
+#if STM32_UART_USE_USART6 &&                                                \
+    !STM32_DMA_IS_VALID_ID(STM32_UART_USART6_TX_DMA_STREAM,                 \
+                           STM32_USART6_TX_DMA_MSK)
+#error "invalid DMA stream associated to USART6 TX"
+#endif
+#endif /* STM32_ADVANCED_DMA */
+
+#if STM32_UART_USE_UART7 &&                                                 \
+    !STM32_DMA_IS_VALID_ID(STM32_UART_UART7_RX_DMA_STREAM,                  \
+                           STM32_UART7_RX_DMA_MSK)
+#error "invalid DMA stream associated to UART7 RX"
+#endif
+
+#if STM32_UART_USE_UART7 &&                                                 \
+    !STM32_DMA_IS_VALID_ID(STM32_UART_UART7_TX_DMA_STREAM,                  \
+                           STM32_UART7_TX_DMA_MSK)
+#error "invalid DMA stream associated to UART7 TX"
+#endif
+
+#if STM32_UART_USE_UART8 &&                                                 \
+    !STM32_DMA_IS_VALID_ID(STM32_UART_UART8_RX_DMA_STREAM,                  \
+                           STM32_UART8_RX_DMA_MSK)
+#error "invalid DMA stream associated to UART8 RX"
+#endif
+
+#if STM32_UART_USE_UART8 &&                                                 \
+    !STM32_DMA_IS_VALID_ID(STM32_UART_UART8_TX_DMA_STREAM,                  \
+                           STM32_UART8_TX_DMA_MSK)
+#error "invalid DMA stream associated to UART8 TX"
+#endif
+
+#if STM32_UART_USE_UART9 &&                                                 \
+    !STM32_DMA_IS_VALID_ID(STM32_UART_UART9_RX_DMA_STREAM,                  \
+                           STM32_UART9_RX_DMA_MSK)
+#error "invalid DMA stream associated to UART9 RX"
+#endif
+
+#if STM32_UART_USE_UART9 &&                                                 \
+    !STM32_DMA_IS_VALID_ID(STM32_UART_UART9_TX_DMA_STREAM,                  \
+                           STM32_UART9_TX_DMA_MSK)
+#error "invalid DMA stream associated to UART9 TX"
+#endif
+
+#if STM32_UART_USE_UART10 &&                                                \
+    !STM32_DMA_IS_VALID_ID(STM32_UART_UART10_RX_DMA_STREAM,                 \
+                           STM32_UART10_RX_DMA_MSK)
+#error "invalid DMA stream associated to UART10 RX"
+#endif
+
+#if STM32_UART_USE_UART10 &&                                                \
+    !STM32_DMA_IS_VALID_ID(STM32_UART_UART10_TX_DMA_STREAM,                 \
+                           STM32_UART10_TX_DMA_MSK)
+#error "invalid DMA stream associated to UART10 TX"
+#endif
+
+#if !defined(STM32_DMA_REQUIRED)
+#define STM32_DMA_REQUIRED
+#endif
+
+/* Checks on allocation of USARTx units.*/
+#if STM32_UART_USE_USART1
+#if defined(STM32_USART1_IS_USED)
+#error "UARTD1 requires USART1 but it is already used"
+#else
+#define STM32_USART1_IS_USED
+#endif
+#endif
+
+#if STM32_UART_USE_USART2
+#if defined(STM32_USART2_IS_USED)
+#error "UARTD2 requires USART2 but it is already used"
+#else
+#define STM32_USART2_IS_USED
+#endif
+#endif
+
+#if STM32_UART_USE_USART3
+#if defined(STM32_USART3_IS_USED)
+#error "UARTD3 requires USART3 but it is already used"
+#else
+#define STM32_USART3_IS_USED
+#endif
+#endif
+
+#if STM32_UART_USE_UART4
+#if defined(STM32_UART4_IS_USED)
+#error "UARTD4 requires UART4 but it is already used"
+#else
+#define STM32_UART4_IS_USED
+#endif
+#endif
+
+#if STM32_UART_USE_UART5
+#if defined(STM32_UART5_IS_USED)
+#error "UARTD5 requires UART5 but it is already used"
+#else
+#define STM32_UART5_IS_USED
+#endif
+#endif
+
+#if STM32_UART_USE_USART6
+#if defined(STM32_USART6_IS_USED)
+#error "UARTD6 requires USART6 but it is already used"
+#else
+#define STM32_USART6_IS_USED
+#endif
+#endif
+
+#if STM32_UART_USE_UART7
+#if defined(STM32_UART7_IS_USED)
+#error "UARTD7 requires UART7 but it is already used"
+#else
+#define STM32_UART7_IS_USED
+#endif
+#endif
+
+#if STM32_UART_USE_UART8
+#if defined(STM32_UART8_IS_USED)
+#error "UARTD8 requires UART8 but it is already used"
+#else
+#define STM32_UART8_IS_USED
+#endif
+#endif
+
+#if STM32_UART_USE_UART9
+#if defined(STM32_UART9_IS_USED)
+#error "UARTD9 requires UART9 but it is already used"
+#else
+#define STM32_UART9_IS_USED
+#endif
+#endif
+
+#if STM32_UART_USE_UART10
+#if defined(STM32_UART10_IS_USED)
+#error "UARTD10 requires UART10 but it is already used"
+#else
+#define STM32_UART10_IS_USED
+#endif
+#endif
+
+
+/******************************************************************************/
+/*                                                                            */
+/*         Universal Synchronous Asynchronous Receiver Transmitter            */
+/*                                                                            */
+/******************************************************************************/
+/*******************  Bit definition for USART_SR register  *******************/
+#define USART_SR_PE_Pos               (0U)
+#define USART_SR_PE_Msk               (0x1U << USART_SR_PE_Pos)                /*!< 0x00000001 */
+#define USART_SR_PE                   USART_SR_PE_Msk                          /*!<Parity Error                 */
+#define USART_SR_FE_Pos               (1U)
+#define USART_SR_FE_Msk               (0x1U << USART_SR_FE_Pos)                /*!< 0x00000002 */
+#define USART_SR_FE                   USART_SR_FE_Msk                          /*!<Framing Error                */
+#define USART_SR_NE_Pos               (2U)
+#define USART_SR_NE_Msk               (0x1U << USART_SR_NE_Pos)                /*!< 0x00000004 */
+#define USART_SR_NE                   USART_SR_NE_Msk                          /*!<Noise Error Flag             */
+#define USART_SR_ORE_Pos              (3U)
+#define USART_SR_ORE_Msk              (0x1U << USART_SR_ORE_Pos)               /*!< 0x00000008 */
+#define USART_SR_ORE                  USART_SR_ORE_Msk                         /*!<OverRun Error                */
+#define USART_SR_IDLE_Pos             (4U)
+#define USART_SR_IDLE_Msk             (0x1U << USART_SR_IDLE_Pos)              /*!< 0x00000010 */
+#define USART_SR_IDLE                 USART_SR_IDLE_Msk                        /*!<IDLE line detected           */
+#define USART_SR_RXNE_Pos             (5U)
+#define USART_SR_RXNE_Msk             (0x1U << USART_SR_RXNE_Pos)              /*!< 0x00000020 */
+#define USART_SR_RXNE                 USART_SR_RXNE_Msk                        /*!<Read Data Register Not Empty */
+#define USART_SR_TC_Pos               (6U)
+#define USART_SR_TC_Msk               (0x1U << USART_SR_TC_Pos)                /*!< 0x00000040 */
+#define USART_SR_TC                   USART_SR_TC_Msk                          /*!<Transmission Complete        */
+#define USART_SR_TXE_Pos              (7U)
+#define USART_SR_TXE_Msk              (0x1U << USART_SR_TXE_Pos)               /*!< 0x00000080 */
+#define USART_SR_TXE                  USART_SR_TXE_Msk                         /*!<Transmit Data Register Empty */
+#define USART_SR_LBD_Pos              (8U)
+#define USART_SR_LBD_Msk              (0x1U << USART_SR_LBD_Pos)               /*!< 0x00000100 */
+#define USART_SR_LBD                  USART_SR_LBD_Msk                         /*!<LIN Break Detection Flag     */
+#define USART_SR_CTS_Pos              (9U)
+#define USART_SR_CTS_Msk              (0x1U << USART_SR_CTS_Pos)               /*!< 0x00000200 */
+#define USART_SR_CTS                  USART_SR_CTS_Msk                         /*!<CTS Flag                     */
+
+/*******************  Bit definition for USART_DR register  *******************/
+#define USART_DR_DR_Pos               (0U)
+#define USART_DR_DR_Msk               (0x1FFU << USART_DR_DR_Pos)              /*!< 0x000001FF */
+#define USART_DR_DR                   USART_DR_DR_Msk                          /*!<Data value */
+
+/******************  Bit definition for USART_BRR register  *******************/
+#define USART_BRR_DIV_Fraction_Pos    (0U)
+#define USART_BRR_DIV_Fraction_Msk    (0xFU << USART_BRR_DIV_Fraction_Pos)     /*!< 0x0000000F */
+#define USART_BRR_DIV_Fraction        USART_BRR_DIV_Fraction_Msk               /*!<Fraction of USARTDIV */
+#define USART_BRR_DIV_Mantissa_Pos    (4U)
+#define USART_BRR_DIV_Mantissa_Msk    (0xFFFU << USART_BRR_DIV_Mantissa_Pos)   /*!< 0x0000FFF0 */
+#define USART_BRR_DIV_Mantissa        USART_BRR_DIV_Mantissa_Msk               /*!<Mantissa of USARTDIV */
+
+/******************  Bit definition for USART_CR1 register  *******************/
+#define USART_CR1_SBK_Pos             (0U)
+#define USART_CR1_SBK_Msk             (0x1U << USART_CR1_SBK_Pos)              /*!< 0x00000001 */
+#define USART_CR1_SBK                 USART_CR1_SBK_Msk                        /*!<Send Break                             */
+#define USART_CR1_RWU_Pos             (1U)
+#define USART_CR1_RWU_Msk             (0x1U << USART_CR1_RWU_Pos)              /*!< 0x00000002 */
+#define USART_CR1_RWU                 USART_CR1_RWU_Msk                        /*!<Receiver wakeup                        */
+#define USART_CR1_RE_Pos              (2U)
+#define USART_CR1_RE_Msk              (0x1U << USART_CR1_RE_Pos)               /*!< 0x00000004 */
+#define USART_CR1_RE                  USART_CR1_RE_Msk                         /*!<Receiver Enable                        */
+#define USART_CR1_TE_Pos              (3U)
+#define USART_CR1_TE_Msk              (0x1U << USART_CR1_TE_Pos)               /*!< 0x00000008 */
+#define USART_CR1_TE                  USART_CR1_TE_Msk                         /*!<Transmitter Enable                     */
+#define USART_CR1_IDLEIE_Pos          (4U)
+#define USART_CR1_IDLEIE_Msk          (0x1U << USART_CR1_IDLEIE_Pos)           /*!< 0x00000010 */
+#define USART_CR1_IDLEIE              USART_CR1_IDLEIE_Msk                     /*!<IDLE Interrupt Enable                  */
+#define USART_CR1_RXNEIE_Pos          (5U)
+#define USART_CR1_RXNEIE_Msk          (0x1U << USART_CR1_RXNEIE_Pos)           /*!< 0x00000020 */
+#define USART_CR1_RXNEIE              USART_CR1_RXNEIE_Msk                     /*!<RXNE Interrupt Enable                  */
+#define USART_CR1_TCIE_Pos            (6U)
+#define USART_CR1_TCIE_Msk            (0x1U << USART_CR1_TCIE_Pos)             /*!< 0x00000040 */
+#define USART_CR1_TCIE                USART_CR1_TCIE_Msk                       /*!<Transmission Complete Interrupt Enable */
+#define USART_CR1_TXEIE_Pos           (7U)
+#define USART_CR1_TXEIE_Msk           (0x1U << USART_CR1_TXEIE_Pos)            /*!< 0x00000080 */
+#define USART_CR1_TXEIE               USART_CR1_TXEIE_Msk                      /*!<PE Interrupt Enable                    */
+#define USART_CR1_PEIE_Pos            (8U)
+#define USART_CR1_PEIE_Msk            (0x1U << USART_CR1_PEIE_Pos)             /*!< 0x00000100 */
+#define USART_CR1_PEIE                USART_CR1_PEIE_Msk                       /*!<PE Interrupt Enable                    */
+#define USART_CR1_PS_Pos              (9U)
+#define USART_CR1_PS_Msk              (0x1U << USART_CR1_PS_Pos)               /*!< 0x00000200 */
+#define USART_CR1_PS                  USART_CR1_PS_Msk                         /*!<Parity Selection                       */
+#define USART_CR1_PCE_Pos             (10U)
+#define USART_CR1_PCE_Msk             (0x1U << USART_CR1_PCE_Pos)              /*!< 0x00000400 */
+#define USART_CR1_PCE                 USART_CR1_PCE_Msk                        /*!<Parity Control Enable                  */
+#define USART_CR1_WAKE_Pos            (11U)
+#define USART_CR1_WAKE_Msk            (0x1U << USART_CR1_WAKE_Pos)             /*!< 0x00000800 */
+#define USART_CR1_WAKE                USART_CR1_WAKE_Msk                       /*!<Wakeup method                          */
+#define USART_CR1_M_Pos               (12U)
+#define USART_CR1_M_Msk               (0x1U << USART_CR1_M_Pos)                /*!< 0x00001000 */
+#define USART_CR1_M                   USART_CR1_M_Msk                          /*!<Word length                            */
+#define USART_CR1_UE_Pos              (13U)
+#define USART_CR1_UE_Msk              (0x1U << USART_CR1_UE_Pos)               /*!< 0x00002000 */
+#define USART_CR1_UE                  USART_CR1_UE_Msk                         /*!<USART Enable                           */
+#define USART_CR1_OVER8_Pos           (15U)
+#define USART_CR1_OVER8_Msk           (0x1U << USART_CR1_OVER8_Pos)            /*!< 0x00008000 */
+#define USART_CR1_OVER8               USART_CR1_OVER8_Msk                      /*!<USART Oversampling by 8 enable         */
+
+/******************  Bit definition for USART_CR2 register  *******************/
+#define USART_CR2_ADD_Pos             (0U)
+#define USART_CR2_ADD_Msk             (0xFU << USART_CR2_ADD_Pos)              /*!< 0x0000000F */
+#define USART_CR2_ADD                 USART_CR2_ADD_Msk                        /*!<Address of the USART node            */
+#define USART_CR2_LBDL_Pos            (5U)
+#define USART_CR2_LBDL_Msk            (0x1U << USART_CR2_LBDL_Pos)             /*!< 0x00000020 */
+#define USART_CR2_LBDL                USART_CR2_LBDL_Msk                       /*!<LIN Break Detection Length           */
+#define USART_CR2_LBDIE_Pos           (6U)
+#define USART_CR2_LBDIE_Msk           (0x1U << USART_CR2_LBDIE_Pos)            /*!< 0x00000040 */
+#define USART_CR2_LBDIE               USART_CR2_LBDIE_Msk                      /*!<LIN Break Detection Interrupt Enable */
+#define USART_CR2_LBCL_Pos            (8U)
+#define USART_CR2_LBCL_Msk            (0x1U << USART_CR2_LBCL_Pos)             /*!< 0x00000100 */
+#define USART_CR2_LBCL                USART_CR2_LBCL_Msk                       /*!<Last Bit Clock pulse                 */
+#define USART_CR2_CPHA_Pos            (9U)
+#define USART_CR2_CPHA_Msk            (0x1U << USART_CR2_CPHA_Pos)             /*!< 0x00000200 */
+#define USART_CR2_CPHA                USART_CR2_CPHA_Msk                       /*!<Clock Phase                          */
+#define USART_CR2_CPOL_Pos            (10U)
+#define USART_CR2_CPOL_Msk            (0x1U << USART_CR2_CPOL_Pos)             /*!< 0x00000400 */
+#define USART_CR2_CPOL                USART_CR2_CPOL_Msk                       /*!<Clock Polarity                       */
+#define USART_CR2_CLKEN_Pos           (11U)
+#define USART_CR2_CLKEN_Msk           (0x1U << USART_CR2_CLKEN_Pos)            /*!< 0x00000800 */
+#define USART_CR2_CLKEN               USART_CR2_CLKEN_Msk                      /*!<Clock Enable                         */
+
+#define USART_CR2_STOP_Pos            (12U)
+#define USART_CR2_STOP_Msk            (0x3U << USART_CR2_STOP_Pos)             /*!< 0x00003000 */
+#define USART_CR2_STOP                USART_CR2_STOP_Msk                       /*!<STOP[1:0] bits (STOP bits) */
+#define USART_CR2_STOP_0              (0x1U << USART_CR2_STOP_Pos)             /*!< 0x1000 */
+#define USART_CR2_STOP_1              (0x2U << USART_CR2_STOP_Pos)             /*!< 0x2000 */
+
+#define USART_CR2_LINEN_Pos           (14U)
+#define USART_CR2_LINEN_Msk           (0x1U << USART_CR2_LINEN_Pos)            /*!< 0x00004000 */
+#define USART_CR2_LINEN               USART_CR2_LINEN_Msk                      /*!<LIN mode enable */
+
+/******************  Bit definition for USART_CR3 register  *******************/
+#define USART_CR3_EIE_Pos             (0U)
+#define USART_CR3_EIE_Msk             (0x1U << USART_CR3_EIE_Pos)              /*!< 0x00000001 */
+#define USART_CR3_EIE                 USART_CR3_EIE_Msk                        /*!<Error Interrupt Enable      */
+#define USART_CR3_IREN_Pos            (1U)
+#define USART_CR3_IREN_Msk            (0x1U << USART_CR3_IREN_Pos)             /*!< 0x00000002 */
+#define USART_CR3_IREN                USART_CR3_IREN_Msk                       /*!<IrDA mode Enable            */
+#define USART_CR3_IRLP_Pos            (2U)
+#define USART_CR3_IRLP_Msk            (0x1U << USART_CR3_IRLP_Pos)             /*!< 0x00000004 */
+#define USART_CR3_IRLP                USART_CR3_IRLP_Msk                       /*!<IrDA Low-Power              */
+#define USART_CR3_HDSEL_Pos           (3U)
+#define USART_CR3_HDSEL_Msk           (0x1U << USART_CR3_HDSEL_Pos)            /*!< 0x00000008 */
+#define USART_CR3_HDSEL               USART_CR3_HDSEL_Msk                      /*!<Half-Duplex Selection       */
+#define USART_CR3_NACK_Pos            (4U)
+#define USART_CR3_NACK_Msk            (0x1U << USART_CR3_NACK_Pos)             /*!< 0x00000010 */
+#define USART_CR3_NACK                USART_CR3_NACK_Msk                       /*!<Smartcard NACK enable       */
+#define USART_CR3_SCEN_Pos            (5U)
+#define USART_CR3_SCEN_Msk            (0x1U << USART_CR3_SCEN_Pos)             /*!< 0x00000020 */
+#define USART_CR3_SCEN                USART_CR3_SCEN_Msk                       /*!<Smartcard mode enable       */
+#define USART_CR3_DMAR_Pos            (6U)
+#define USART_CR3_DMAR_Msk            (0x1U << USART_CR3_DMAR_Pos)             /*!< 0x00000040 */
+#define USART_CR3_DMAR                USART_CR3_DMAR_Msk                       /*!<DMA Enable Receiver         */
+#define USART_CR3_DMAT_Pos            (7U)
+#define USART_CR3_DMAT_Msk            (0x1U << USART_CR3_DMAT_Pos)             /*!< 0x00000080 */
+#define USART_CR3_DMAT                USART_CR3_DMAT_Msk                       /*!<DMA Enable Transmitter      */
+#define USART_CR3_RTSE_Pos            (8U)
+#define USART_CR3_RTSE_Msk            (0x1U << USART_CR3_RTSE_Pos)             /*!< 0x00000100 */
+#define USART_CR3_RTSE                USART_CR3_RTSE_Msk                       /*!<RTS Enable                  */
+#define USART_CR3_CTSE_Pos            (9U)
+#define USART_CR3_CTSE_Msk            (0x1U << USART_CR3_CTSE_Pos)             /*!< 0x00000200 */
+#define USART_CR3_CTSE                USART_CR3_CTSE_Msk                       /*!<CTS Enable                  */
+#define USART_CR3_CTSIE_Pos           (10U)
+#define USART_CR3_CTSIE_Msk           (0x1U << USART_CR3_CTSIE_Pos)            /*!< 0x00000400 */
+#define USART_CR3_CTSIE               USART_CR3_CTSIE_Msk                      /*!<CTS Interrupt Enable        */
+#define USART_CR3_ONEBIT_Pos          (11U)
+#define USART_CR3_ONEBIT_Msk          (0x1U << USART_CR3_ONEBIT_Pos)           /*!< 0x00000800 */
+#define USART_CR3_ONEBIT              USART_CR3_ONEBIT_Msk                     /*!<USART One bit method enable */
+
+/******************  Bit definition for USART_GTPR register  ******************/
+#define USART_GTPR_PSC_Pos            (0U)
+#define USART_GTPR_PSC_Msk            (0xFFU << USART_GTPR_PSC_Pos)            /*!< 0x000000FF */
+#define USART_GTPR_PSC                USART_GTPR_PSC_Msk                       /*!<PSC[7:0] bits (Prescaler value) */
+#define USART_GTPR_PSC_0              (0x01U << USART_GTPR_PSC_Pos)            /*!< 0x0001 */
+#define USART_GTPR_PSC_1              (0x02U << USART_GTPR_PSC_Pos)            /*!< 0x0002 */
+#define USART_GTPR_PSC_2              (0x04U << USART_GTPR_PSC_Pos)            /*!< 0x0004 */
+#define USART_GTPR_PSC_3              (0x08U << USART_GTPR_PSC_Pos)            /*!< 0x0008 */
+#define USART_GTPR_PSC_4              (0x10U << USART_GTPR_PSC_Pos)            /*!< 0x0010 */
+#define USART_GTPR_PSC_5              (0x20U << USART_GTPR_PSC_Pos)            /*!< 0x0020 */
+#define USART_GTPR_PSC_6              (0x40U << USART_GTPR_PSC_Pos)            /*!< 0x0040 */
+#define USART_GTPR_PSC_7              (0x80U << USART_GTPR_PSC_Pos)            /*!< 0x0080 */
+
+
+#define USART_GTPR_GT_Pos             (8U)
+#define USART_GTPR_GT_Msk             (0xFFU << USART_GTPR_GT_Pos)             /*!< 0x0000FF00 */
+#define USART_GTPR_GT                 USART_GTPR_GT_Msk                        /*!<Guard time value */
+
+/*===========================================================================*/
+/* Driver data structures and types.                                         */
+/*===========================================================================*/
+
+/**
+ * @brief   UART driver condition flags type.
+ */
+typedef uint32_t uartflags_t;
+
+/**
+ * @brief   Type of an UART driver.
+ */
+typedef struct hal_uart_driver UARTDriver;
+
+/**
+ * @brief   Generic UART notification callback type.
+ *
+ * @param[in] uartp     pointer to the @p UARTDriver object
+ */
+typedef void (*uartcb_t)(UARTDriver *uartp);
+
+/**
+ * @brief   Character received UART notification callback type.
+ *
+ * @param[in] uartp     pointer to the @p UARTDriver object
+ * @param[in] c         received character
+ */
+typedef void (*uartccb_t)(UARTDriver *uartp, uint16_t c);
+
+/**
+ * @brief   Receive error UART notification callback type.
+ *
+ * @param[in] uartp     pointer to the @p UARTDriver object
+ * @param[in] e         receive error mask
+ */
+typedef void (*uartecb_t)(UARTDriver *uartp, uartflags_t e);
+
+/**
+ * @brief   Type of an UART configuration structure.
+ * @note    It could be empty on some architectures.
+ */
+typedef struct hal_uart_config {
+  /**
+   * @brief End of transmission buffer callback.
+   */
+  uartcb_t                  txend1_cb;
+  /**
+   * @brief Physical end of transmission callback.
+   */
+  uartcb_t                  txend2_cb;
+  /**
+   * @brief Receive buffer filled callback.
+   */
+  uartcb_t                  rxend_cb;
+  /**
+   * @brief Character received while out if the @p UART_RECEIVE state.
+   */
+  uartccb_t                 rxchar_cb;
+  /**
+   * @brief Receive error callback.
+   */
+  uartecb_t                 rxerr_cb;
+  /* End of the mandatory fields.*/
+  /**
+   * @brief   Receiver timeout callback.
+   * @details Handles idle interrupts depending on configured
+   *          flags in CR registers and supported hardware features.
+   */
+  uartcb_t                  timeout_cb;
+  /**
+   * @brief Bit rate.
+   */
+  uint32_t                  speed;
+  /**
+   * @brief Initialization value for the CR1 register.
+   */
+  uint16_t                  cr1;
+  /**
+   * @brief Initialization value for the CR2 register.
+   */
+  uint16_t                  cr2;
+  /**
+   * @brief Initialization value for the CR3 register.
+   */
+  uint16_t                  cr3;
+} UARTConfig;
+
+/**
+ * @brief   Structure representing an UART driver.
+ */
+struct hal_uart_driver {
+  /**
+   * @brief Driver state.
+   */
+  uartstate_t               state;
+  /**
+   * @brief Transmitter state.
+   */
+  uarttxstate_t             txstate;
+  /**
+   * @brief Receiver state.
+   */
+  uartrxstate_t             rxstate;
+  /**
+   * @brief Current configuration data.
+   */
+  const UARTConfig          *config;
+#if (UART_USE_WAIT == TRUE) || defined(__DOXYGEN__)
+  /**
+   * @brief   Synchronization flag for transmit operations.
+   */
+  bool                      early;
+  /**
+   * @brief   Waiting thread on RX.
+   */
+  thread_reference_t        threadrx;
+  /**
+   * @brief   Waiting thread on TX.
+   */
+  thread_reference_t        threadtx;
+#endif /* UART_USE_WAIT */
+#if (UART_USE_MUTUAL_EXCLUSION == TRUE) || defined(__DOXYGEN__)
+  /**
+   * @brief   Mutex protecting the peripheral.
+   */
+  mutex_t                   mutex;
+#endif /* UART_USE_MUTUAL_EXCLUSION */
+#if defined(UART_DRIVER_EXT_FIELDS)
+  UART_DRIVER_EXT_FIELDS
+#endif
+  /* End of the mandatory fields.*/
+  /**
+   * @brief Pointer to the USART registers block.
+   */
+  usart_type             *usart;
+  /**
+   * @brief   Clock frequency for the associated USART/UART.
+   */
+  uint32_t                  clock;
+  /**
+   * @brief Receive DMA mode bit mask.
+   */
+  uint32_t                  dmarxmode;
+  /**
+   * @brief Send DMA mode bit mask.
+   */
+  uint32_t                  dmatxmode;
+  /**
+   * @brief Receive DMA channel.
+   */
+  const stm32_dma_stream_t  *dmarx;
+  /**
+   * @brief Transmit DMA channel.
+   */
+  const stm32_dma_stream_t  *dmatx;
+  /**
+   * @brief Default receive buffer while into @p UART_RX_IDLE state.
+   */
+  volatile uint16_t         rxbuf;
+};
+
+/*===========================================================================*/
+/* Driver macros.                                                            */
+/*===========================================================================*/
+
+/*===========================================================================*/
+/* External declarations.                                                    */
+/*===========================================================================*/
+
+#if STM32_UART_USE_USART1 && !defined(__DOXYGEN__)
+extern UARTDriver UARTD1;
+#endif
+
+#if STM32_UART_USE_USART2 && !defined(__DOXYGEN__)
+extern UARTDriver UARTD2;
+#endif
+
+#if STM32_UART_USE_USART3 && !defined(__DOXYGEN__)
+extern UARTDriver UARTD3;
+#endif
+
+#if STM32_UART_USE_UART4 && !defined(__DOXYGEN__)
+extern UARTDriver UARTD4;
+#endif
+
+#if STM32_UART_USE_UART5 && !defined(__DOXYGEN__)
+extern UARTDriver UARTD5;
+#endif
+
+#if STM32_UART_USE_USART6 && !defined(__DOXYGEN__)
+extern UARTDriver UARTD6;
+#endif
+
+#if STM32_UART_USE_UART7 && !defined(__DOXYGEN__)
+extern UARTDriver UARTD7;
+#endif
+
+#if STM32_UART_USE_UART8 && !defined(__DOXYGEN__)
+extern UARTDriver UARTD8;
+#endif
+
+#if STM32_UART_USE_UART9 && !defined(__DOXYGEN__)
+extern UARTDriver UARTD9;
+#endif
+
+#if STM32_UART_USE_UART10 && !defined(__DOXYGEN__)
+extern UARTDriver UARTD10;
+#endif
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+  void uart_lld_init(void);
+  void uart_lld_start(UARTDriver *uartp);
+  void uart_lld_stop(UARTDriver *uartp);
+  void uart_lld_start_send(UARTDriver *uartp, size_t n, const void *txbuf);
+  size_t uart_lld_stop_send(UARTDriver *uartp);
+  void uart_lld_start_receive(UARTDriver *uartp, size_t n, void *rxbuf);
+  size_t uart_lld_stop_receive(UARTDriver *uartp);
+  void uart_lld_serve_interrupt(UARTDriver *uartp);
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* HAL_USE_UART */
+
+#endif /* HAL_UART_LLD_H */
+
+/** @} */

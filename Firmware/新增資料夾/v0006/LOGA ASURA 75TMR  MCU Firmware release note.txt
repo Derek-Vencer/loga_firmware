@@ -1,0 +1,25 @@
+LOGA ASURA 75TMR  MCU Firmware release note
+========================================
+Version:0006
+Build date:2025-07-22
+Enhancement:
+1.Support 8k
+
+Fixed:
+None
+========================================
+Version:0005
+Build date:2025-06-09
+Enhancement:
+1.Added iOne API Template
+2.Added Get Firmware Version API
+3.Added Set Profile API
+4.Added Get Profile State API
+5.Added Set Factory Reset API
+
+Fixed:
+None
+========================================
+Version:0004
+Build date:2025-06-04
+Initial release

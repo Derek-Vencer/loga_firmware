@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<section name="Workbench">
+	<section name="org.eclipse.ui.texteditor.FindReplaceDialog">
+		<item key="selection" value="TOG"/>
+		<item key="wrap" value="true"/>
+		<item key="casesensitive" value="false"/>
+		<item key="wholeword" value="false"/>
+		<item key="incremental" value="false"/>
+		<item key="isRegEx" value="false"/>
+		<list key="findhistory">
+			<item value="tog"/>
+			<item value="TMR"/>
+			<item value="changed"/>
+			<item value="kind.id"/>
+			<item value="mo15"/>
+			<item value="profilePreviusMode"/>
+			<item value="normal"/>
+			<item value="keymap"/>
+			<item value="setChangeProfileEffect"/>
+			<item value="eprof"/>
+			<item value=".col"/>
+			<item value="= 11;"/>
+			<item value="rainbow"/>
+			<item value="row"/>
+			<item value="profile"/>
+		</list>
+		<list key="replacehistory">
+			<item value="QK_SYSTEMRESET"/>
+			<item value="QK_BOOTLOADER"/>
+			<item value="KC_BTLD"/>
+			<item value="KC_SYRST"/>
+			<item value="SYRST"/>
+			<item value="BTLD"/>
+			<item value=""/>
+			<item value="GPIOC, 13"/>
+		</list>
+	</section>
+	<section name="org.eclipse.ui.texteditor.FindReplaceDialog_dialogBounds">
+		<item key="DIALOG_X_ORIGIN" value="1517"/>
+		<item key="DIALOG_Y_ORIGIN" value="282"/>
+		<item key="DIALOG_WIDTH" value="322"/>
+		<item key="DIALOG_HEIGHT" value="391"/>
+		<item key="DIALOG_FONT_NAME" value="1|Microsoft JhengHei UI|9.0|0|WINDOWS|1|-12|0|0|0|400|0|0|0|1|0|0|0|0|Microsoft JhengHei UI"/>
+	</section>
+</section>

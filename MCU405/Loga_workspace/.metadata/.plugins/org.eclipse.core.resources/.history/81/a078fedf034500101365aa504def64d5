@@ -1,0 +1,596 @@
+# include "hal.h"
+# include "keymap_common.h"
+# include "report.h"
+# include "matrix.h"
+# include "dynamic_macro.h"
+# include "usb_main.h"
+# include "../led/led_function.h"
+
+#include "via.h"
+
+#define DYNAMIC_KEYMAP_MACRO_EEPROM_SIZE sizeof(dynamic_macro_t) * DYNAMIC_MACRO_COUNT
+
+binary_semaphore_t VIA_ReciveSem;
+extern uint8_t raw_report[32];
+extern uint16_t eepromKeyBuffer[KEYMAPS_COUNT][MATRIX_ROWS][MATRIX_COLS];
+extern int16_t keyMatrixTriggerLevel, keyMatrixReleaseLevel;
+extern led_runMode_t currentLED_RunMode;
+extern uint8_t currentProfile;
+
+
+//USB Recived
+static THD_WORKING_AREA(waVIA_Thread, 256);
+static THD_FUNCTION(VIA_Thread, arg)
+{
+    (void)arg;
+
+    chRegSetThreadName("VIA Recive");
+    chBSemObjectInit(&VIA_ReciveSem, true);
+
+    while (true)
+    {
+        chBSemWait(&VIA_ReciveSem);
+
+//        for (uint8_t i=0;i<sizeof(raw_report);i++){
+//        	printf("%02X",raw_report[i]);
+//        }
+        raw_hid_receive(raw_report, sizeof(raw_report));
+    }
+}
+
+void via_creatTask(void)
+{
+    chThdCreateStatic(waVIA_Thread, sizeof(waVIA_Thread), NORMALPRIO + 3, VIA_Thread, NULL);
+}
+
+
+void via_init(void){
+	via_creatTask();
+}
+
+//void dynamic_keymap_get_buffer(uint16_t offset, uint16_t size, uint8_t *data) {
+//    uint16_t * source = (uint16_t *)(&eepromKeyBuffer[0][0][0] + offset/2);
+//    uint8_t *target = data;
+//    for (uint16_t i = 0; i < size/2; i++) {
+//        if (offset + i < sizeof(eepromKeyBuffer)) {
+//        	*target = (*source)>>8;
+//            target++;
+//            *target = (*source)&0xff;
+//
+//        } else {
+//            *target = 0x00;
+//            target++;
+//            *target = 0x00;
+//        }
+//        target++;
+//        source++;
+//
+//    }
+//}
+
+void dynamic_keymap_get_buffer(uint16_t offset, uint16_t size, uint8_t *data) {
+    uint16_t * source = (uint16_t *)(&eepromKeyBuffer[0][0][0] + offset);
+    uint16_t *target = data;
+    for (uint16_t i = 0; i < size; i++) {
+        if (offset + i < sizeof(eepromKeyBuffer)) {
+        	*target = *source<<8;
+        	*target |= (*source&0xff00)>>8;
+        } else {
+            *target = 0x00;
+        }
+        target++;
+        source++;
+
+    }
+}
+
+void dynamic_keymap_set_buffer(uint16_t offset, uint16_t size, uint8_t *data) {
+    uint16_t * source = (uint16_t *)(&eepromKeyBuffer[0][0][0] + offset);
+    uint16_t *target = data;
+    for (uint16_t i = 0; i < size; i++) {
+        if (offset + i < sizeof(eepromKeyBuffer)) {
+//            eeprom_update_byte(target, *source);
+        	*target = *source<<8;
+        	*target |= (*source&0xff00)>>8;
+        }
+        source++;
+        target++;
+    }
+
+}
+
+void dynamic_keymap_macro_get_buffer(uint16_t offset, uint16_t size, uint8_t *data) {
+    void *   source = (void *)(DYNAMIC_MACRO_EEPROM_BLOCK0_ADDR + offset);
+    uint8_t *target = data;
+    for (uint16_t i = 0; i < size; i++) {
+        if (offset + i < DYNAMIC_KEYMAP_MACRO_EEPROM_SIZE) {
+            *target = eeprom_read_byte(source);
+        } else {
+            *target = 0x00;
+        }
+        source++;
+        target++;
+    }
+}
+
+void dynamic_keymap_macro_set_buffer(uint16_t offset, uint16_t size, uint8_t *data) {
+    void *   target = (void *)(DYNAMIC_MACRO_EEPROM_BLOCK0_ADDR + offset);
+    uint8_t *source = data;
+    for (uint16_t i = 0; i < size; i++) {
+        if (offset + i < DYNAMIC_KEYMAP_MACRO_EEPROM_SIZE) {
+            eeprom_update_byte(target, *source);
+        }
+        source++;
+        target++;
+    }
+}
+
+void dynamic_keymap_macro_reset(void) {
+    void *p   = (void *)(DYNAMIC_MACRO_EEPROM_BLOCK0_ADDR);
+    void *end = (void *)(DYNAMIC_MACRO_EEPROM_BLOCK0_ADDR + DYNAMIC_KEYMAP_MACRO_EEPROM_SIZE);
+    while (p != end) {
+        eeprom_update_byte(p, 0);
+        ++p;
+    }
+}
+
+// Keyboard level code can override this to handle custom messages from VIA.
+// See raw_hid_receive() implementation.
+// DO NOT call raw_hid_send() in the override function.
+__attribute__((weak)) bool raw_hid_receive_kb(uint8_t *data, uint8_t length) {
+    uint8_t *command_id = &(data[0]);
+    *command_id         = id_unhandled;
+}
+
+bool raw_hid_receive_ione(uint8_t *data, uint8_t length) {
+	uint8_t *data_start = &(data[0]);
+	uint8_t recive_payload[32-6];
+	uint16_t hid_vid = *data++ <<8 | *data++;
+	uint8_t *payload_length = &(data[0]);
+	data++;
+    uint16_t command_id = *data++ <<8 | *data++;
+    uint8_t *send_payload = data;
+    uint8_t *send_status = &(data[0]);
+    uint8_t *send_data = &(data[1]);
+	//uprintf ("iOne API Receive:\r\nvid:0x%04X\r\nlength:%d\r\ncommand_id:0x%04X\r\npayload:",hid_vid,*payload_length,command_id);
+	memcpy (recive_payload,data,sizeof(recive_payload));
+//    for (uint8_t i=0;i<payload_length;i++){
+//    	uprintf ("%02X ",recive_payload[i]);
+//    }
+//    uprintf ("\r\n");
+	memset (send_payload,0,sizeof(recive_payload));
+	switch(command_id){
+		case ione_api_cmd_get_firmware_version:
+			uprintf ("API=>Get Firmware Version:\r\n");
+			if (*payload_length == 0){
+				*payload_length = 4;
+				*send_status = ione_api_status_success;
+				*send_data = DEVICE_VER>>8;
+				uprintf("Major Version:%02X ",*send_data++);
+				*send_data = DEVICE_VER & 0xFF;
+				uprintf ("Minor: Version:%02X ",*send_data++);
+				*send_data = 0x00;
+				uprintf ("Build: Version:%02X\r\n",*send_data++);
+			} else {
+				uprintf ("Fail\r\n");
+			}
+		break;
+		case ione_api_cmd_Set_Profil:
+			uprintf ("API=>Set Profile:\r\n");
+			if (*payload_length == 1 && (recive_payload[0]<PROFILE_COUNT)){
+				*send_status = ione_api_status_success;
+				currentProfile = recive_payload[0];
+				layer_move(currentProfile*LAYERS_PER_PROFILE);
+				uprintf ("Profile:%d \r\n",recive_payload[0]);
+				clear_keyboard();
+			}
+			else {
+				*send_status = ione_api_status_fail;
+				uprintf ("Fail\r\n");
+			}
+		break;
+		case ione_api_cmd_get_Profile_state:
+			uprintf ("API=>Get Profile:\r\n");
+			if (*payload_length == 0){
+			*send_status = 0x00;
+			*send_data = currentProfile;
+			*payload_length = 4;
+			uprintf ("Profile:%d\r\n",*send_data++);
+			} else {
+				uprintf ("Fail\r\n");
+			}
+		break;
+		case ione_api_cmd_set_key_mapping:
+		break;
+		case ione_api_cmd_get_key_mapping:
+		break;
+		case ione_api_cmd_get_all_key_mapping:
+		break;
+		case ione_api_cmd_set_ligthing_effect:
+		break;
+		case ione_api_cmd_get_lighting_effect:
+		break;
+		case ione_api_cmd_set_lighting_color:
+		break;
+		case ione_api_cmd_get_lighting_color:
+		break;
+		case ione_api_cmd_konb_state:
+		break;
+		case ione_api_cmd_get_lock_state:
+		break;
+		case ione_api_cmd_set_rapid_trigger_state:
+		break;
+		case ione_api_cmd_get_rapid_trigger_state:
+		break;
+		case ione_api_cmd_set_rapid_trigger_value:
+		break;
+		case ione_api_cmd_get_Rapid_trigger_value:
+		break;
+		case ione_api_cmd_set_tachyon_mode:
+		break;
+		case ione_api_cmd_tachyon_mode:
+		break;
+		case ione_api_cmd_set_snap_tap_SOCD_Binding:
+		break;
+		case ione_api_cmd_get_snap_tap_SOCD_Binding:
+		break;
+		case ione_api_cmd_set_dynamic_keystroke:
+		break;
+		case ione_api_cmd_get_dynamic_keysytoke:
+		break;
+		case ione_api_cmd_set_toggle_key:
+		break;
+		case ione_api_cmd_get_toggle_key:
+		break;
+		case ione_api_cmd_set_mod_tap:
+		break;
+		case ione_api_cmd_get_mod_tap:
+		break;
+		case ione_api_cmd_set_rappy_snappy:
+		break;
+		case ione_api_cmd_get_rappy_snappy:
+		break;
+		case ione_api_cmd_set_factory_reset:
+			uprintf("Factory Reset\r\nStart .");
+			currentLED_RunMode.mode = 8;
+		    currentLED_RunMode.type = offMode;
+			setRunMode(currentLED_RunMode);
+			uprintf (".");
+			*send_status = ione_api_status_success;
+			eeconfig_rapidTrigger_init();
+			keyMatrixTriggerLevel = DEFAULT_TRIGGER_LEVEL;
+			keyMatrixReleaseLevel = DEFAULT_RELEASE_LEVEL;
+			eeprom_write_word(EECONFIG_KEYMAP_TRIGGER_LEVEL, keyMatrixTriggerLevel);
+			uprintf (".");
+			eeprom_write_word(EECONFIG_KEYMAP_RELEASE_LEVEL, keyMatrixReleaseLevel);
+			uprintf (".");
+			write_trigger_to_eeprom();
+			uprintf (".");
+			write_Release_to_eeprom();
+			uprintf (".");
+			eeconfig_rapidTrigger_init();
+			uprintf (".");
+			write_keymap_to_eeprom();
+			uprintf (".");
+			dynamic_macro_reset_eeprom();
+			uprintf (".");
+			raw_hid_send(data_start, length);
+			uprintf (".");
+			uprintf("\r\nEnd\r\n");
+			chThdSleepMilliseconds(1000);
+			NVIC_SystemReset();
+			return false;
+		break;
+		case ione_api_cmd_set_test_mode:
+		break;
+		default:
+			return false;
+	}
+
+
+//    for (uint8_t i=0;i<payload_length;i++){
+//    	uprintf ("%02X ",send_payload[i]);
+//    }
+//    uprintf ("\r\n");
+    return true;
+}
+
+void raw_hid_receive(uint8_t *data, uint8_t length) {
+    uint8_t *command_id   = &(data[0]);
+    uint8_t *command_data = &(data[1]);
+    switch (*command_id) {
+        case id_get_protocol_version: {
+            command_data[0] = VIA_PROTOCOL_VERSION >> 8;
+            command_data[1] = VIA_PROTOCOL_VERSION & 0xFF;
+            break;
+        }
+        case id_get_keyboard_value: {
+            switch (command_data[0]) {
+                case id_uptime: {
+                    uint32_t value  = timer_read32();
+                    command_data[1] = (value >> 24) & 0xFF;
+                    command_data[2] = (value >> 16) & 0xFF;
+                    command_data[3] = (value >> 8) & 0xFF;
+                    command_data[4] = value & 0xFF;
+                    break;
+                }
+                case id_layout_options: {
+                    //uint32_t value  = via_get_layout_options();
+                	uint32_t value  = 0x000000;
+                    command_data[1] = (value >> 24) & 0xFF;
+                    command_data[2] = (value >> 16) & 0xFF;
+                    command_data[3] = (value >> 8) & 0xFF;
+                    command_data[4] = value & 0xFF;
+                    break;
+                }
+                case id_switch_matrix_state: {
+//#ifdef VIAL_ENABLE
+//                    /* Disable wannabe keylogger unless unlocked */
+//                    if (!vial_unlocked)
+//                        goto skip;
+//#endif
+
+#if ((MATRIX_COLS / 8 + 1) * MATRIX_ROWS <= 28)
+                    uint8_t i = 1;
+                    for (uint8_t row = 0; row < MATRIX_ROWS; row++) {
+                        matrix_row_t value = matrix_get_row(row);
+#    if (MATRIX_COLS > 24)
+                        command_data[i++] = (value >> 24) & 0xFF;
+#    endif
+#    if (MATRIX_COLS > 16)
+                        command_data[i++] = (value >> 16) & 0xFF;
+#    endif
+#    if (MATRIX_COLS > 8)
+                        command_data[i++] = (value >> 8) & 0xFF;
+#    endif
+                        command_data[i++] = value & 0xFF;
+                    }
+#endif
+                    break;
+                }
+
+                case id_firmware_version:	{
+					uint32_t blVersion;
+					switch (command_data[1])
+					{
+					case 0:
+						command_data[2] = VENDOR_ID & 0x0ff;
+						command_data[3] = VENDOR_ID >> 8;
+						break;
+					case 1:
+						command_data[2] = PRODUCT_ID & 0x0ff;
+						command_data[3] = PRODUCT_ID >> 8;
+						break;
+					case 2:
+						command_data[2] = DEVICE_VER & 0x0ff;
+						command_data[3] = DEVICE_VER >> 8;
+						break;
+					case 3:
+						blVersion = *((uint32_t *)(0x0800580c));
+						command_data[2] = blVersion & 0xff;
+						command_data[3] = (blVersion >> 8) & 0xff;
+						break;
+					}
+				}
+
+
+
+                	break;
+                default: {
+                    raw_hid_receive_kb(data, length);
+                    break;
+                }
+            }
+            break;
+        }
+        case id_set_keyboard_value: {
+            switch (command_data[0]) {
+//                case id_layout_options: {
+//                    uint32_t value = ((uint32_t)command_data[1] << 24) | ((uint32_t)command_data[2] << 16) | ((uint32_t)command_data[3] << 8) | (uint32_t)command_data[4];
+//                    via_set_layout_options(value);
+//                    break;
+//                }
+            	case id_control:
+            		via_controlSet(&command_data[1]);
+            		break;
+                default: {
+                    raw_hid_receive_kb(data, length);
+                    break;
+                }
+            }
+            break;
+        }
+        case id_dynamic_keymap_get_keycode: {
+        	uint16_t keycode = eepromKeyBuffer[command_data[0]][command_data[1]][command_data[2]];
+            command_data[3]  = keycode >> 8;
+            command_data[4]  = keycode & 0xFF;
+            break;
+        }
+        case id_dynamic_keymap_set_keycode: {
+        	eeconfig_write_keymap_key(command_data[0], command_data[1], command_data[2], (command_data[3] << 8) | command_data[4]);
+            break;
+        }
+        case id_dynamic_keymap_reset: {
+        	write_keymap_to_eeprom();
+            break;
+        }
+        case id_lighting_set_value:
+        	switch (command_data[0]){
+        		case id_light_runMode:
+        			setLightRunMode(command_data[1]);
+        			break;
+        		case id_light_mode:
+                	if (command_data[1]!=volSpdMode){
+                        currentLED_RunMode.type = command_data[1];
+                        currentLED_RunMode.mode = command_data[2];
+                        currentLED_RunMode.brightness = command_data[3];
+                        currentLED_RunMode.speed = command_data[4];
+                        setRunMode(currentLED_RunMode);
+
+                	} else {
+                        currentLED_RunMode.brightness = command_data[3];
+                        currentLED_RunMode.speed = command_data[4];
+                        LED_SpeedChange(currentLED_RunMode.brightness, currentLED_RunMode.speed);
+                	}
+
+        			break;
+        	}
+            break;
+
+        case id_lighting_get_value:
+            break;
+
+//#ifdef VIA_EEPROM_ALLOW_RESET
+        case id_eeprom_reset: {
+//        	write_keymap_to_eeprom();
+            eeconfig_rapidTrigger_init();
+            dynamic_macro_reset_eeprom();
+#ifdef minTriggerCheck
+
+            keyMatrixTriggerLevel = 3;
+			keyMatrixReleaseLevel = 0;
+#else
+            keyMatrixTriggerLevel = DEFAULT_TRIGGER_LEVEL;
+			keyMatrixReleaseLevel = DEFAULT_RELEASE_LEVEL;
+#endif
+    		eeprom_write_word(EECONFIG_KEYMAP_TRIGGER_LEVEL, keyMatrixTriggerLevel);
+    		eeprom_write_word(EECONFIG_KEYMAP_RELEASE_LEVEL, keyMatrixReleaseLevel);
+
+            write_trigger_to_eeprom();
+            write_Release_to_eeprom();
+            eeconfig_rapidTrigger_init();
+            NVIC_SystemReset();
+            break;
+        }
+//#endif
+        case id_dynamic_keymap_macro_get_count: {
+            command_data[0] = DYNAMIC_MACRO_COUNT;
+            break;
+        }
+        case id_dynamic_keymap_macro_get_buffer_size: {
+            //uint16_t size = DYNAMIC_MACRO_COUNT * DYNAMIC_MACRO_SIZE;		//!!
+            //uint16_t size = DYNAMIC_KEYMAP_MACRO_EEPROM_SIZE;
+        	uint16_t size = 10;
+            command_data[0] = size >> 8;
+            command_data[1] = size & 0xFF;
+            break;
+        }
+        case id_dynamic_keymap_macro_get_buffer: {
+            uint16_t offset = (command_data[0] << 8) | command_data[1];
+            uint16_t size   = command_data[2]; // size <= 28
+            if (size <= 28)
+                dynamic_keymap_macro_get_buffer(offset, size, &command_data[3]);
+            break;
+        }
+        case id_dynamic_keymap_macro_set_buffer: {
+//#ifdef VIAL_ENABLE
+//            /* Until keyboard is unlocked, don't allow changing macros */
+//            if (!vial_unlocked)
+//                goto skip;
+//#endif
+            uint16_t offset = (command_data[0] << 8) | command_data[1];
+            uint16_t size   = command_data[2]; // size <= 28
+            if (size <= 28)
+                dynamic_keymap_macro_set_buffer(offset, size, &command_data[3]);	//!!
+            	command_data[3] = 100;
+            break;
+        }
+        case id_dynamic_keymap_macro_reset: {
+            dynamic_keymap_macro_reset();		//!!
+            break;
+        }
+        case id_dynamic_keymap_get_layer_count: {
+//            command_data[0] = dynamic_keymap_get_layer_count();		//!!
+        	command_data[0] = KEYMAPS_COUNT;
+            break;
+        }
+        case id_dynamic_keymap_get_buffer: {
+            uint16_t offset = (command_data[0] << 8) | command_data[1];
+            uint16_t size   = command_data[2]; // size <= 28
+            if (size <= 28)
+                dynamic_keymap_get_buffer(offset>>1, size>>1, &command_data[3]);		//!!
+            break;
+        }
+        case id_dynamic_keymap_set_buffer: {
+            uint16_t offset = (command_data[0] << 8) | command_data[1];
+            uint16_t size   = command_data[2]; // size <= 28
+            if (size <= 28)
+                dynamic_keymap_set_buffer(offset>>1, size>>1, &command_data[3]);		//!!
+            break;
+        }
+        case id_loga_api:
+        	if (!raw_hid_receive_ione(data, length)){
+        		return false;
+        	}
+        	break;
+        /* As VIA removed bootloader jump entirely, we shall only keep it for secure builds */
+        case id_bootloader_jump: {
+            /* Until keyboard is unlocked, don't allow jumping to bootloader */
+            // Need to send data back before the jump
+            // Informs host that the command is handled
+            raw_hid_send(data, length);
+            // Give host time to read it
+            chThdSleepMilliseconds(100);
+
+            switch (command_data[0])
+            {
+                case 0x00:
+                    //uprintf("Enter Normal Boot\r\n");
+                    NVIC_SystemReset();
+                    break;
+                case 0x01:
+                    //uprintf("Enter HID Bootloader\r\n");
+                    	*((uint32_t *)(0x2000FFF0)) = 0xDEADBEEF;
+                    	NVIC_SystemReset();
+                    break;
+                case 0x02:
+                    //uprintf("Enter DFU Bootloader\r\n");
+                    *((uint32_t *)(0x2000FFF0)) = 0xE0351AE;
+					NVIC_SystemReset();
+                    break;
+            }
+
+
+//            bootloader_jump();
+            break;
+        }
+
+
+//#if defined(VIAL_ENABLE) && !defined(VIAL_INSECURE)
+//        /* As VIA removed bootloader jump entirely, we shall only keep it for secure builds */
+//        case id_bootloader_jump: {
+//            /* Until keyboard is unlocked, don't allow jumping to bootloader */
+//            if (!vial_unlocked)
+//                goto skip;
+//            // Need to send data back before the jump
+//            // Informs host that the command is handled
+//            raw_hid_send(data, length);
+//            // Give host time to read it
+//            wait_ms(100);
+//            bootloader_jump();
+//            break;
+//        }
+//#endif
+//#ifdef VIAL_ENABLE
+//        case id_vial_prefix: {
+//            vial_handle_cmd(data, length);
+//            break;
+//        }
+//#endif
+//        default: {
+//            // The command ID is not known let the keyboard implement it
+//            raw_hid_receive_kb(data, length);
+//            break;
+//        }
+        default:
+            if (!raw_hid_receive_kb(data, length)){return;}
+            break;
+    }
+#ifdef VIAL_ENABLE
+skip:
+#endif
+    // Return the same buffer, optionally with values changed
+    // (i.e. returning state to the host, or the unhandled state).
+    raw_hid_send(data, length);
+}
+

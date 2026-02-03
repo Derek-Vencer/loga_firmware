@@ -1,0 +1,2 @@
+PLATFORMSRC += $(CHIBIOS)/os/hal/ports/AT32/LLD/DMAv2/at32_dma.c
+PLATFORMINC += $(CHIBIOS)/os/hal/ports/AT32/LLD/DMAv2

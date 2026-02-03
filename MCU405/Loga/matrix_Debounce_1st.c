@@ -1,0 +1,1909 @@
+# include "ch.h"
+# include "hal.h"
+# include "eeprom.h"
+# include "keymap_in_eeprom.h"
+# include "keyboard.h"
+# include "suspend.h"
+# include "encoder.h"
+# include "led/led_function.h"
+# include "led/led_effect.h"
+# include "print.h"
+# include "debug.h"
+# include "util.h"
+# include "matrix.h"
+# include "wait.h"
+# include "keycode.h"
+# include "report.h"
+# include "math.h"
+# include "action_layer.h"
+
+
+
+//
+extern led_runMode_t currentLED_RunMode;
+extern binary_semaphore_t ledUpdateSem;
+extern led_config_t LED_Datas[LedNumbers];
+
+binary_semaphore_t adcCompleteSem;
+//mutex_t keymatrixProcessMut;
+
+bool adcTestToggle = true;
+
+#define ADC_Debug
+
+#define ADCTestHispeed
+
+//#define keycodeOutput
+
+#define ADC_LevelOutput              //Check Level
+
+//#define debug_matrix
+
+//#define ADC_Monitor
+//
+
+#define Noise_Find
+
+#define rapidShiftP 		15
+
+#define rapidShiftM 		-15
+
+extern void LED_init(void);
+extern int uprintf(const char* fmt, ...);
+//extern bool setRunMode(uint8_t runMode, int8_t mode, uint8_t brightness, uint8_t speed);
+void send_lamp_array(report_lamp_array_t* report);
+void adcOffsetGet(bool findMax);
+extern void LED_SpeedChange(uint8_t brightness, uint8_t speed);
+
+
+# ifndef DEBOUNCE
+#define DEBOUNCE 5
+#endif
+//static uint8_t debouncing = DEBOUNCE;
+
+/* matrix state(1:on, 0:off) */
+matrix_row_t matrix[MATRIX_ROWS];
+static matrix_row_t matrix_temp[MATRIX_ROWS];
+static bool debouncing = false;
+static uint16_t debouncing_time = 0;
+uint16_t currentMatrix_CRC, lastMatrix_CRC;
+rapidTrigger_config_t rapidTriggerKeys[RAPID_TRIGGER_COUNT];
+
+int16_t keyMatrixTriggerLevel = 20, keyMatrixReleaseLevel;
+
+uint8_t currentKeyMatrixMode = keyMatrixMode_Normal;
+//uint8_t currentKeyMatrixMode = keyMatrixMode_TravelPostionCalc;
+
+analogKey_Config_t keyLocation;
+
+bool keycodeOutput = false;
+bool rapidKeyEnable = true, lastRapidKeyEnable;
+bool keyScanEffect = false, lastKeyScanEffect;
+bool noiseFind = false;
+
+extern bool ledUpdatingLock;
+bool ledUpdateFilter = true;
+
+bool lastkeycodeOutput;
+
+const analogKey_Config_t analogKeyRelocate[7][16] = {
+    { { 0, 0},{ 1, 0},{ 2, 0},{ 3, 0},{ 4, 0},{ 5, 0},{ 0, 1},{ 1, 1},{ 2, 1},{ 3, 1},{ 5, 1},{ 1, 2},{ 2, 2},{ 3, 2},{ 4, 1},{ 5, 2} },
+		{ { 0, 2},{ 1, 3},{ 2, 3},{ 3, 3},{ 4, 2},{ 0, 3},{ 1, 4},{ 2, 4},{ 3, 4},{ 4, 3},{ 0, 4},{ 1, 5},{ 2, 5},{ 3, 5},{ 4, 4},{ 5, 3} },
+		{ { 0, 5},{ 1, 6},{ 2, 6},{ 3, 6},{ 4, 5},{ 0, 6},{ 1, 7},{ 2, 7},{ 3, 7},{ 4, 6},{ 0, 7},{ 1, 8},{ 2, 8},{ 3, 8},{ 4, 7},{ 4, 8} },
+		{ { 0, 8},{ 1, 9},{ 2, 9},{ 3, 9},{ 0, 9},{ 1,10},{ 2,10},{ 3,10},{ 4, 9},{ 5, 4},{ 0,10},{ 1,11},{ 2,11},{ 3,11},{ 4,10},{ 5, 5} },
+		{ { 1,12},{ 2,12},{ 5, 6},{ 0,11},{ 1,13},{ 2,13},{ 3,12},{ 4,11},{ 5, 7},{ 0,12},{ 5, 8},{ 4,12},{ 5, 9},{ 5,10},{ -1,-1},{ -1,-1} },
+		{ { 0,13},{ 1,14},{ 2,14},{ 0,14},{ 1,15},{ 2,15},{ 0,15},{ 1,16},{ 2,16},{ 1,17},{ -1,-1},{ -1,-1},{ -1,-1},{ -1,-1},{ -1,-1},{ -1,-1} },
+		{ { 2,17},{ 3,13},{ 4,13},{ 5,11},{ 1,18},{ 2,18},{ 3,14},{ 4,14},{ 1,19},{ 2,19},{ 3,15},{ 4,15},{ 5,12},{ 1,20},{ 2,20},{ 4,16} },
+};
+
+const analogKey_Config_t matrixAnalogRelocate[6][21] = {
+    { { 0, 0},{ 0, 6},{ 1, 0},{ 1, 5},{ 1, 10},{ 2, 0},{ 2, 5},{ 2, 10},{ 3, 0},{ 3, 4},{ 3, 10},{ 4, 3},{ 4, 9},{ 5, 0},{ 5, 3},{ 5, 6},{ -1, -1},{ -1, -1},{ -1, -1},{ -1, -1},{ -1, -1} },				//16
+		{ { 0, 1},{ 0, 7},{ 0, 11},{ 1, 1},{ 1, 6},{ 1, 11},{ 2, 1},{ 2, 6},{ 2, 11},{ 3, 1},{ 3, 5},{ 3, 11},{ 4, 0},{ 4, 4},{ 5, 1},{ 5, 4},{ 5, 7},{ 5, 9},{ 6, 4},{ 6, 8},{ 6, 13} },						//21
+		{ { 0, 2},{ 0, 8},{ 0, 12},{ 1, 2},{ 1, 7},{ 1, 12},{ 2, 2},{ 2, 7},{ 2, 12},{ 3, 2},{ 3, 6},{ 3, 12},{ 4, 1},{ 4, 5},{ 5, 2},{ 5, 5},{ 5, 8},{ 6, 0},{ 6, 5},{ 6, 9},{ 6, 14} },						//21
+		{ { 0, 3},{ 0, 9},{ 0, 13},{ 1, 3},{ 1, 8},{ 1, 13},{ 2, 3},{ 2, 8},{ 2, 13},{ 3, 3},{ 3, 7},{ 3, 13},{ 4, 6},{ 6, 1},{ 6, 6},{ 6, 10},{ -1, -1},{ -1, -1},{ -1, -1},{ -1, -1},{ -1, -1} },			//16
+		{ { 0, 4},{ 0, 14},{ 1, 4},{ 1, 9},{ 1, 14},{ 2, 4},{ 2, 9},{ 2, 14},{ 2, 15},{ 3, 8},{ 3, 14},{ 4, 7},{ 4, 11},{ 6, 2},{ 6, 7},{ 6, 11},{ 6, 15},{ -1, -1},{ -1, -1},{ -1, -1},{ -1, -1} },			//17
+		{ { 0, 5},{ 0, 10},{ 0, 15},{ 1, 15},{ 3, 9},{ 3, 15},{ 4, 2},{ 4, 8},{ 4, 10},{ 4, 12},{ 4, 13},{ 6, 3},{ 6, 12},{ -1, -1},{ -1, -1},{ -1, -1},{ -1, -1},{ -1, -1},{ -1, -1},{ -1, -1},{ -1, -1} },	//13
+};
+
+
+const uint8_t locationMax[7] = { 15, 15, 15, 15, 13, 9, 15 };
+const uint8_t colMax[] = { 16, 21, 21, 16, 17, 13 };
+
+
+inline uint8_t matrix_rows(void) {
+    return MATRIX_ROWS;
+}
+
+inline uint8_t matrix_cols(void) {
+    return MATRIX_COLS;
+}
+
+#define LED_ON()    do { palClearPad(GPIOD, 8) ;} while (0)
+#define LED_OFF()   do { palSetPad(GPIOD, 8); } while (0)
+#define LED_TGL()   do { palTogglePad(GPIOD, 8); } while (0)
+
+#define TriggerMax	300
+#define TriggerMin  3
+#define TriggerInitial 3
+
+#define ReleaseMax	15
+#define ReleaseMin	0
+#define ReleaseInitial 1
+
+void hook_early_init(void)
+{
+    int16_t i;
+    LED_init();
+    i2c_init();
+    uart_init();
+    uprintf("\033[2J\033[HiOne M18 Start .....\r\n");
+    uprintf("KeyMap Size:%d %X END:%d %X\r\n",KEYMAP_SIZE,KEYMAP_SIZE,EECONFIG_END,EECONFIG_END);
+
+    //Keyboard LEDs
+    palSetPadMode(GPIOB, 3, PAL_MODE_OUTPUT_OPENDRAIN);
+    palSetPadMode(GPIOB, 4, PAL_MODE_OUTPUT_OPENDRAIN);
+    palSetPadMode(GPIOF, 7, PAL_MODE_OUTPUT_OPENDRAIN);
+
+    //Encoder
+    palSetPadMode(GPIOD, 2, PAL_MODE_INPUT_PULLUP);
+    palSetPadMode(GPIOC, 12, PAL_MODE_INPUT_PULLUP);
+    palSetPadMode(GPIOA, 15, PAL_MODE_INPUT_PULLUP);
+
+    memset(matrix, 0, MATRIX_ROWS);
+
+}
+
+void hook_late_init()
+{
+    //int16_t i;
+    //	while (1){
+    //		for (uint8_t i=0;i<3;i++){
+    //			tap_code(KC_VOLU);
+    //			chThdSleepMilliseconds(500);
+    //		}
+    //		for (uint8_t i=0;i<3;i++){
+    //			tap_code(KC_VOLD);
+    //			chThdSleepMilliseconds(500);
+    //		}
+    //		for (uint8_t i=0;i<3;i++){
+    //			tap_code(KC_MUTE);
+    //			chThdSleepMilliseconds(500);
+    //		}
+    //	}
+
+}
+
+
+/*===========================================================================*/
+/* GPT driver related.                                                       */
+/*===========================================================================*/
+
+/*
+ * GPT7 configuration. This timer is used as trigger for the ADC.
+ */
+
+void irq_storm_gpt7_cb(GPTDriver* gptp)
+{
+    //	msg_t msg;
+    //
+    //	(void)gptp;
+    //	chSysLockFromISR();
+    //#ifdef ADC_Debug
+    //	palTogglePad(GPIOF, 7);														//ADC GPT Trigger LED
+    //#endif
+    //	chSysUnlockFromISR();
+}
+
+const GPTConfig gpt7cfg1 = {
+  .frequency = 12000U,
+  .callback = irq_storm_gpt7_cb,
+  .cr2 = 0x10,   /* MMS = 010 = TRGO on Update Event.    */
+  .dier = 0U
+};
+
+
+#define ADC_SAMPLE_CYCLE		ADC_SAMPLE_640_5			//ADC_SAMPLE_2_5	ADC_SAMPLE_6_5	ADC_SAMPLE_12_5	*ADC_SAMPLE_24_5	ADC_SAMPLE_47_5	ADC_SAMPLE_92_5	ADC_SAMPLE_247_5	ADC_SAMPLE_640_5
+//#define ADC_VM_HIGH				0x07F0
+#define ADC_VM_HIGH				0x0eF0
+#define ADC_VM_LOW				0x0000
+
+static adcsample_t samples1[ADC_NUM_CHANNELS];
+adcsample_t samples2[ADC_BUF_DEPTH][ADC_NUM_CHANNELS], initPostionLevel[ADC_BUF_DEPTH][ADC_NUM_CHANNELS], travelPostionLevel[ADC_BUF_DEPTH][ADC_NUM_CHANNELS]; ;
+static uint32_t adcsampleIndex = 0, adcUpdateIndex = 0;
+static void adccallback(ADCDriver* adcp);
+static void adcerrorcallback(ADCDriver* adcp, adcerror_t err);
+/*
+ * ADC streaming callback.
+ */
+//size_t nx = 0, ny = 0;
+
+static const ADCConversionGroup adcgrpcfg1 = {
+  FALSE,
+  ADC_NUM_CHANNELS,
+  adccallback,
+  adcerrorcallback,
+#ifdef ADC_Monitor
+  ADC_VMONITOR_SINGLE_ORDINARY | ADC_CHANNEL_4,                        /* CR1 */
+#else
+  //ADC_PARTITION_CHANNEL_1,
+  0,
+#endif
+  ADC_CR2_EXTEN_0 | (0xE << 24) | 1 << 31,
+  //ADC_CR2_SWSTART,          /* CR2 */
+  ADC_SMPR1_SMP_AN13(ADC_SAMPLE_CYCLE) |
+  ADC_SMPR1_SMP_AN12(ADC_SAMPLE_CYCLE) | ADC_SMPR1_SMP_AN11(ADC_SAMPLE_CYCLE) |
+  ADC_SMPR1_SMP_AN10(ADC_SAMPLE_CYCLE),
+  ADC_SMPR2_SMP_AN2(ADC_SAMPLE_CYCLE) | ADC_SMPR2_SMP_AN1(ADC_SAMPLE_CYCLE) |
+  ADC_SMPR2_SMP_AN0(ADC_SAMPLE_640_5) ,
+  ADC_VM_HIGH,              /* HTR */
+  ADC_VM_LOW,               /* LTR */
+  0,                        /* SQR1 */
+  ADC_SQR2_SQ7_N(ADC_CHANNEL_IN2) ,
+  ADC_SQR3_SQ6_N(ADC_CHANNEL_IN1) | ADC_SQR3_SQ5_N(ADC_CHANNEL_IN0) |
+  ADC_SQR3_SQ4_N(ADC_CHANNEL_IN13) | ADC_SQR3_SQ3_N(ADC_CHANNEL_IN12) |
+  ADC_SQR3_SQ2_N(ADC_CHANNEL_IN11) | ADC_SQR3_SQ1_N(ADC_CHANNEL_IN10)
+};
+
+static const ADCConversionGroup adcgrpcfg2 = {
+  TRUE,
+  ADC_NUM_CHANNELS,
+  adccallback,
+  adcerrorcallback,
+#ifdef ADC_Monitor
+  ADC_VMONITOR_SINGLE_ORDINARY | ADC_CHANNEL_4,                        /* CR1 */
+#else
+  //ADC_PARTITION_CHANNEL_7,
+  0,
+#endif
+  0,
+  //ADC_CR2_SWSTART,          /* CR2 */
+  ADC_SMPR1_SMP_AN13(ADC_SAMPLE_CYCLE) |
+  ADC_SMPR1_SMP_AN12(ADC_SAMPLE_CYCLE) | ADC_SMPR1_SMP_AN11(ADC_SAMPLE_CYCLE) |
+  ADC_SMPR1_SMP_AN10(ADC_SAMPLE_CYCLE),
+  ADC_SMPR2_SMP_AN2(ADC_SAMPLE_CYCLE) | ADC_SMPR2_SMP_AN1(ADC_SAMPLE_CYCLE) |
+  ADC_SMPR2_SMP_AN0(ADC_SAMPLE_640_5) ,                      /* SMPR2 */
+  ADC_VM_HIGH,              /* HTR */
+  ADC_VM_LOW,               /* LTR */
+  0,                        /* SQR1 */
+  ADC_SQR2_SQ7_N(ADC_CHANNEL_IN2) ,
+  ADC_SQR3_SQ6_N(ADC_CHANNEL_IN1) | ADC_SQR3_SQ5_N(ADC_CHANNEL_IN0) |
+  ADC_SQR3_SQ4_N(ADC_CHANNEL_IN13) | ADC_SQR3_SQ3_N(ADC_CHANNEL_IN12) |
+  ADC_SQR3_SQ2_N(ADC_CHANNEL_IN11) | ADC_SQR3_SQ1_N(ADC_CHANNEL_IN10)
+
+	//  ADC_SQR3_SQ4_N(ADC_CHANNEL_IN7)   | ADC_SQR3_SQ3_N(ADC_CHANNEL_IN6),
+	//  ADC_SQR3_SQ4_N(ADC_CHANNEL_IN7)   | ADC_SQR3_SQ3_N(ADC_CHANNEL_IN6) |
+	//  ADC_SQR3_SQ4_N(ADC_CHANNEL_IN7)   | ADC_SQR3_SQ3_N(ADC_CHANNEL_IN6) |
+	//  ADC_SQR3_SQ2_N(ADC_CHANNEL_IN5)   | ADC_SQR3_SQ1_N(ADC_CHANNEL_IN4)
+};
+
+void adcOffsetGet(bool findMax)
+{
+    if (!findMax)
+    {
+        memset(initPostionLevel, 0, sizeof(initPostionLevel));
+        //uprintf ("offset clear\r\n");
+    }
+    //uprintf ("offset get\r\n");
+    for (uint8_t i = 0; i < ADC_NUM_CHANNELS; i++)
+    {
+        for (uint8_t j = 0; j < ADC_BUF_DEPTH; j++)
+        {
+            if (samples2[j][i] > initPostionLevel[j][i])
+            {
+                initPostionLevel[j][i] = samples2[j][i];
+            }
+        }
+    }
+}
+
+void adcOffsetCalc(bool findMax, bool update, uint16_t samples)
+{
+    uint16_t k = 0;
+    uint32_t SampleTimer;
+    memset(initPostionLevel, 0, sizeof(initPostionLevel));
+
+    adcUpdateIndex = 0;
+    SampleTimer = timer_read();
+    currentKeyMatrixMode = keyMatrixMode_InitialPostionCalc;
+    lastKeyScanEffect = keyScanEffect;
+    lastRapidKeyEnable = rapidKeyEnable;
+    lastkeycodeOutput = keycodeOutput;
+    currentLED_RunMode.type = offMode;
+    setRunMode(currentLED_RunMode);
+    chThdSleepMilliseconds(10);
+    ledAllOff(true);
+    keyScanEffect = true;
+    rapidKeyEnable = false;
+    keycodeOutput = false;
+    while (timer_read() < (SampleTimer + samples*10))
+    {
+        for (uint8_t i = 0; i < ADC_NUM_CHANNELS; i++)
+        {
+            for (uint8_t j = 0; j < ADC_BUF_DEPTH; j++)
+            {
+                if (samples2[j][i] > initPostionLevel[j][i])
+                {
+                	if (k++<500){
+                    initPostionLevel[j][i] 	= samples2[j][i];
+                	} else {
+                		initPostionLevel[j][i] 	= samples2[j][i] + 5;
+                	}
+                }
+            }
+        }
+    }
+    if (update)
+    {
+        uprintf("offset calc \r\n");
+        for (uint16_t i = 0; i < (ADC_NUM_CHANNELS * ADC_BUF_DEPTH); i++)
+        {
+            eeprom_write_word(EECONFIG_KEYMAP_OFFSET_CALIBRATION + i * 2, initPostionLevel[i % ADC_BUF_DEPTH][i / ADC_BUF_DEPTH]);
+        }
+    }
+    currentKeyMatrixMode = keyMatrixMode_Normal;
+    keyScanEffect = false;
+    rapidKeyEnable = lastRapidKeyEnable;
+    keycodeOutput = lastkeycodeOutput;
+//    if (!noiseFind){
+//		currentLED_RunMode.type = normalMode;
+//		setRunMode(currentLED_RunMode);
+//    }
+}
+
+void adcTravelCalc(uint8_t mode)
+{
+    uint16_t i;
+    uint32_t SampleTimer;
+    switch (mode)
+    {
+        case 0:
+            lastKeyScanEffect = keyScanEffect;
+            lastRapidKeyEnable = rapidKeyEnable;
+            lastkeycodeOutput = keycodeOutput;
+            currentLED_RunMode.type = offMode;
+            setRunMode(currentLED_RunMode);
+            chThdSleepMilliseconds(10);
+            ledAllOff(true);
+            keyScanEffect = true;
+            rapidKeyEnable = false;
+            keycodeOutput = false;
+            memset(travelPostionLevel, 0, sizeof(travelPostionLevel));
+            uprintf("enter travel postion calibration modes\r\n");
+            currentKeyMatrixMode = keyMatrixMode_TravelPostionCalc;
+            break;
+        case 1:
+            uprintf("update travel postion levels\r\n");
+            uprintf("Start:%X\r\n", EECONFIG_KEYMAP_TRAVEL_CALIBRATION);
+
+            for (i = 0; i < (ADC_NUM_CHANNELS * ADC_BUF_DEPTH); i++)
+            {
+                eeprom_write_word(EECONFIG_KEYMAP_TRAVEL_CALIBRATION + i * 2, travelPostionLevel[i % ADC_BUF_DEPTH][i / ADC_BUF_DEPTH]);
+            }
+            uprintf("End:%X\r\n\r\n", EECONFIG_KEYMAP_TRAVEL_CALIBRATION + i * 2);
+            currentKeyMatrixMode = keyMatrixMode_Normal;
+            keyScanEffect = lastKeyScanEffect;
+            rapidKeyEnable = lastRapidKeyEnable;
+            keycodeOutput =lastkeycodeOutput;
+//            if (!noiseFind){
+//                currentLED_RunMode.type = normalMode;
+//                setRunMode(currentLED_RunMode);
+//            }
+            break;
+    }
+}
+
+static void adccallback(ADCDriver* adcp)
+{
+    int16_t adcData;
+
+    //mux channel select
+    palWriteGroup(GPIOC, PAL_PORT_BIT(6) | PAL_PORT_BIT(7) | PAL_PORT_BIT(8) | PAL_PORT_BIT(9), 0, (adcsampleIndex + 1) << 6);
+
+
+# ifdef ADC_Monitor
+    if (adc_flag_get(adcp->adc, ADC_VMOR_FLAG) != RESET)
+    {
+        adc_flag_clear(ADC1, ADC_VMOR_FLAG);
+        palTogglePad(GPIOD, 13);
+    }
+#endif
+    //for (uint32_t i=0; i<0xffff;i++);
+//    for (uint8_t i = 0; i < ADC_NUM_CHANNELS; i++)
+//    {
+//        samples2[adcsampleIndex][i] = samples1[i];
+//    }
+//
+//	if (adcsampleIndex >= 15)
+//	{
+//	    chSysLockFromISR();
+//		chBSemSignalI(&adcCompleteSem);
+//		chSysUnlockFromISR();
+//	} else {
+//		//for (uint32_t i=0; i<0xffff;i++);			//ADC Sample wait
+//	}
+//
+//	switch (adcsampleIndex)
+//	{
+//		case 0:
+//			adcStartConversion(&ADCD1, &adcgrpcfg2, samples1, 1);
+//			adcStartConversion_Start(&ADCD1, ADC_CR2_SWSTART);
+//			break;
+//		case 1 ... 14:
+//			adcStartConversion_Start(&ADCD1, ADC_CR2_SWSTART);
+//			break;
+//		case 15:
+//			adcStartConversion_Start(&ADCD1, ADC_CR2_SWSTART);
+//			adcsampleIndex = 0;
+//
+//			return;
+//			break;
+//	}
+//	adcsampleIndex++;
+
+//==========================================================================
+    if (!ledUpdateFilter || !ledUpdatingLock){
+    for (uint8_t i = 0; i < ADC_NUM_CHANNELS; i++)
+      {
+          samples2[adcsampleIndex][i] = samples1[i];
+      }
+    }
+
+  	if (adcsampleIndex == 15 )
+  	{
+  	    chSysLockFromISR();
+  		chBSemSignalI(&adcCompleteSem);
+  		chSysUnlockFromISR();
+  	} else {
+  		//for (uint32_t i=0; i<0xffff;i++);			//ADC Sample wait
+  	}
+  	adcStartConversion_Start(&ADCD1, ADC_CR2_SWSTART);
+  	if (adcsampleIndex++ == 15){
+  		adcsampleIndex = 0;
+  	}
+//  	switch (adcsampleIndex++)
+//  	{
+//  		case 0:
+//  			adcStartConversion_Start(&ADCD1, ADC_CR2_SWSTART);
+//  			break;
+//  		case 1 ... 14:
+//  			adcStartConversion_Start(&ADCD1, ADC_CR2_SWSTART);
+//  			break;
+//  		case 15:
+//  			adcStartConversion_Start(&ADCD1, ADC_CR2_SWSTART);
+//  			adcsampleIndex = 0;
+//  			return;
+//  			break;
+//  	}
+
+//===============================================================
+
+//    for (uint8_t i = 0; i < ADC_NUM_CHANNELS; i++)
+//    {
+//        samples2[adcsampleIndex][i] = samples1[i];
+//    }
+//
+//    if (adcsampleIndex >= 15)
+//    {
+//        adcUpdateIndex++;
+//
+//		chSysLockFromISR();
+//		chBSemSignalI(&adcCompleteSem);
+//		chSysUnlockFromISR();
+//    }
+//
+//
+//
+//        switch (adcsampleIndex)
+//        {
+//            case 0:
+//                adcStartConversion(&ADCD1, &adcgrpcfg2, samples1, 1);
+//                adcStartConversion_Start(&ADCD1, ADC_CR2_SWSTART);
+//                break;
+//            case 1 ... 14:
+//                adcStartConversion_Start(&ADCD1, ADC_CR2_SWSTART);
+//                break;
+//            case 15:
+//                adcStartConversion_Start(&ADCD1, ADC_CR2_SWSTART);
+//                adcsampleIndex = 0;
+//                return;
+//                break;
+//            default:
+//                adcStartConversion(&ADCD1, &adcgrpcfg1, samples1, 1);
+//                adcsampleIndex = 0;
+//                return;
+//        }
+//        adcsampleIndex++;
+
+}
+
+static void adcerrorcallback(ADCDriver* adcp, adcerror_t err)
+{
+
+	(void)adcp;
+	(void)err;
+}
+
+void analogPowerSwitch(uint8_t data)
+{
+	uint8_t data_pa, data_pf;
+	data_pa = (((data & 0x01) | ((data >> 2)) & 0x1e)) << 3;
+	data_pf = ((data >> 1) & 0x03) << 4;
+	//uprintf ("pa:%X pf:%X\r\n",data_pa,data_pf);
+	palWriteGroup(GPIOA, PAL_PORT_BIT(3) | PAL_PORT_BIT(4) | PAL_PORT_BIT(5) | PAL_PORT_BIT(6) | PAL_PORT_BIT(7), 0, data_pa);
+	palWriteGroup(GPIOF, PAL_PORT_BIT(4) | PAL_PORT_BIT(5), 0, data_pf);
+    }
+//# ifdef ADCTestHispeed
+//void matrixDebugTest(uint8_t mode)
+//{
+//	int adcCalc;
+//	for (uint8_t group = 0; group < ADC_NUM_CHANNELS; group++)
+//	{
+//		for (uint8_t location = 0; location < ADC_BUF_DEPTH; location++)
+//		{
+//			switch (mode)
+//			{
+//				case 0:
+//					adcCalc = samples2[location][group] - initPostionLevel[location][group];
+//					if (adcCalc < 3)
+//					{
+//						adcCalc = 0;
+//					}
+//					else
+//					{
+//						adcCalc -= 3;
+//					}
+//					break;
+//				case 1:
+//					adcCalc = travelPostionLevel[location][group] - initPostionLevel[location][group];
+//					if (adcCalc < 32)
+//					{
+//						adcCalc = 0;
+//					}
+//					break;
+//			}
+//
+//			//analogBtnFill(group, location, LED_NULL, adcCalc);
+//
+//
+//				led_config_t EffectranbowColor;
+//				analogKey_Config_t keyLocation = analogKeyRelocate[group][location];;
+//				uint8_t currentStep = 0;
+//				if (location > locationMax[group]) { break; }
+//				for (uint8_t i=0;i<RAPID_TRIGGER_COUNT;i++){
+//						if (rapidTriggerKeys[i].row == keyLocation.rowA && rapidTriggerKeys[i].col == keyLocation.colA){
+//							if (rapidTriggerKeys[i].enable && rapidTriggerKeys[i].counts != 0){
+//							if (adcCalc < rapidTriggerKeys[i].onLevel[0]){
+//								EffectranbowColor = LED_NULL;
+//
+//							} else {
+//								for (uint8_t j=0;j<rapidTriggerKeys[i].counts;j++){
+//									if (adcCalc> rapidTriggerKeys[i].onLevel[j] && adcCalc< rapidTriggerKeys[i].onLevel[j+1]){
+//										currentStep ++;
+//										break;
+//									}else {
+//										if (adcCalc>rapidTriggerKeys[i].onLevel[j+1]){currentStep ++;}
+//									}
+//								}
+//								EffectranbowColor = rainbowColor[currentStep-1];
+//							}
+//							if (currentStep && currentStep != rapidTriggerKeys[i].lastStep){
+//								if (rapidTriggerKeys[i].lastKeycode != 0xffff){
+//									unregister_rapidTrigger_code(rapidTriggerKeys[i].lastKeycode);
+//									register_rapidTrigger_code(rapidTriggerKeys[i].keycode[currentStep-1]);
+//
+//								} else {
+//									register_rapidTrigger_code(rapidTriggerKeys[i].keycode[currentStep-1]);
+//								}
+//								rapidTriggerKeys[i].lastKeycode = rapidTriggerKeys[i].keycode[currentStep-1];
+//							}
+//							if (currentStep == 0 && rapidTriggerKeys[i].lastStep != 0){
+//								unregister_rapidTrigger_code(rapidTriggerKeys[i].lastKeycode);
+//								rapidTriggerKeys[i].lastKeycode = 0xffff;
+//								rapidTriggerKeys[i].lastStep = 0;
+//							}
+//							rapidTriggerKeys[i].lastStep = currentStep;
+//							setKeyMatrixLED(keyLocation.rowA, keyLocation.colA, EffectranbowColor);
+//							//break;
+//						}
+//
+//					}
+//				}
+//
+//				float mult;
+//				if (keyLocation.rowA == -1 || keyLocation.colA == -1) { return; }
+//				EffectranbowColor = rainbowColor[group];
+//				if (adcCalc>35){ adcCalc-=35;}
+//				if (adcCalc>600){
+//					mult = 1;
+//				} else {
+//					mult = (float)adcCalc / 600;         //OP*2	nonOP*10
+//				}
+//				EffectranbowColor.red *= mult;
+//				EffectranbowColor.green *= mult;
+//				EffectranbowColor.blue *= mult;
+//				setKeyMatrixLED(keyLocation.rowA, keyLocation.colA, EffectranbowColor);
+//				//break;
+//
+//		}
+//	}
+//	chBSemSignal(&ledUpdateSem);
+//    }
+//
+//
+//#else
+//    uint8_t matrixDebugTest(uint8_t mode)
+//    {
+//        int adcCalc;
+//        uprintf("\033[2J\033[H");
+//        uprintf("Timer:%6d   00   01   02   03   04   05   06   07   08   09   10   11   12   13   14   15\r\n", adcUpdateIndex);
+//
+//        for (uint8_t i = 0; i < ADC_NUM_CHANNELS; i++)
+//        {
+//            uprintf("Key group %d: ", i);
+//            for (uint8_t j = 0; j < ADC_BUF_DEPTH; j++)
+//            {
+//                adcCalc = samples2[j][i] - initPostionLevel[j][i];
+//                if (adcCalc < 3)
+//                {
+//                    adcCalc = 0;
+//                    uprintf("   0 ");
+//                }
+//                else
+//                {
+//                    adcCalc -= 3;
+//                    uprintf("%4d ", adcCalc);
+//                }
+//                analogBtnFill(i, j, LED_NULL, adcCalc);
+//
+//            }
+//            uprintf("\r\n");
+//        }
+//        chBSemSignal(&ledUpdateSem);
+//    }
+//#endif
+//
+
+//Optimize version
+//bool matrixAnalogScan(void)
+//{
+//	uint8_t rapidKeyStatus;
+//	int adcCalc;
+//	bool rapidStartCheck, rapidEndCheck;
+//	led_config_t EffectranbowColor;
+//	uint8_t currentStep = 0;
+//    chSysLock();
+//	for (uint8_t group = 0; group < ADC_NUM_CHANNELS; group++)
+//	{
+//		for (uint8_t channel = 0; channel < (ADC_BUF_DEPTH); channel++)
+//		{
+//			switch (currentKeyMatrixMode)
+//			{
+//				case keyMatrixMode_Normal:
+//				case keyMatrixMode_InitialPostionCalc:
+//					adcCalc = samples2[channel][group] - initPostionLevel[channel][group];
+//					break;
+//				case keyMatrixMode_TravelPostionCalc:
+//					if (travelPostionLevel[channel][group] < samples2[channel][group])
+//					{
+//						travelPostionLevel[channel][group] = samples2[channel][group];
+//					}
+//					adcCalc = travelPostionLevel[channel][group] - initPostionLevel[channel][group];
+//					if (adcCalc < 32)
+//					{
+//						adcCalc = 0;
+//					}
+//					break;
+//			}
+//
+//			if (adcCalc < 0)
+//			{
+//				adcCalc = 0;
+//			}
+//			rapidKeyStatus = false;
+//			keyLocation = analogKeyRelocate[group][channel];
+//			for (uint8_t i = 0; i < RAPID_TRIGGER_COUNT && !rapidKeyStatus && rapidKeyEnable; i++)
+//			{
+//				if (rapidTriggerKeys[i].row == keyLocation.rowA && rapidTriggerKeys[i].col == keyLocation.colA)
+//				{
+//					if (rapidTriggerKeys[i].enable && rapidTriggerKeys[i].counts != 0)
+//					{
+//
+//						if (adcCalc < rapidTriggerKeys[i].onLevel[0])																//no press
+//						{
+//							EffectranbowColor = LED_NULL;
+//						}
+//						else
+//						{
+//							for (uint8_t j = 0; j < rapidTriggerKeys[i].counts; j++)
+//							{
+//								rapidEndCheck = false;
+//								rapidStartCheck = false;
+//								if (adcCalc > rapidTriggerKeys[i].onLevel[j] && adcCalc < rapidTriggerKeys[i].onLevel[j + 1])
+//								{
+//									currentStep++;
+//									break;
+//								}
+//								else
+//								{
+//									if (adcCalc > rapidTriggerKeys[i].onLevel[j + 1]) { currentStep++; }
+//								}
+//							}
+//							EffectranbowColor = rainbowColor[currentStep - 1];
+//						}
+//						if (currentStep && currentStep != rapidTriggerKeys[i].lastStep)
+//						{
+//							if (keycodeOutput){
+//								if (rapidTriggerKeys[i].lastKeycode != 0xffff)
+//								{
+//									unregister_rapidTrigger_code(rapidTriggerKeys[i].lastKeycode);
+//									uprintf ("last keycode:%X\r\n",rapidTriggerKeys[i].lastKeycode);
+//									uprintf ("break last key Step:%d\r\n",currentStep,rapidTriggerKeys[i].lastKeycode);
+//									register_rapidTrigger_code(rapidTriggerKeys[i].keycode[currentStep - 1]);
+//									uprintf ("make last key Step:%d code:%X\r\n",currentStep,rapidTriggerKeys[i].keycode[currentStep - 1]);
+//								}
+//								else
+//								{
+//									if (!rapidStartCheck){
+//									register_rapidTrigger_code(rapidTriggerKeys[i].keycode[currentStep - 1]);
+//									uprintf ("\033[2J\033[HMake start current step:%d rapidStartCheck:%d \r\n",currentStep,rapidStartCheck);
+//									rapidStartCheck = true;
+//									}
+//								}
+//							}
+//							rapidTriggerKeys[i].lastKeycode = rapidTriggerKeys[i].keycode[currentStep - 1];
+//						}
+//						if (currentStep == 0 && rapidTriggerKeys[i].lastStep != 0)
+//						{
+//							if (keycodeOutput && rapidTriggerKeys[i].lastKeycode != 0xffff && !rapidEndCheck){
+//							unregister_rapidTrigger_code(rapidTriggerKeys[i].lastKeycode);
+//							uprintf ("End break\r\n");
+//							//tap_code(KC_ENT);
+//							rapidEndCheck = true;
+//							}
+//							rapidTriggerKeys[i].lastKeycode = 0xffff;
+//							rapidTriggerKeys[i].lastStep = 0;
+//						}
+//						rapidTriggerKeys[i].lastStep = currentStep;
+//						if (keyScanEffect)LED_Datas[ledKeyMatrix[keyLocation.rowA][keyLocation.colA]] = EffectranbowColor;
+//						rapidKeyStatus = true;
+//						break;
+//					}
+//				}
+//			}
+//			if (rapidKeyStatus == false)
+//			{
+//				if (adcCalc > keyMatrixTriggerLevel)
+//				{
+//					matrix_temp[keyLocation.rowA] |= (0x01 << keyLocation.colA);
+//				}
+//				if (adcCalc <= keyMatrixReleaseLevel)
+//				{
+//					matrix_temp[keyLocation.rowA] &= ~(0x01 << keyLocation.colA);
+//				}
+//				if (noiseFind){
+//					if (keyScanEffect)
+//					{
+//						float mult;
+//						//if (keyLocation.rowA == -1 || keyLocation.colA == -1) { return; }
+//
+//						if (adcCalc>1){
+//							adcCalc -= 1;
+//							EffectranbowColor = rainbowColor[group];
+//							if (adcCalc > 600)
+//							{
+//								mult = 1;
+//							}
+//							else
+//							{
+//								mult = (float)adcCalc / 600;         //OP*2	nonOP*10
+//							}
+//							EffectranbowColor.red *= mult;
+//							EffectranbowColor.green *= mult;
+//							EffectranbowColor.blue *= mult;
+//
+//							LED_Datas[ledKeyMatrix[keyLocation.rowA][keyLocation.colA]] = EffectranbowColor;
+//
+//						} else {
+//							EffectranbowColor = LED_NULL;
+//						}
+//						//LED_Datas[ledKeyMatrix[keyLocation.rowA][keyLocation.colA]] = EffectranbowColor;
+//					}
+//				}
+//				else {
+//					if (keyScanEffect)
+//					{
+//						float mult;
+//						//if (keyLocation.rowA == -1 || keyLocation.colA == -1) { return; }
+//
+//						if (adcCalc>15){
+//							adcCalc -= 15;
+//							EffectranbowColor = rainbowColor[group];
+//							if (adcCalc > 600)
+//							{
+//								mult = 1;
+//							}
+//							else
+//							{
+//								mult = (float)adcCalc / 600;         //OP*2	nonOP*10
+//							}
+//							EffectranbowColor.red *= mult;
+//							EffectranbowColor.green *= mult;
+//							EffectranbowColor.blue *= mult;
+//						} else {
+//							EffectranbowColor = LED_NULL;
+//						}
+//						LED_Datas[ledKeyMatrix[keyLocation.rowA][keyLocation.colA]] = EffectranbowColor;
+//					}
+//				}
+//			}
+//		}
+//	}
+//		crcReset(&CRCD1);
+//		currentMatrix_CRC = crcCalc(&CRCD1, sizeof(matrix_temp), &matrix_temp);
+//		if (lastMatrix_CRC != currentMatrix_CRC)
+//		{
+//			memcpy(matrix, matrix_temp, sizeof(matrix));
+//			keyboard_taskTMR();
+//			lastMatrix_CRC = currentMatrix_CRC;
+//		}
+//
+//	if (keyScanEffect)chBSemSignal(&ledUpdateSem);
+//    chSysUnlock();
+//}
+
+bool matrixAnalogScan(void)
+{
+	 bool rapidKeyStatus;
+	int adcCalc;
+	bool rapidStartCheck, rapidEndCheck;
+	led_config_t EffectranbowColor;
+	int8_t currentStep = 0;
+    chSysLock();
+
+	for (uint8_t group = 0; group < ADC_NUM_CHANNELS; group++)
+	{
+		for (uint8_t channel = 0; channel < (ADC_BUF_DEPTH); channel++)
+		{
+			switch (currentKeyMatrixMode)
+			{
+				case keyMatrixMode_Normal:
+				case keyMatrixMode_InitialPostionCalc:
+					adcCalc = samples2[channel][group] - initPostionLevel[channel][group];
+					break;
+				case keyMatrixMode_TravelPostionCalc:
+					if (travelPostionLevel[channel][group] < samples2[channel][group])
+					{
+						travelPostionLevel[channel][group] = samples2[channel][group];
+					}
+					adcCalc = travelPostionLevel[channel][group] - initPostionLevel[channel][group];
+					if (adcCalc < 32)
+					{
+						adcCalc = 0;
+					}
+					break;
+			}
+
+			if (adcCalc < 0)
+			{
+				adcCalc = 0;
+			}
+			keyLocation = analogKeyRelocate[group][channel];
+			rapidKeyStatus = false;
+			if (rapidKeyEnable){
+				for (uint8_t i = 0; i < RAPID_TRIGGER_COUNT && !rapidKeyStatus; i++){
+					if (rapidTriggerKeys[i].enable && rapidTriggerKeys[i].counts != 0){
+						if (rapidTriggerKeys[i].row == keyLocation.rowA && rapidTriggerKeys[i].col == keyLocation.colA){
+							currentStep = 0;
+							rapidKeyStatus = true;
+							if (adcCalc < rapidTriggerKeys[i].onLevel[0])																//no press
+							{
+
+								if (rapidTriggerKeys[i].lastStep == 0){
+									//uprintf ("<==end break:%d \r\n",rapidTriggerKeys[i].lastStep);
+									if (keycodeOutput){
+										unregister_rapidTrigger_code(rapidTriggerKeys[i].keycode[rapidTriggerKeys[i].lastStep]);
+										tap_code(KC_ENT);
+									}
+									rapidTriggerKeys[i].lastStep = -1;
+									if (keyScanEffect)LED_Datas[ledKeyMatrix[keyLocation.rowA][keyLocation.colA]] = LED_NULL;
+									//chThdSleepMilliseconds(3);
+									//rapidKeyStatus = true;
+									continue;
+								}
+
+							}else {
+//								for (uint8_t j = 1; j < rapidTriggerKeys[i].counts; j++)
+//								{
+//									//rapidEndCheck = false;
+//									//rapidStartCheck = false;
+//									if (adcCalc >= rapidTriggerKeys[i].onLevel[j] && adcCalc < rapidTriggerKeys[i].onLevel[j + 1])
+//									//if (adcCalc >= rapidTriggerKeys[i].onLevel[j] && adcCalc < rapidTriggerKeys[i].onLevel[j] + 50)
+//									{
+//										currentStep++;
+//										break;
+//									}
+//									else
+//									{
+//										if (adcCalc > rapidTriggerKeys[i].onLevel[j + 1]) { currentStep++; }
+//									}
+//								}
+
+								currentStep = -1;
+								for (uint8_t j = 1; j < rapidTriggerKeys[i].counts; j++)
+								{
+									//rapidEndCheck = false;
+									//rapidStartCheck = false;
+									/////if ((adcCalc > rapidTriggerKeys[i].onLevel[j]+rapidShiftM) && adcCalc < (rapidTriggerKeys[i].onLevel[j + 1]+rapidShiftP))
+									if (adcCalc >= rapidTriggerKeys[i].onLevel[j] && adcCalc < rapidTriggerKeys[i].onLevel[j] + 50)
+									{
+										//currentStep = j;
+										currentStep++;
+										break;
+									}
+									else
+									{
+										if (adcCalc > rapidTriggerKeys[i].onLevel[j + 1]) { currentStep++; }
+									}
+								}
+								//if (currentStep == -1){return;}
+
+								EffectranbowColor = rainbowColor[currentStep];
+								//chThdSleepMilliseconds(1);
+								//uprintf ("---currentStep:%d adc:%d---\r\n",currentStep,adcCalc);
+
+
+//
+								EffectranbowColor = rainbowColor[currentStep - 1];
+								if (rapidTriggerKeys[i].lastStep != currentStep){
+									if (currentStep == 0 && rapidTriggerKeys[i].lastStep ==-1){
+										//uprintf ("\033[2J\033[H==>start make step:%d\r\n",currentStep);
+										if (keycodeOutput){
+											register_rapidTrigger_code(rapidTriggerKeys[i].keycode[currentStep]);
+										}
+										if (keyScanEffect && ledKeyMatrix[keyLocation.rowA][keyLocation.colA] != -1)LED_Datas[ledKeyMatrix[keyLocation.rowA][keyLocation.colA]] = rainbowColor[0];
+										//chThdSleepMilliseconds(3);
+									}else {
+										//uprintf ("break last step:%d\r\n",rapidTriggerKeys[i].lastStep);
+										if (keycodeOutput){
+											//chThdSleepMilliseconds(3);
+											unregister_rapidTrigger_code(rapidTriggerKeys[i].keycode[rapidTriggerKeys[i].lastStep]);
+											//uprintf ("make step:%d\r\n",currentStep);
+											register_rapidTrigger_code(rapidTriggerKeys[i].keycode[currentStep]);
+										}
+										if (keyScanEffect && ledKeyMatrix[keyLocation.rowA][keyLocation.colA] != -1)LED_Datas[ledKeyMatrix[keyLocation.rowA][keyLocation.colA]] = rainbowColor[currentStep];
+									}
+									//rapidKeyStatus = true;
+									rapidTriggerKeys[i].lastStep = currentStep;
+									continue;
+								}
+							}
+						}
+					}
+				}
+
+			}
+			if (rapidKeyStatus == false)
+			{
+				if (adcCalc > keyMatrixTriggerLevel)
+				{
+					matrix_temp[keyLocation.rowA] |= (0x01 << keyLocation.colA);
+				}
+				if (adcCalc <= keyMatrixReleaseLevel)
+				{
+					matrix_temp[keyLocation.rowA] &= ~(0x01 << keyLocation.colA);
+				}
+				//if (noiseFind){
+					if (keyScanEffect)
+					{
+						float mult;
+						//if (keyLocation.rowA == -1 || keyLocation.colA == -1) { return; }
+
+						if (adcCalc>30){
+							adcCalc -= 30;
+							EffectranbowColor = rainbowColor[group];
+							if (adcCalc > 600)
+							{
+								mult = 1;
+							}
+							else
+							{
+								mult = (float)adcCalc / 600;         //OP*2	nonOP*10
+							}
+							EffectranbowColor.red *= mult;
+							EffectranbowColor.green *= mult;
+							EffectranbowColor.blue *= mult;
+
+							//LED_Datas[ledKeyMatrix[keyLocation.rowA][keyLocation.colA]] = EffectranbowColor;
+
+						} else {
+							EffectranbowColor = LED_NULL;
+						}
+						LED_Datas[ledKeyMatrix[keyLocation.rowA][keyLocation.colA]] = EffectranbowColor;
+					}
+				//}
+//				else {
+//					if (keyScanEffect)
+//					{
+//						float mult;
+//						//if (keyLocation.rowA == -1 || keyLocation.colA == -1) { return; }
+//
+//						if (adcCalc>15){
+//							adcCalc -= 15;
+//							EffectranbowColor = rainbowColor[group];
+//							if (adcCalc > 600)
+//							{
+//								mult = 1;
+//							}
+//							else
+//							{
+//								mult = (float)adcCalc / 600;         //OP*2	nonOP*10
+//							}
+//							EffectranbowColor.red *= mult;
+//							EffectranbowColor.green *= mult;
+//							EffectranbowColor.blue *= mult;
+//						} else {
+//							EffectranbowColor = LED_NULL;
+//						}
+//						LED_Datas[ledKeyMatrix[keyLocation.rowA][keyLocation.colA]] = EffectranbowColor;
+//					}
+//				}
+			}
+		}
+	}
+	if (rapidKeyStatus == false){
+		crcReset(&CRCD1);
+		currentMatrix_CRC = crcCalc(&CRCD1, sizeof(matrix_temp), &matrix_temp);
+		if (lastMatrix_CRC != currentMatrix_CRC)
+		{
+			memcpy(matrix, matrix_temp, sizeof(matrix));
+			keyboard_taskTMR();
+			lastMatrix_CRC = currentMatrix_CRC;
+		}
+	}
+	if (keyScanEffect)chBSemSignal(&ledUpdateSem);
+    chSysUnlock();
+}
+
+
+//
+//
+//
+//			rapidKeyStatus = false;
+//			keyLocation = analogKeyRelocate[group][channel];
+//			for (uint8_t i = 0; i < RAPID_TRIGGER_COUNT && !rapidKeyStatus && rapidKeyEnable; i++)
+//			{
+//				if (rapidTriggerKeys[i].row == keyLocation.rowA && rapidTriggerKeys[i].col == keyLocation.colA)
+//				{
+//					if (rapidTriggerKeys[i].enable && rapidTriggerKeys[i].counts != 0)
+//					{
+//
+//						if (adcCalc < rapidTriggerKeys[i].onLevel[0])																//no press
+//						{
+//							EffectranbowColor = LED_NULL;
+//						}
+//						else
+//						{
+//							for (uint8_t j = 0; j < rapidTriggerKeys[i].counts; j++)
+//							{
+//								rapidEndCheck = false;
+//								rapidStartCheck = false;
+//								if (adcCalc > rapidTriggerKeys[i].onLevel[j] && adcCalc < rapidTriggerKeys[i].onLevel[j + 1])
+//								{
+//									currentStep++;
+//									break;
+//								}
+//								else
+//								{
+//									if (adcCalc > rapidTriggerKeys[i].onLevel[j + 1]) { currentStep++; }
+//								}
+//							}
+//							EffectranbowColor = rainbowColor[currentStep - 1];
+//						}
+//						if (currentStep && currentStep != rapidTriggerKeys[i].lastStep)
+//						{
+//							if (keycodeOutput){
+//								if (rapidTriggerKeys[i].lastKeycode != 0xffff)
+//								{
+//									unregister_rapidTrigger_code(rapidTriggerKeys[i].lastKeycode);
+//									uprintf ("last keycode:%X\r\n",rapidTriggerKeys[i].lastKeycode);
+//									uprintf ("break last key Step:%d\r\n",currentStep,rapidTriggerKeys[i].lastKeycode);
+//									register_rapidTrigger_code(rapidTriggerKeys[i].keycode[currentStep - 1]);
+//									uprintf ("make last key Step:%d code:%X\r\n",currentStep,rapidTriggerKeys[i].keycode[currentStep - 1]);
+//								}
+//								else
+//								{
+//									if (!rapidStartCheck){
+//									register_rapidTrigger_code(rapidTriggerKeys[i].keycode[currentStep - 1]);
+//									uprintf ("\033[2J\033[HMake start current step:%d rapidStartCheck:%d \r\n",currentStep,rapidStartCheck);
+//									rapidStartCheck = true;
+//									}
+//								}
+//							}
+//							rapidTriggerKeys[i].lastKeycode = rapidTriggerKeys[i].keycode[currentStep - 1];
+//						}
+//						if (currentStep == 0 && rapidTriggerKeys[i].lastStep != 0)
+//						{
+//							if (keycodeOutput && rapidTriggerKeys[i].lastKeycode != 0xffff && !rapidEndCheck){
+//							unregister_rapidTrigger_code(rapidTriggerKeys[i].lastKeycode);
+//							uprintf ("End break\r\n");
+//							//tap_code(KC_ENT);
+//							rapidEndCheck = true;
+//							}
+//							rapidTriggerKeys[i].lastKeycode = 0xffff;
+//							rapidTriggerKeys[i].lastStep = 0;
+//						}
+//						rapidTriggerKeys[i].lastStep = currentStep;
+//						if (keyScanEffect)LED_Datas[ledKeyMatrix[keyLocation.rowA][keyLocation.colA]] = EffectranbowColor;
+//						rapidKeyStatus = true;
+//						break;
+//					}
+//				}
+//			}
+//			if (rapidKeyStatus == false)
+//			{
+//				if (adcCalc > keyMatrixTriggerLevel)
+//				{
+//					matrix_temp[keyLocation.rowA] |= (0x01 << keyLocation.colA);
+//				}
+//				if (adcCalc <= keyMatrixReleaseLevel)
+//				{
+//					matrix_temp[keyLocation.rowA] &= ~(0x01 << keyLocation.colA);
+//				}
+//				if (noiseFind){
+//					if (keyScanEffect)
+//					{
+//						float mult;
+//						//if (keyLocation.rowA == -1 || keyLocation.colA == -1) { return; }
+//
+//						if (adcCalc>1){
+//							adcCalc -= 1;
+//							EffectranbowColor = rainbowColor[group];
+//							if (adcCalc > 600)
+//							{
+//								mult = 1;
+//							}
+//							else
+//							{
+//								mult = (float)adcCalc / 600;         //OP*2	nonOP*10
+//							}
+//							EffectranbowColor.red *= mult;
+//							EffectranbowColor.green *= mult;
+//							EffectranbowColor.blue *= mult;
+//
+//							LED_Datas[ledKeyMatrix[keyLocation.rowA][keyLocation.colA]] = EffectranbowColor;
+//
+//						} else {
+//							EffectranbowColor = LED_NULL;
+//						}
+//						//LED_Datas[ledKeyMatrix[keyLocation.rowA][keyLocation.colA]] = EffectranbowColor;
+//					}
+//				}
+//				else {
+//					if (keyScanEffect)
+//					{
+//						float mult;
+//						//if (keyLocation.rowA == -1 || keyLocation.colA == -1) { return; }
+//
+//						if (adcCalc>15){
+//							adcCalc -= 15;
+//							EffectranbowColor = rainbowColor[group];
+//							if (adcCalc > 600)
+//							{
+//								mult = 1;
+//							}
+//							else
+//							{
+//								mult = (float)adcCalc / 600;         //OP*2	nonOP*10
+//							}
+//							EffectranbowColor.red *= mult;
+//							EffectranbowColor.green *= mult;
+//							EffectranbowColor.blue *= mult;
+//						} else {
+//							EffectranbowColor = LED_NULL;
+//						}
+//						LED_Datas[ledKeyMatrix[keyLocation.rowA][keyLocation.colA]] = EffectranbowColor;
+//					}
+//				}
+//			}
+//		}
+//	}
+//		crcReset(&CRCD1);
+//		currentMatrix_CRC = crcCalc(&CRCD1, sizeof(matrix_temp), &matrix_temp);
+//		if (lastMatrix_CRC != currentMatrix_CRC)
+//		{
+//			memcpy(matrix, matrix_temp, sizeof(matrix));
+//			keyboard_taskTMR();
+//			lastMatrix_CRC = currentMatrix_CRC;
+//		}
+//
+//	if (keyScanEffect)chBSemSignal(&ledUpdateSem);
+//    chSysUnlock();
+//}
+
+//BF Marco Org version
+//bool matrixAnalogScan(void)
+//{
+//uint8_t rapidKeyStatus;
+//int adcCalc;
+//led_config_t EffectranbowColor;
+//uint8_t currentStep = 0;
+//for (uint8_t group = 0; group < ADC_NUM_CHANNELS; group++)
+//{
+//	for (uint8_t channel = 0; channel < (ADC_BUF_DEPTH); channel++)
+//	{
+//		switch (currentKeyMatrixMode)
+//		{
+//			case keyMatrixMode_Normal:
+//			case keyMatrixMode_InitialPostionCalc:
+//				adcCalc = samples2[channel][group] - initPostionLevel[channel][group];
+//				break;
+//			case keyMatrixMode_TravelPostionCalc:
+//				if (travelPostionLevel[channel][group] < samples2[channel][group])
+//				{
+//					travelPostionLevel[channel][group] = samples2[channel][group];
+//				}
+//				adcCalc = travelPostionLevel[channel][group] - initPostionLevel[channel][group];
+//				if (adcCalc < 32)
+//				{
+//					adcCalc = 0;
+//				}
+//				break;
+//		}
+//
+//		if (adcCalc < 0)
+//		{
+//			adcCalc = 0;
+//		}
+//		if (channel <= locationMax[group])
+//		{
+//			keyLocation = analogKeyRelocate[group][channel];
+//			rapidKeyStatus = false;
+//			for (uint8_t i = 0; i < RAPID_TRIGGER_COUNT && !rapidKeyStatus && rapidKeyEnable; i++)
+//			{
+//				if (rapidTriggerKeys[i].row == keyLocation.rowA && rapidTriggerKeys[i].col == keyLocation.colA)
+//				{
+//					if (rapidTriggerKeys[i].enable && rapidTriggerKeys[i].counts != 0)
+//					{
+//						rapidKeyStatus = TRUE;
+//						if (adcCalc < rapidTriggerKeys[i].onLevel[0])
+//						{
+//							EffectranbowColor = LED_NULL;
+//
+//						}
+//						else
+//						{
+//							for (uint8_t j = 0; j < rapidTriggerKeys[i].counts; j++)
+//							{
+//								if (adcCalc > rapidTriggerKeys[i].onLevel[j] && adcCalc < rapidTriggerKeys[i].onLevel[j + 1])
+//								{
+//									currentStep++;
+//									break;
+//								}
+//								else
+//								{
+//									if (adcCalc > rapidTriggerKeys[i].onLevel[j + 1]) { currentStep++; }
+//								}
+//							}
+//							EffectranbowColor = rainbowColor[currentStep - 1];
+//						}
+//						if (currentStep && currentStep != rapidTriggerKeys[i].lastStep)
+//						{
+//							if (keycodeOutput){
+//								if (rapidTriggerKeys[i].lastKeycode != 0xffff)
+//								{
+//										unregister_code(rapidTriggerKeys[i].lastKeycode);
+//										register_code(rapidTriggerKeys[i].keycode[currentStep - 1]);
+//								}
+//								else
+//								{
+//									register_code(rapidTriggerKeys[i].keycode[currentStep - 1]);
+//								}
+//							}
+//							rapidTriggerKeys[i].lastKeycode = rapidTriggerKeys[i].keycode[currentStep - 1];
+//						}
+//						if (currentStep == 0 && rapidTriggerKeys[i].lastStep != 0)
+//						{
+//							if (keycodeOutput){
+//							unregister_code(rapidTriggerKeys[i].lastKeycode);
+//							}
+//							rapidTriggerKeys[i].lastKeycode = 0xffff;
+//							rapidTriggerKeys[i].lastStep = 0;
+//						}
+//						rapidTriggerKeys[i].lastStep = currentStep;
+//						if (keyScanEffect)LED_Datas[ledKeyMatrix[keyLocation.rowA][keyLocation.colA]] = EffectranbowColor;
+//						//chBSemSignal(&ledUpdateSem);
+//						rapidKeyStatus = true;
+//					}
+//
+//				}
+//			}
+//			if (rapidKeyStatus == false)
+//			{
+//				if (adcCalc > keyMatrixTriggerLevel)
+//				{
+//					matrix_temp[keyLocation.rowA] |= (0x01 << keyLocation.colA);
+//				}
+//				else
+//				{
+//					matrix_temp[keyLocation.rowA] &= ~(0x01 << keyLocation.colA);
+//				}
+//				if (keyScanEffect)
+//				{
+//					float mult;
+//					//if (keyLocation.rowA == -1 || keyLocation.colA == -1) { return; }
+//					EffectranbowColor = rainbowColor[group];
+//					if (adcCalc > 600)
+//					{
+//						mult = 1;
+//					}
+//					else
+//					{
+//						mult = (float)adcCalc / 600;         //OP*2	nonOP*10
+//					}
+//					EffectranbowColor.red *= mult;
+//					EffectranbowColor.green *= mult;
+//					EffectranbowColor.blue *= mult;
+//					LED_Datas[ledKeyMatrix[keyLocation.rowA][keyLocation.colA]] = EffectranbowColor;
+//				}
+//			}
+//		}
+//	}
+//	//if (keycodeOutput){
+//		crcReset(&CRCD1);
+//		currentMatrix_CRC = crcCalc(&CRCD1, sizeof(matrix_temp), &matrix_temp);
+////			if (lastMatrix_CRC != currentMatrix_CRC)
+//		{
+//			memcpy(matrix, matrix_temp, sizeof(matrix));
+//			keyboard_taskTMR();
+//			lastMatrix_CRC = currentMatrix_CRC;
+//		}
+//
+//	//}
+////# ifdef keycodeOutput
+////		switch (currentKeyMatrixMode)
+////		{
+////			case keyMatrixMode_Normal:
+////				crcReset(&CRCD1);
+////				currentMatrix_CRC = crcCalc(&CRCD1, sizeof(matrix_temp), &matrix_temp);
+////				if (lastMatrix_CRC != currentMatrix_CRC)
+////				{
+////					memcpy(matrix, matrix_temp, sizeof(matrix));
+////					keyboard_taskTMR();
+////				}
+////				lastMatrix_CRC = currentMatrix_CRC;
+////
+////			case keyMatrixMode_InitialPostionCalc:
+////			case keyMatrixMode_TravelPostionCalc:
+////				break;
+////		}
+////
+////#endif
+//
+//}
+//if (keyScanEffect)chBSemSignal(&ledUpdateSem);
+//}
+
+    //bool matrixAnalogFind(void){
+    //int triggerLevel = 15;
+    //int releaseLevel = 1;
+    //int adcCalc;
+    //	for (uint8_t i = 0; i < ADC_NUM_CHANNELS; i++) {
+    //		for (uint8_t j = 0; j < (ADC_BUF_DEPTH); j++) {
+    //			adcCalc = samples2[j][i] - initPostionLevel[j][i];
+    //			keyLocation = analogKeyRelocate[i][j];
+    //			//uprintf ("Groupt:%d Channel:%d Row:%d Col:%d\r\n",i,j,keyLocation.rowA,keyLocation.colA);
+    //			uprintf ("%d\t%d\t%d\t%d\t\r\n",i,j,keyLocation.rowA,keyLocation.colA);
+    //		}
+    //	}
+    //}
+
+    bool matrixAnalogFind(void)
+    {
+        int triggerLevel = 20;
+        int releaseLevel = 5;
+        int adcCalc;
+
+        uprintf("\033[2J\033[H");
+        uprintf("         00   01   02   03   04   05   06   07   08   09   10   11   12   13   14   15   16   17   18   19   20\r\n");
+        for (uint8_t i = 0; i < 6; i++)
+        {
+            uprintf("Row %d: ", i);
+            for (uint8_t j = 0; j < 21; j++)
+            {
+                keyLocation = matrixAnalogRelocate[i][j];
+                adcCalc = initPostionLevel[keyLocation.colA][keyLocation.rowA];
+                if (j < colMax[i])
+                {
+                    uprintf("%04X ", adcCalc);
+                }
+            }
+            uprintf("\r\n");
+        }
+    }
+
+
+static THD_WORKING_AREA(waADC_ProcessThread, 512);
+static THD_FUNCTION(ADC_ProcessThread, arg)
+{
+    uprintf("ADC Task start...\r\n");
+
+    //Init ADC control GPIO
+    chBSemObjectInit(&adcCompleteSem, true);
+    //osalMutexObjectInit(&keymatrixProcessMut);
+    palSetGroupMode(GPIOC, PAL_PORT_BIT(0) | PAL_PORT_BIT(1) | PAL_PORT_BIT(2) | PAL_PORT_BIT(3), 0, PAL_MODE_INPUT_ANALOG);
+    palSetGroupMode(GPIOA, PAL_PORT_BIT(0) | PAL_PORT_BIT(1) | PAL_PORT_BIT(2), 0, PAL_MODE_INPUT_ANALOG);
+
+
+
+    //ADC Mux select			S0:PC6	S1:PC7	S2:PC8	s3:PC9
+    //Selector IO
+    palSetGroupMode(GPIOC, PAL_PORT_BIT(6) | PAL_PORT_BIT(7) | PAL_PORT_BIT(8) | PAL_PORT_BIT(9), 0, PAL_MODE_OUTPUT_PUSHPULL);
+    palWriteGroup(GPIOC, PAL_PORT_BIT(6) | PAL_PORT_BIT(7) | PAL_PORT_BIT(8) | PAL_PORT_BIT(9), 0, 0xffffffff);
+
+
+    //Mux Enable IO
+    palSetGroupMode(GPIOC, PAL_PORT_BIT(4) | PAL_PORT_BIT(5), 0, PAL_MODE_OUTPUT_PUSHPULL);
+    palWriteGroup(GPIOC, PAL_PORT_BIT(4) | PAL_PORT_BIT(5), 0, 0x0000);
+
+    palSetGroupMode(GPIOB, PAL_PORT_BIT(0) | PAL_PORT_BIT(1) | PAL_PORT_BIT(2) | PAL_PORT_BIT(10) | PAL_PORT_BIT(12), 0, PAL_MODE_OUTPUT_PUSHPULL);
+    palWriteGroup(GPIOB, PAL_PORT_BIT(0) | PAL_PORT_BIT(1) | PAL_PORT_BIT(2) | PAL_PORT_BIT(10) | PAL_PORT_BIT(12), 0, 0x0000);
+
+
+    //Analog Power
+    palSetGroupMode(GPIOA, PAL_PORT_BIT(3) | PAL_PORT_BIT(4) | PAL_PORT_BIT(5) | PAL_PORT_BIT(6) | PAL_PORT_BIT(7), 0, PAL_MODE_OUTPUT_PUSHPULL);
+    palSetGroupMode(GPIOF, PAL_PORT_BIT(4) | PAL_PORT_BIT(5), 0, PAL_MODE_OUTPUT_PUSHPULL);
+    analogPowerSwitch(0);
+
+    //enable all analog power
+    analogPowerSwitch(PAL_PORT_BIT(0) | PAL_PORT_BIT(1) | PAL_PORT_BIT(2) | PAL_PORT_BIT(3) | PAL_PORT_BIT(4) | PAL_PORT_BIT(5) | PAL_PORT_BIT(6));
+
+
+    //Starting GPT7 driver, it is used for triggering the ADC.
+    gptStart(&GPTD7, &gpt7cfg1);
+    adcStart(&ADCD1, NULL);
+    adcStartConversion(&ADCD1, &adcgrpcfg2, samples1, 1);
+    adcStartConversion_Start(&ADCD1, ADC_CR2_SWSTART);
+    //gptStartContinuous(&GPTD7, 3);
+    gptStartContinuous(&GPTD7, 2);
+
+//# ifdef ADC_LevelOutput
+//
+//    //autonomousMode = false;
+//    chThdSleepMilliseconds(3000);
+//    currentLED_RunMode.type = dynamticLightingMode;
+//    setRunMode(currentLED_RunMode);
+//    ledAllOff(true);
+//
+//    setRunMode(currentLED_RunMode);
+//    ledAllOff(true);
+//    adcUpdateIndex = 0;
+//
+//    while (1)
+//    {
+//        chBSemWait(&adcCompleteSem);
+//        switch (currentKeyMatrixMode)
+//        {
+//            case keyMatrixMode_Normal:
+//                if (matrixDebugTest(0) == 0){
+//                	matrixAnalogScan();
+//                }
+//                break;
+//            case keyMatrixMode_InitialPostionCalc:
+//                break;
+//            case keyMatrixMode_TravelPostionCalc:
+//                matrixDebugTest(1);
+//                break;
+//        }
+//        //matrixAnalogScan();
+//        //matrixAnalogFind();
+//    }
+//#endif
+# ifdef ADC_LevelOutput
+    chThdSleepMilliseconds(500);
+    currentLED_RunMode.type = offMode;
+    currentLED_RunMode.mode = 8;
+    currentLED_RunMode.brightness = 10;
+    currentLED_RunMode.speed = 3;
+	setRunMode(currentLED_RunMode);
+
+//    ledAllOff(true);
+//	currentLED_RunMode.type = offMode;
+//	setRunMode(currentLED_RunMode);
+
+    adcUpdateIndex = 0;
+
+    while (1)
+    {
+        chBSemWait(&adcCompleteSem);
+        //osalMutexLock(&keymatrixProcessMut);
+//        switch (currentKeyMatrixMode)
+//        {
+//            case keyMatrixMode_Normal:
+//                //matrixDebugTest(0);
+//                break;
+//            case keyMatrixMode_InitialPostionCalc:
+//                break;
+//            case keyMatrixMode_TravelPostionCalc:
+//                //matrixDebugTest(1);
+//                break;
+//        }
+        matrixAnalogScan();
+        //osalMutexUnlock(&keymatrixProcessMut);
+        //matrixAnalogFind();
+    }
+#endif
+
+}
+
+int8_t rapidTriggerKeyBuilder(bool enable, uint8_t key, uint8_t row, uint8_t col, uint8_t counts, uint16_t *keycode){
+analogKey_Config_t keyLocation;
+uint16_t initPosValue, travelPosValue;
+uint16_t shiftValue;
+	if (key>=RAPID_TRIGGER_COUNT || counts > rapidTrigger_Levels){return -1;}
+	keyLocation = matrixAnalogRelocate[row][col];
+	initPosValue = initPostionLevel[keyLocation.colA][keyLocation.rowA];
+	travelPosValue = travelPostionLevel[keyLocation.colA][keyLocation.rowA];
+    for (uint8_t i=0; i< counts; i++){
+    	rapidTriggerKeys[key].onLevel[counts-i] = keyMatrixTriggerLevel + (1-sqrt((float)i/(float)counts)) * (travelPosValue - initPosValue - keyMatrixTriggerLevel);
+    	rapidTriggerKeys[key].onLevel[counts-i] *= 1.1;
+    }
+    rapidTriggerKeys[key].onLevel[0] = keyMatrixTriggerLevel;
+
+    for (uint8_t i=0; i< counts-1; i++){
+    	rapidTriggerKeys[key].offLevel[i] =rapidTriggerKeys[key].onLevel[i+1] - ((rapidTriggerKeys[key].onLevel[i+1] - rapidTriggerKeys[key].onLevel[i])/8);
+    	//uprintf ("Off: %4d %4d\r\n",rapidTriggerKeys[key].onLevel[i+1],rapidTriggerKeys[key].onLevel[i]);
+
+    }
+
+    rapidTriggerKeys[key].enable = enable;
+	rapidTriggerKeys[key].row = row;
+	rapidTriggerKeys[key].col = col;
+	rapidTriggerKeys[key].counts = counts;
+
+    rapidTriggerKeys[key].lastStep = -1;
+    rapidTriggerKeys[key].triggeredLevel = 0;
+	memcpy (rapidTriggerKeys[key].keycode,keycode,counts*2);
+	uprintf ("rapidTriggerKeys row:%d col:%d counts:%d\r\n",rapidTriggerKeys[key].row, rapidTriggerKeys[key].col, rapidTriggerKeys[key].counts);
+	for (uint8_t i=0;i<counts;i++){
+		uprintf ("onLevel  %d:%0d\t",i , rapidTriggerKeys[key].onLevel[i]);
+	}
+	uprintf ("\r\n");
+	for (uint8_t i=0;i<counts-1;i++){
+		uprintf ("offLevel %d:%0d\t",i , rapidTriggerKeys[key].offLevel[i]);
+	}
+	uprintf ("\r\n");
+	for (uint8_t i=0;i<counts;i++){
+		uprintf ("Keycode %d:%04x\t",i , rapidTriggerKeys[key].keycode[i]);
+	}
+	uprintf ("\r\n");
+	return 0;
+}
+
+//typedef struct {
+//	//uint8_t layer;
+//	uint8_t row;
+//	uint8_t col;
+//    uint8_t counts;
+//    uint16_t level[rapidTrigger_Levels];
+//    uint16_t keycode[rapidTrigger_Levels];
+//    uint8_t lastStep;
+//    uint16_t lastKeycode;
+//} rapidTrigger_config_t;
+
+void matrix_init(void)
+{
+	if (noiseFind){
+		keycodeOutput = false;
+		keyScanEffect = true;
+		rapidKeyEnable = false;
+	} else {
+//		keycodeOutput = true;
+//		keyScanEffect = false;
+	}
+
+	keycodeOutput = true;
+
+	if (!readPin(A15)){
+		keycodeOutput = false;
+	}
+
+    //Reade Iniit/Travel postion calibration data
+	for (uint16_t i = 0; i < (ADC_NUM_CHANNELS * ADC_BUF_DEPTH); i++)
+    {
+        initPostionLevel[i % ADC_BUF_DEPTH][i / ADC_BUF_DEPTH] = eeprom_read_word(EECONFIG_KEYMAP_OFFSET_CALIBRATION + i * 2);
+        travelPostionLevel[i % ADC_BUF_DEPTH][i / ADC_BUF_DEPTH] = eeprom_read_word(EECONFIG_KEYMAP_TRAVEL_CALIBRATION + i * 2);
+    }
+	// Trigger level
+	keyMatrixTriggerLevel = eeprom_read_word(EECONFIG_KEYMAP_TRIGGER_LEVEL);
+	if (keyMatrixTriggerLevel>TriggerMax || keyMatrixTriggerLevel<TriggerMin){
+		keyMatrixTriggerLevel = TriggerInitial;
+		eeprom_write_word(EECONFIG_KEYMAP_TRIGGER_LEVEL, keyMatrixTriggerLevel);
+	}
+
+	//Release level
+	keyMatrixReleaseLevel = eeprom_read_word(EECONFIG_KEYMAP_RELEASE_LEVEL);
+	if (keyMatrixReleaseLevel>ReleaseMax || keyMatrixReleaseLevel<ReleaseMin || keyMatrixReleaseLevel>=keyMatrixTriggerLevel){
+		keyMatrixReleaseLevel = ReleaseInitial;
+		eeprom_write_word(EECONFIG_KEYMAP_RELEASE_LEVEL, keyMatrixReleaseLevel);
+	}
+
+	uprintf ("Trigger Level:%d output:%d btn:%d\r\n",keyMatrixTriggerLevel, keycodeOutput, readPin(A15));
+
+    //void rapidTriggerKeyBuilder(uint8_t key, uint8_t row, uint8_t col, uint8_t counts, uint8_t *keycode)
+    uint16_t keycodes[] = {KC_1, KC_2, KC_3, KC_4, KC_5, KC_6, KC_7, KC_8, KC_9, KC_0};
+    if (rapidTriggerKeyBuilder(true, 0, 1, 2, 2, keycodes) !=0){
+    	uprintf ("build Fail #1\r\n");
+    }
+
+    if (rapidTriggerKeyBuilder(true, 1, 1, 3, 3, keycodes) !=0){
+    	uprintf ("build Fail #2\r\n");
+    }
+
+    if (rapidTriggerKeyBuilder(true, 2, 1, 4, 4, keycodes) !=0){
+    	uprintf ("build Fail #3\r\n");
+    }
+
+    if (rapidTriggerKeyBuilder(true, 3, 1, 5, 5, keycodes) !=0){
+    	uprintf ("build Fail #4\r\n");
+    }
+
+    if (rapidTriggerKeyBuilder(true, 4, 1, 6, 6, keycodes) !=0){
+    	uprintf ("build Fail #5\r\n");
+    }
+
+    if (rapidTriggerKeyBuilder(true, 5, 1, 7, 7, keycodes) !=0){
+    	uprintf ("build Fail #6\r\n");
+    }
+
+    if (rapidTriggerKeyBuilder(true, 6, 1, 8, 8, keycodes) !=0){
+    	uprintf ("build Fail #7\r\n");
+    }
+
+    if (rapidTriggerKeyBuilder(true, 7, 1, 9, 9, keycodes) !=0){
+    	uprintf ("build Fail #8\r\n");
+    }
+
+//    if (rapidTriggerKeyBuilder(7, 1, 10, 10, keycodes) !=0){
+//    	uprintf ("build Fail #9\r\n");
+//    }
+
+    chThdCreateStatic(waADC_ProcessThread, sizeof(waADC_ProcessThread), NORMALPRIO +10 , ADC_ProcessThread, NULL);
+}
+
+uint8_t matrix_scan(void)
+{
+static counts = 0;
+	//chThdSleepMilliseconds(1);
+//	chBSemWait(&matrixScanSem);
+	uprintf ("Matrix scan\r\n");
+	keyboard_taskTMR();
+//	if (counts++<5000){ss
+//		chThdSleepMilliseconds(1);
+//	}
+//	for (uint32_t i=0;i>10000000;i++);
+    return 1;
+}
+
+bool matrix_is_on(uint8_t row, uint8_t col)
+{
+    return (matrix[row] & (1 << col));
+}
+
+matrix_row_t matrix_get_row(uint8_t row)
+{
+    return matrix[row];
+}
+
+//matrix_row_t matrix_get_row(uint8_t row) {
+//static bool speedTest = false;
+//static uint16_t key;
+////	if (speedTest){
+////		matrix[3] = 0x08;
+////	} else {
+////		matrix[3] = 0x00;
+////	}
+////	speedTest = !speedTest;
+////	if (key ==0){key = 1;}
+////	matrix[3] = key;
+////	key<<=1;
+//	return matrix[row];
+//}
+
+bool hook_matrix_change(keyevent_t event)
+{
+	uint16_t keycode = keymap_key_to_keycode(biton32(layer_state),event.key);
+	bool resault;
+	resault = true;
+	//uprintf ("row:%d col:%d state:%d keycode:%04X\r\n",event.key.row, event.key.row, event.pressed, keycode);
+
+	//uprintf ("Layer state:%d keycode:%04X\r\n", biton32(layer_state),keycode);
+
+		if (event.pressed){
+			//uprintf ("keymatrix change pressed code:%04X\r\n",keycode);
+			switch(keycode){
+				case KC_RGB_TOG:
+				//case	KC_X:
+                    if (!keyScanEffect)
+                    {
+                        currentLED_RunMode.type = offMode;
+                        keyScanEffect = true;
+                    }
+                    else
+                    {
+                    	keyScanEffect = false;
+                    	currentLED_RunMode.type = normalMode;
+                    }
+                    setRunMode(currentLED_RunMode);
+                    //keycodeOutput = !keycodeOutput;
+                    resault = false;
+					break;
+				case KC_RGB_OFF:
+					keyScanEffect = false;
+					chThdSleepMilliseconds(10);
+					currentLED_RunMode.type = offMode;
+					setRunMode(currentLED_RunMode);
+					resault = false;
+					break;
+				case KC_RGB_VAI ... KC_RGB_SPD:
+					switch (keycode){
+					case KC_RGB_VAI:
+						++currentLED_RunMode.brightness;
+						break;
+					case KC_RGB_VAD:
+						--currentLED_RunMode.brightness;
+						break;
+					case KC_RGB_SPI:
+						--currentLED_RunMode.speed;
+						break;
+					case KC_RGB_SPD:
+						++currentLED_RunMode.speed;
+						break;
+					}
+						if (currentLED_RunMode.brightness > 10){
+							currentLED_RunMode.brightness = 10;
+						}
+						if (currentLED_RunMode.brightness < 1){
+							currentLED_RunMode.brightness = 1;
+						}
+						if (currentLED_RunMode.speed < 1){
+							currentLED_RunMode.speed = 1;
+						}
+						if (currentLED_RunMode.speed > 5){
+							currentLED_RunMode.speed = 5;
+						}
+						LED_SpeedChange(currentLED_RunMode.brightness, currentLED_RunMode.speed);
+						//setRunMode(currentLED_RunMode);
+						resault = false;
+				break;
+
+			}
+		} else {
+			switch(keycode){
+			}
+		}
+		if (!keycodeOutput){ resault = false;}
+
+	return resault;
+}
+
+void matrix_print(void)
+{
+    uprintf("\033[2J\033[H");   //VT100 Clr Screen
+    uprintf("\r\nr/c 0123456789ABCDE\r\n");
+    for (uint8_t row = 0; row < MATRIX_ROWS; row++)
+    {
+        uprintf("%02X: ", row);
+        matrix_row_t data = matrix_get_row(row);
+        for (int col = 0; col < MATRIX_COLS; col++)
+        {
+            if (data & (1 << col))
+                uprintf("1");
+            else
+                uprintf("0");
+            //				host_consumer_send(0x00e9);
+            //				host_consumer_send(0x0000);
+        }
+        uprintf("\r\n");
+    }
+}
+
+void analogKeyMatrixConvert(uint8_t group, uint8_t location, uint8_t level)
+{
+    //analogKey_Config_t keyLocation;
+    uprintf("Row:%2d  Col:%2d  ", keyLocation.rowA, keyLocation.colA);
+    if (location > locationMax[group])
+    {
+        uprintf("Skip\r\n");
+        return;
+    }
+    keyLocation = analogKeyRelocate[group][location];
+    if (level > keyMatrixTriggerLevel)
+    {
+        matrix[keyLocation.rowA] |= (0x01 << keyLocation.colA);
+        uprintf("On\r\n");
+    }
+    else
+    {
+        matrix[keyLocation.rowA] &= ~(0x01 << keyLocation.colA);
+        uprintf("Off\r\n");
+    }
+    //matrix_print();
+}
+
+bool encoder_update_kb(uint8_t index, uint8_t status)
+{
+    if (!encoder_update_user(index, status))
+    {
+        return false; /* Don't process further events if user function exists and returns false */
+    }
+    switch (index)
+    {
+        case 0:                         /* First encoder */
+            switch (status)
+            {
+                case ENCODER_CLOCKWISE:
+                	if (keycodeOutput)
+                    tap_code(KC_VOLU);
+                    break;
+                case ENCODER_COUNTER_CLOCKWISE:
+                	if (keycodeOutput)
+                    tap_code(KC_VOLD);
+                    break;
+
+                case ENCODER_BUTTON:
+
+                	if (currentKeyMatrixMode != keyMatrixMode_TravelPostionCalc){
+                    if (!keyScanEffect)
+                    {
+                        currentLED_RunMode.type = offMode;
+                        keyScanEffect = true;
+                        keycodeOutput = false;
+                    }
+                    else
+                    {
+                    	keyScanEffect = false;
+                    	currentLED_RunMode.type = normalMode;
+                    	if (noiseFind){
+                    		keycodeOutput = false;
+                    	} else {
+                    		keycodeOutput = true;
+                    	}
+                    }
+                    setRunMode(currentLED_RunMode);
+                	}
+                    break;
+
+
+            }
+            chThdSleepMilliseconds(50);
+            break;
+        case 1:
+            if (status)
+            {           /* Second encoder */
+                tap_code(KC_VOLU);
+            }
+            else
+            {
+                tap_code(KC_VOLD);
+            }
+            break;
+
+    }
+
+    return true;
+}
+
+void hook_usb_wakeup(void)
+{
+    currentLED_RunMode.type = normalMode;
+    setRunMode(currentLED_RunMode);
+}
+//
+void hook_usb_suspend_entry(void)
+{
+    if (timer_read() > 1500)
+    {
+        currentLED_RunMode.type = offMode;
+        setRunMode(currentLED_RunMode);
+    }
+}
