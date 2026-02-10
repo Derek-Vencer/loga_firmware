@@ -9,6 +9,7 @@
 # include "socd.h" 
 
 #include "via.h"
+#include "rappy_snappy.h"
 
 #define DYNAMIC_KEYMAP_MACRO_EEPROM_SIZE sizeof(dynamic_macro_t) * DYNAMIC_MACRO_COUNT
 
@@ -31,7 +32,9 @@ extern uint8_t rapidKeyEnable; // test for rapid trigger state
 
 // extern layer_keypos_t snappy_key1;
 // extern layer_keypos_t snappy_key2;
-
+#ifdef rappySnappy
+extern rappy_snappy_pair_t g_rappy_pairs[RAPPY_SNAPPY_PAIR_COUNT];
+#endif // rappysnappy
 #ifdef socd 
 // extern socd_keyrecord_t firstSnap; // for socd function in socd.h lyon
 extern socd_policy_t g_policy;
@@ -932,45 +935,90 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length) {
         #endif
 #endif // modTap
 #ifdef rappySnappy
-		// case ione_api_cmd_set_rappy_snappy:
-        //     uprintf("API=>Set Rapid Snappy State:\r\n");
-        //     if (*payload_length == 6) {             
-        //         *send_status = ione_api_status_success;
-        //         recive_payload[0];
-        //         snappy_key1.row = recive_payload[1];
-        //         snappy_key1.col = recive_payload[2];
-        //         recive_payload[3];
-        //         snappy_key2.row = recive_payload[4];
-        //         snappy_key2.col = recive_payload[5];
-        //     } else {
-        //         *send_status = ione_api_status_fail;
-        //         uprintf("Payload should be 6\r\n");
-        //     }
-        //     *payload_length = 1;
-		// break;
-		// case ione_api_cmd_get_rappy_snappy:
-        // uprintf ("API=>Get Rapid Snappy key:\r\n");
-		// 	if (*payload_length == 0){
-		// 	*send_status = ione_api_status_success;
-		// 	*send_data = snappy_key1.layer;     //key1 layer
-        //     send_data++;
-        //     *send_data = snappy_key1.row;       //key1 row
-        //     send_data++;
-        //     *send_data = snappy_key1.col;       //key1 col
-        //     send_data++;
-        //     *send_data = snappy_key2.layer;     //key2 layer
-        //     send_data++;
-        //     *send_data = snappy_key2.row;       //key2 row
-        //     send_data++;
-        //     *send_data = snappy_key2.col;       //key2 col
-        //     send_data++;
-		// 	// uprintf ("Get Rapid Snappy key:%d\r\n",*send_data++);
-		// 	} else {
-		// 		*send_status = ione_api_status_fail;
-		// 		uprintf ("Fail\r\n");
-		// 	}
-		// 	*payload_length = 7;
-		// break;
+        case ione_api_cmd_set_rappy_snappy:
+        {
+            uprintf("API=>Set Rappy Snappy (Analog Pair)\r\n");
+
+            if (*payload_length == 6) {
+
+                uint8_t index = recive_payload[0];
+
+                if (index >= RAPPY_SNAPPY_PAIR_COUNT) {
+                    *send_status = ione_api_status_fail;
+                    *payload_length = 1;
+                    break;
+                }
+
+                rappy_snappy_pair_t *p = &g_rappy_pairs[index];
+
+                p->enable = 1;
+
+                // Key A
+                p->row_a = recive_payload[1];
+                p->col_a = recive_payload[2];
+                // p->kc_a  = keymap_get_keycode(0, p->row_a, p->col_a);
+                p->kc_a = eepromKeyBuffer[0][p->row_a][p->col_a];
+
+                // Key B
+                p->row_b = recive_payload[4];
+                p->col_b = recive_payload[5];
+                // p->kc_b  = keymap_get_keycode(0, p->row_b, p->col_b);
+                p->kc_b = eepromKeyBuffer[0][p->row_b][p->col_b];
+
+                // 新版 rappy snappy：固定使用 Analog Depth Priority
+                p->hysteresis = 40;     // 你之後可調
+                p->state      = RS2_IDLE;
+
+                *send_status = ione_api_status_success;
+            }
+            else {
+                *send_status = ione_api_status_fail;
+                uprintf("Payload should be 6\r\n");
+            }
+
+            *payload_length = 1;
+        }
+        break;
+        case ione_api_cmd_get_rappy_snappy:
+        {
+            uprintf("API=>Get Rappy Snappy (Analog Pair)\r\n");
+
+            if (*payload_length == 1) {
+
+                uint8_t index = recive_payload[0];
+
+                if (index >= RAPPY_SNAPPY_PAIR_COUNT ||
+                    !g_rappy_pairs[index].enable) {
+
+                    *send_status = ione_api_status_fail;
+                    *payload_length = 1;
+                    break;
+                }
+
+                rappy_snappy_pair_t *p = &g_rappy_pairs[index];
+
+                *send_status = ione_api_status_success;
+
+                // Key A
+                *send_data++ = 0;           // layer (暫固定 0)
+                *send_data++ = p->row_a;
+                *send_data++ = p->col_a;
+
+                // Key B
+                *send_data++ = 0;           // layer (暫固定 0)
+                *send_data++ = p->row_b;
+                *send_data++ = p->col_b;
+
+                *payload_length = 7;        // status + 6 bytes
+            }
+            else {
+                *send_status = ione_api_status_fail;
+                *payload_length = 1;
+                uprintf("Fail\r\n");
+            }
+        }
+        break;
+
 #endif // rappySnappy
 		case ione_api_cmd_set_factory_reset:
 			uprintf("API=>Factory Reset:\r\n");

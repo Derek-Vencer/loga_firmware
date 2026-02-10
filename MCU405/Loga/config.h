@@ -7,7 +7,7 @@
 #define VENDOR_ID       0x195d
 #define PRODUCT_ID      0x2100//0x2092
 #define DEVICE_VER      0x000E//14//0x000E
-#define DEVICE_VER_FIX  0x0C // 12
+#define DEVICE_VER_FIX  0x0E // 14
 /* in python2: list(u"whatever".encode('utf-16-le')) */
 /*   at most 32 characters or the ugly hack in usb_main.c borks */
 #define MANUFACTURER "iOne Innovation"
@@ -18,7 +18,7 @@
 #define USBSTR_SERIAL 		   '0', '\x00', '1', '\x00', '2', '\x00', '3', '\x00'
 
 //#define minTriggerCheck
-#define DEFAULT_TRIGGER_LEVEL	400//400//500//150  //350 可以，但是500為了看log
+#define DEFAULT_TRIGGER_LEVEL	50//400//500//150  //350 可以，但是500為了看log
 #define DEFAULT_RELEASE_LEVEL	0
 
 /* key matrix size */
@@ -55,9 +55,9 @@
 #define EECONFIG_KEYMAP_OFFSET_CALIBRATION	(uint16_t *)(0x80)
 #define EECONFIG_KEYMAP_TRAVEL_CALIBRATION	(uint16_t *)(EECONFIG_KEYMAP_OFFSET_CALIBRATION + (ADC_NUM_CHANNELS*ADC_BUF_DEPTH*2))
 #define EECONFIG_KEYMAP_TRIGGER_LEVEL       (uint16_t *)(EECONFIG_KEYMAP_TRAVEL_CALIBRATION + (ADC_NUM_CHANNELS*ADC_BUF_DEPTH*2))
-#define EECONFIG_KEYMAP_RELEASE_LEVEL       (uint16_t *)(EECONFIG_KEYMAP_TRIGGER_LEVEL+2)
+#define EECONFIG_KEYMAP_RELEASE_LEVEL       (uint16_t *)(EECONFIG_KEYMAP_TRIGGER_LEVEL+4)
 
-#define EECONFIG_KEYMAP_IN_EEPROM 			(uint16_t *)(EECONFIG_KEYMAP_RELEASE_LEVEL+2)
+#define EECONFIG_KEYMAP_IN_EEPROM 			(uint16_t *)(EECONFIG_KEYMAP_RELEASE_LEVEL+4)
 #define EECONFIG_END						(uint16_t *)(EECONFIG_KEYMAP_IN_EEPROM + KEYMAP_SIZE)
 
 #define EECONFIG_TRIGGER_LEVEL				(uint16_t *)(EECONFIG_END)

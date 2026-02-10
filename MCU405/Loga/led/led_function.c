@@ -75,7 +75,7 @@ extern bool adcTestToggle;
 //int8_t MultiUpdatelastLED = -1;
 bool ledUpdatingLock = false;
 static int32_t lastLED_Update = -1;
-extern uint8_t keyMatrixTriggerLevel, keyMatrixReleaseLevel;
+extern uint16_t keyMatrixTriggerLevel, keyMatrixReleaseLevel;
 
 extern const analogKey_Config_t matrixAnalogRelocate[6][15];
 
@@ -1364,14 +1364,14 @@ static THD_FUNCTION(LED_DynamaticLighting, arg)
                                         switch (lamp_array_data_report.data[3])
                                         {
                                             case 0:
-												// uprintf("200");
+												// uprintf("read all trigger\r\n");
                                                 keyMatrixTriggerLevel = eeprom_read_word(EECONFIG_KEYMAP_TRIGGER_LEVEL);
                                                 dynamaticReciveBuff[4] = (keyMatrixTriggerLevel >> 8) & 0xFF;
                                                 dynamaticReciveBuff[5] = keyMatrixTriggerLevel & 0xff;
                                                 uprintf("Read Trigger Level:%d\r\n", keyMatrixTriggerLevel);
                                                 break;
                                             case 1:
-												// uprintf("201");
+												// uprintf("write all trigger\r\n");
                                                 data = lamp_array_data_report.data[4] << 8 | lamp_array_data_report.data[5];
                                                 uprintf("Write Trigger Level:%0x\r\n", data);
                                                 eeprom_write_word(EECONFIG_KEYMAP_TRIGGER_LEVEL, data);
@@ -1390,14 +1390,14 @@ static THD_FUNCTION(LED_DynamaticLighting, arg)
                                         switch (lamp_array_data_report.data[3])
                                         {
 											case 0:
-												// uprintf("210");
+												// uprintf("read all release"); //  沒用?
 												keyMatrixReleaseLevel = eeprom_read_word(EECONFIG_KEYMAP_RELEASE_LEVEL);
 												dynamaticReciveBuff[4] = (keyMatrixReleaseLevel >> 8) & 0xFF;
 												dynamaticReciveBuff[5] = keyMatrixReleaseLevel & 0xff;
 												uprintf("Read Release Level:%d\r\n", keyMatrixReleaseLevel);
 												break;
 											case 1:
-												// uprintf("211");
+												// uprintf("write all release"); //  會寫到read all trigger 的 less two bit
 												data = lamp_array_data_report.data[4] << 8 | lamp_array_data_report.data[5];
 												uprintf("Write Release Level:%0x\r\n", data);
 												eeprom_write_word(EECONFIG_KEYMAP_RELEASE_LEVEL, data);

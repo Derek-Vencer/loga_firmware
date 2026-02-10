@@ -31,6 +31,7 @@ extern socd_policy_t g_policy;
 # include "keymap_common.h" // lyon customize keycode
 #define draftShift	0 //
 #include "feature.h"
+#define TRAVEL_STEPS 100
 
 //
 extern led_runMode_t currentLED_RunMode, lastLED_RunMode;
@@ -923,6 +924,7 @@ const GPTConfig gpt9cfg1 = {
 
 static adcsample_t samples1[ADC_NUM_CHANNELS];
 adcsample_t samples2[ADC_BUF_DEPTH][ADC_NUM_CHANNELS], initPostionLevel[ADC_BUF_DEPTH][ADC_NUM_CHANNELS], travelPostionLevel[ADC_BUF_DEPTH][ADC_NUM_CHANNELS]; ;
+adcsample_t keyDepth[MATRIX_ROWS][MATRIX_COLS];
 // adcsample_t adc2mmLevel[ADC_BUF_DEPTH][ADC_NUM_CHANNELS];
 static int32_t adcsampleIndex = 0, adcUpdateIndex = 0;
 static void adccallback(ADCDriver* adcp);
@@ -2260,6 +2262,20 @@ if (!reset_checked) {
 					break;
 			}
 
+			adcsample_t travel = travelPostionLevel[channel][group];
+			adcsample_t init   = initPostionLevel[channel][group];
+			adcsample_t now    = samples2[channel][group];
+
+			adcsample_t range  = travel - init;
+			adcPre = adcCalc * TRAVEL_STEPS / range;
+
+			if (adcPre < 0){
+				adcPre = 0;
+			}
+			if (adcPre >= 100){
+				adcPre = 100;
+			}
+
 			if (adcCalc < 0)
 			{
 				adcCalc = 0;
@@ -2678,12 +2694,12 @@ if (!reset_checked) {
 //				filterValue = draftShift;
 				// uprintf("%s\r\n", globleTrigger ? "true" : "false"); //false
 				if (globleTrigger){ //
-					if (adcCalc > (keyMatrixTriggerLevel+draftValue))
+					if (adcPre > (keyMatrixTriggerLevel+draftValue))
 					{
 						matrix_temp[keyLocation.rowA] |= (0x01 << keyLocation.colA);
 					}
 				} else {
-					if (adcCalc > (eeconfig_read_Trigger(keyLocation.rowA,keyLocation.colA)+draftValue))
+					if (adcPre > (eeconfig_read_Trigger(keyLocation.rowA,keyLocation.colA)+draftValue))
 					{
 						matrix_temp[keyLocation.rowA] |= (0x01 << keyLocation.colA);
 						// uprintf ("group:%d channel:%d row:%d col:%d\r\n",group,channel,keyLocation.rowA,keyLocation.colA);
@@ -2691,17 +2707,43 @@ if (!reset_checked) {
 					}
 				}
 				if (globleTrigger){
-					if (adcCalc <= keyMatrixReleaseLevel)
+					if (adcPre <= keyMatrixReleaseLevel)
 					{
 						matrix_temp[keyLocation.rowA] &= ~(0x01 << keyLocation.colA);
 					}
 				}
 				else {
-					if (adcCalc <= eeconfig_read_Release(keyLocation.rowA,keyLocation.colA))
+					if (adcPre <= eeconfig_read_Release(keyLocation.rowA,keyLocation.colA))
 					{
 						matrix_temp[keyLocation.rowA] &= ~(0x01 << keyLocation.colA);
 					}
 				}
+				// if (globleTrigger){ //
+				// 	if (adcCalc > (keyMatrixTriggerLevel+draftValue))
+				// 	{
+				// 		// matrix_temp[keyLocation.rowA] |= (0x01 << keyLocation.colA);
+				// 	}
+				// } else {
+				// 	if (adcCalc > (eeconfig_read_Trigger(keyLocation.rowA,keyLocation.colA)+draftValue))
+				// 	{
+				// 		// matrix_temp[keyLocation.rowA] |= (0x01 << keyLocation.colA);
+				// 		// uprintf("eeconfig_read_Trigger(keyLocation.rowA,keyLocation.colA) is %d",eeconfig_read_Trigger(keyLocation.rowA,keyLocation.colA));
+				// 		// uprintf ("group:%d channel:%d row:%d col:%d\r\n",group,channel,keyLocation.rowA,keyLocation.colA);
+				// 		// uprintf ("eeconfig_read_Trigger:%d\r\n",eeconfig_read_Trigger(keyLocation.rowA,keyLocation.colA)+draftValue); //
+				// 	}
+				// }
+				// if (globleTrigger){
+				// 	if (adcCalc <= keyMatrixReleaseLevel)
+				// 	{
+				// 		// matrix_temp[keyLocation.rowA] &= ~(0x01 << keyLocation.colA);
+				// 	}
+				// }
+				// else {
+				// 	if (adcCalc <= eeconfig_read_Release(keyLocation.rowA,keyLocation.colA))
+				// 	{
+				// 		// matrix_temp[keyLocation.rowA] &= ~(0x01 << keyLocation.colA);
+				// 	}
+				// }
 				//if (globleTrigger){
 #ifdef nonOP
 					if (keyScanEffect)
