@@ -4,7 +4,8 @@
 #include "matrix.h"
 
 // 你專案既有
-extern int adcCalc;  // 注意：這是「目前掃描到的鍵」用
+// extern int adcCalc;  // 注意：這是「目前掃描到的鍵」用
+extern int adcPre; 
 // extern int adc_value(uint8_t row, uint8_t col); 
 // ↑ 如果你沒有 function，下面會教你怎麼處理
 
@@ -77,8 +78,8 @@ void rappy_snappy_process_all(void)
 
         // ★ 這裡是關鍵：怎麼取得 depth
         // 若你沒有 adc_value(row,col)，請看下面「補充」
-        int16_t da = adc_value[p->row_a][p->col_a];
-        int16_t db = adc_value[p->row_b][p->col_b];
+        int16_t da = adcPre_value[p->row_a][p->col_a];
+        int16_t db = adcPre_value[p->row_b][p->col_b];
 
 
         if (da < 0) da = 0;

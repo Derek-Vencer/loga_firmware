@@ -149,6 +149,7 @@ static socd_runtime_t socd_rt[SOCD_SLOT_COUNT];
 
 #ifdef rappyTrigger
 //rappy trigger lyon
+int16_t adcPre_value[MATRIX_ROWS][MATRIX_COLS];
 
 rappy_fixed_ratio_t rappy_q = {
     .enabled = true,
@@ -2368,16 +2369,16 @@ if (!reset_checked) {
 
 				//if (keyLocation.rowA == -1 || keyLocation.colA == -1) { return; }
 
-				if (adcCalc>150){//DEFAULT_TRIGGER_LEVEL){ // lyon change DEFAULT_TRIGGER_LEVEL to original daytona value 150
-					adcCalc -= 150;//DEFAULT_TRIGGER_LEVEL;
+				if (adcPre>50){//DEFAULT_TRIGGER_LEVEL){ // lyon change DEFAULT_TRIGGER_LEVEL to original daytona value 150
+					adcPre -= 50;//DEFAULT_TRIGGER_LEVEL;
 					EffectranbowColor = rainbowColor[group];
-					if (adcCalc > 600)
+					if (adcPre > 80)
 					{
 						mult = 1;
 					}
 					else
 					{
-						mult = (float)adcCalc / 600;         //OP*2	nonOP*10
+						mult = (float)adcPre / 80;         //OP*2	nonOP*10
 					}
 					EffectranbowColor.red *= mult;
 					EffectranbowColor.green *= mult;
@@ -2398,7 +2399,8 @@ if (!reset_checked) {
 			// if (is_skipped_key(keyLocation.rowA, keyLocation.colA) && rappySnappyisOn == true) {continue;}
 
 			// adcCalc 已經算好
-			adc_value[keyLocation.rowA][keyLocation.colA] = (int16_t)adcCalc;
+			// adc_value[keyLocation.rowA][keyLocation.colA] = (int16_t)adcCalc;
+			adcPre_value[keyLocation.rowA][keyLocation.colA] = (int16_t)adcPre;
 
 			/**********
 			#define TEST_ROW  2

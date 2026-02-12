@@ -6,7 +6,8 @@
 
 #define RAPPY_SNAPPY_PAIR_COUNT 8   // 可自行調整
 
-static int16_t adc_value[MATRIX_ROWS][MATRIX_COLS];
+// static int16_t adc_value[MATRIX_ROWS][MATRIX_COLS];
+extern int16_t adcPre_value[MATRIX_ROWS][MATRIX_COLS];
 
 typedef enum {
     RS2_IDLE = 0,
