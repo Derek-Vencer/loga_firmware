@@ -18,7 +18,7 @@
 #        define I2C1_OPMODE OPMODE_I2C
 #    endif
 #    ifndef I2C1_CLOCK_SPEED
-#        define I2C1_CLOCK_SPEED 100000 /* 400000 */
+#        define I2C1_CLOCK_SPEED 100000 /* 400000 //*/
 #    endif
 #    ifndef I2C1_DUTY_CYCLE
 #        define I2C1_DUTY_CYCLE STD_DUTY_CYCLE /* FAST_DUTY_CYCLE_2 */

@@ -1,6 +1,184 @@
-14:52:41 **** Incremental Build of configuration Default for project Loga ****
+09:31:31 **** Incremental Build of configuration Default for project Loga ****
 make all 
-Compiling rappy_snappy.c
+Compiling via.c
+In file included from ../../keyboard_core/tool/chibios/chibios/os/hal/include/hal.h:314,
+                 from via/via.c:1:
+../../keyboard_core/tool/chibios/chibios/os/hal/include/hal_i2c.h:50: warning: "I2C_TIMEOUT" redefined
+   50 | #define I2C_TIMEOUT                0x20    /**< @brief Hardware timeout.    */
+      | 
+In file included from <command-line>:
+./config.h:148: note: this is the location of the previous definition
+  148 | #define I2C_TIMEOUT 1000 // milliseconds
+      | 
+In file included from ../../keyboard_core/common/action_util.h:21,
+                 from ./keymap_common.h:25,
+                 from via/via.c:2:
+../../keyboard_core/common/report.h:303:1: warning: no semicolon at end of struct or union
+  303 | } trm_calibration_t;
+      | ^
+In file included from ../../keyboard_core/common/action_util.h:21,
+                 from ./keymap_common.h:25,
+                 from via/via.c:2:
+../../keyboard_core/common/report.h:354:1: warning: multi-line comment [-Wcomment]
+  354 | // #define KEYCODE2CONSUMER(key) \
+      | ^
+In file included from ./keymap_common.h:27,
+                 from via/via.c:2:
+../../keyboard_core/common/report.h:354:1: warning: multi-line comment [-Wcomment]
+  354 | // #define KEYCODE2CONSUMER(key) \
+      | ^
+In file included from via/via.c:7:
+via/../led/led_function.h:216:62: warning: missing braces around initializer [-Wmissing-braces]
+  216 | static const int8_t ledKeyMatrix[MATRIX_ROWS][MATRIX_COLS] = {
+      |                                                              ^
+  217 |   27,28,29,30,31,32,33,34,35,36,37,38,39,40,-1,   //14
+      |   {                                           }
+  218 |   43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,   //15
+      |   {                                           }
+  219 |   60,61,62,63,64,65,66,67,68,69,70,71,72,73,74,   //15
+      |   {                                           }
+  220 |   77,78,79,80,81,82,83,84,85,86,87,88,89,90,-1,  //14
+      |   {                                           }
+  221 |   93,94,95,96,97,98,99,100,101,102,103,104,105,-1,-1,   //13
+      |   {                                                 }
+  222 |   108,109,110,111,112,113,114,115,116,117,-1,-1,-1,-1,-1,   //10
+      |   {
+  223 | 
+  224 | };
+      | }
+via/../led/led_function.h:226:66: warning: missing braces around initializer [-Wmissing-braces]
+  226 | static const int8_t ledRemap[LED_MATRIX_ROWS][LED_MATRIX_COLS] = {
+      |                                                                  ^
+  227 |    0, 1, 2, 3, 4, 5, 6, 7, 8, 9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,        //26 0-25
+      |    {                                                                           }
+  228 |   26,27,-1,-1,28,29,30,31,-1,-1,32,33,34,-1,-1,35,36,37,38,-1,39,-1,-1,-1,40,41,          //16 26,41
+      |   {                                                                            }
+  229 |   42,43,44,-1,45,46,47,-1,48,49,50,-1,51,52,53,-1,54,55,-1,-1,56,-1,-1,-1,57,58,        //17 42-58
+      |   {                                                                            }
+  230 |   59,60,61,-1,62,63,64,-1,65,66,67,-1,68,69,70,-1,71,72,-1,-1,73,-1,-1,-1,74,75,        //17 59,75
+      |   {                                                                            }
+  231 |   76,77,-1,-1,78,79,80,-1,81,82,83,-1,84,85,86,-1,87,88,-1,-1,89,-1,-1,-1,90,91,        //16 76-91
+      |   {                                                                            }
+  232 |    92, -1, 93, -1, 94, 95, 96, 97, 98, -1, 99,100,101,102,103, -1, -1,104, -1, -1, 105,105 -1, -1, -1, -1,106,      //15 92-106
+      |    {                                                                                                         }
+  233 |   107,-1,108,-1,109,-1,110,-1,-1,-1,-1,111,-1,-1,-1,-1,112,113,114,-1,-1,115,116,117,-1,118,     //12 107-118
+      |   {
+  234 | };
+      | }
+via/via.c: In function 'VIA_Thread':
+via/via.c:80:9: warning: implicit declaration of function 'raw_hid_receive'; did you mean 'spi_lld_receive'? [-Wimplicit-function-declaration]
+   80 |         raw_hid_receive(raw_report, sizeof(raw_report));
+      |         ^~~~~~~~~~~~~~~
+      |         spi_lld_receive
+via/via.c: In function 'dynamic_keymap_get_buffer':
+via/via.c:116:24: warning: initialization of 'uint16_t *' {aka 'short unsigned int *'} from incompatible pointer type 'uint8_t *' {aka 'unsigned char *'} [-Wincompatible-pointer-types]
+  116 |     uint16_t *target = data;
+      |                        ^~~~
+via/via.c: In function 'dynamic_keymap_set_buffer':
+via/via.c:132:24: warning: initialization of 'uint16_t *' {aka 'short unsigned int *'} from incompatible pointer type 'uint8_t *' {aka 'unsigned char *'} [-Wincompatible-pointer-types]
+  132 |     uint16_t *target = data;
+      |                        ^~~~
+via/via.c: In function 'raw_hid_receive_kb':
+via/via.c:183:70: warning: unused parameter 'length' [-Wunused-parameter]
+  183 | __attribute__((weak)) bool raw_hid_receive_kb(uint8_t *data, uint8_t length) {
+      |                                                              ~~~~~~~~^~~~~~
+via/via.c: In function 'raw_hid_receive_ione':
+via/via.c:192:40: warning: operation on 'data' may be undefined [-Wsequence-point]
+  192 |  uint16_t hid_vid = *data++ <<8 | *data++;
+      |                                    ~~~~^~
+via/via.c:196:46: warning: operation on 'data' may be undefined [-Wsequence-point]
+  196 |     uint16_t command_id = *data++ <<8 | *data++;
+      |                                          ~~~~^~
+via/via.c:201:2: warning: implicit declaration of function 'memcpy' [-Wimplicit-function-declaration]
+  201 |  memcpy (recive_payload,data,sizeof(recive_payload));
+      |  ^~~~~~
+via/via.c:201:2: warning: incompatible implicit declaration of built-in function 'memcpy'
+via/via.c:13:1: note: include '<string.h>' or provide a declaration of 'memcpy'
+   12 | #include "rappy_snappy.h"
+  +++ |+#include <string.h>
+   13 | 
+via/via.c:207:2: warning: implicit declaration of function 'memset' [-Wimplicit-function-declaration]
+  207 |  memset (send_payload,0,sizeof(recive_payload));
+      |  ^~~~~~
+via/via.c:207:2: warning: incompatible implicit declaration of built-in function 'memset'
+via/via.c:207:2: note: include '<string.h>' or provide a declaration of 'memset'
+via/via.c:256:17: warning: implicit declaration of function 'eeconfig_write_keymap_key'; did you mean 'eeconfig_write_keymap'? [-Wimplicit-function-declaration]
+  256 |                 eeconfig_write_keymap_key(recive_payload[0], recive_payload[1], recive_payload[2], (recive_payload[3] << 8) | recive_payload[4]); //Add comment More actions
+      |                 ^~~~~~~~~~~~~~~~~~~~~~~~~
+      |                 eeconfig_write_keymap
+via/via.c:333:29: warning: implicit declaration of function 'raw_hid_send' [-Wimplicit-function-declaration]
+  333 |                             raw_hid_send(data_start, EP);
+      |                             ^~~~~~~~~~~~
+via/via.c:355:17: warning: implicit declaration of function 'setRunMode'; did you mean 'setLightRunMode'? [-Wimplicit-function-declaration]
+  355 |                 setRunMode(currentLED_RunMode);
+      |                 ^~~~~~~~~~
+      |                 setLightRunMode
+via/via.c:399:31: warning: statement with no effect [-Wunused-value]
+  399 |                 recive_payload[0];
+      |                 ~~~~~~~~~~~~~~^~~
+via/via.c:403:31: warning: statement with no effect [-Wunused-value]
+  403 |                 recive_payload[4];
+      |                 ~~~~~~~~~~~~~~^~~
+via/via.c:453:28: warning: assignment to 'uint8_t *' {aka 'unsigned char *'} from 'int' makes pointer from integer without a cast [-Wint-conversion]
+  453 |             payload_length = 1;
+      |                            ^
+via/via.c:556:17: warning: implicit declaration of function 'write_trigger_to_eeprom' [-Wimplicit-function-declaration]
+  556 |                 write_trigger_to_eeprom();
+      |                 ^~~~~~~~~~~~~~~~~~~~~~~
+via/via.c:557:14: warning: implicit declaration of function 'write_Release_to_eeprom' [-Wimplicit-function-declaration]
+  557 |              write_Release_to_eeprom();
+      |              ^~~~~~~~~~~~~~~~~~~~~~~
+via/via.c:712:59: warning: statement with no effect [-Wunused-value]
+  712 |                         rapidTriggerKey[i].key.keycode[0] == recive_payload[3];   // no.1
+      |                         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~
+via/via.c:713:59: warning: statement with no effect [-Wunused-value]
+  713 |                         rapidTriggerKey[i].key.keycode[1] == recive_payload[4];  // no.2
+      |                         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~
+via/via.c:714:59: warning: statement with no effect [-Wunused-value]
+  714 |                         rapidTriggerKey[i].key.keycode[2] == recive_payload[5];  // no.3
+      |                         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~
+via/via.c:715:59: warning: statement with no effect [-Wunused-value]
+  715 |                         rapidTriggerKey[i].key.keycode[3] == recive_payload[6];  // no.4
+      |                         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~
+via/via.c:1053:5: warning: implicit declaration of function 'eeconfig_rapidTrigger_init' [-Wimplicit-function-declaration]
+ 1053 |     eeconfig_rapidTrigger_init();
+      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~
+via/via.c:1066:5: warning: implicit declaration of function 'write_keymap_to_eeprom' [-Wimplicit-function-declaration]
+ 1066 |     write_keymap_to_eeprom();
+      |     ^~~~~~~~~~~~~~~~~~~~~~
+via/via.c:192:11: warning: unused variable 'hid_vid' [-Wunused-variable]
+  192 |  uint16_t hid_vid = *data++ <<8 | *data++;
+      |           ^~~~~~~
+via/via.c: At top level:
+via/via.c:1146:6: warning: conflicting types for 'raw_hid_receive'
+ 1146 | void raw_hid_receive(uint8_t *data, uint8_t length) {
+      |      ^~~~~~~~~~~~~~~
+via/via.c:80:9: note: previous implicit declaration of 'raw_hid_receive' was here
+   80 |         raw_hid_receive(raw_report, sizeof(raw_report));
+      |         ^~~~~~~~~~~~~~~
+via/via.c: In function 'raw_hid_receive':
+via/via.c:1159:39: warning: implicit declaration of function 'timer_read32' [-Wimplicit-function-declaration]
+ 1159 |                     uint32_t value  = timer_read32();
+      |                                       ^~~~~~~~~~~~
+via/via.c:1283:25: warning: implicit declaration of function 'LED_SpeedChange' [-Wimplicit-function-declaration]
+ 1283 |                         LED_SpeedChange(currentLED_RunMode.brightness, currentLED_RunMode.speed);
+      |                         ^~~~~~~~~~~~~~~
+via/via.c:1343:13: warning: this 'if' clause does not guard... [-Wmisleading-indentation]
+ 1343 |             if (size <= 28)
+      |             ^~
+via/via.c:1345:14: note: ...this statement, but the latter is misleadingly indented as if it were guarded by the 'if'
+ 1345 |              command_data[3] = 100;
+      |              ^~~~~~~~~~~~
+via/via.c:1374:18: warning: 'return' with a value, in function returning void [-Wreturn-type]
+ 1374 |           return false;
+      |                  ^~~~~
+via/via.c:1146:6: note: declared here
+ 1146 | void raw_hid_receive(uint8_t *data, uint8_t length) {
+      |      ^~~~~~~~~~~~~~~
+via/via.c: In function 'raw_hid_receive_kb':
+via/via.c:187:1: warning: control reaches end of non-void function [-Wreturn-type]
+  187 | }
+      | ^
 Linking build/M18.elf
 lto-wrapper.exe: warning: Options to Xassembler do not match: -alms=build/lst/crt1.lst, -alms=build/lst/chsys.lst, dropping all -Xassembler and -Wa options.
 ../../keyboard_core/common/action_util.c:189:12: warning: type of 'bitpop' does not match original declaration [-Wlto-type-mismatch]
@@ -134,10 +312,10 @@ Creating build/M18.bin
 Creating build/M18.dmp
 
    text	   data	    bss	    dec	    hex	filename
-  80116	   1144	  97152	 178412	  2b8ec	build/M18.elf
+  80624	   1144	  97152	 178920	  2bae8	build/M18.elf
 Creating build/M18.list
 
 Done
 
-14:52:48 Build Finished. 0 errors, 15 warnings. (took 7s.211ms)
+09:31:41 Build Finished. 0 errors, 52 warnings. (took 9s.591ms)
 

@@ -136,7 +136,13 @@ typedef enum {
 typedef struct {
     uint8_t  enable;
     uint16_t kc_a;
+    uint8_t  a_layer;
+    uint8_t  a_row;
+    uint8_t  a_col;
     uint16_t kc_b;
+    uint8_t  b_layer;
+    uint8_t  b_row;
+    uint8_t  b_col;
     uint8_t  mode;   // socd_policy_t
 } socd_config_t;
 

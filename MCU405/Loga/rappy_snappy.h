@@ -19,11 +19,13 @@ typedef struct {
     uint8_t enable;
 
     // Key A
+    uint8_t lay_a;
     uint8_t row_a;
     uint8_t col_a;
     uint16_t kc_a;
 
     // Key B
+    uint8_t lay_b;
     uint8_t row_b;
     uint8_t col_b;
     uint16_t kc_b;

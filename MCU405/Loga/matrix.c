@@ -31,7 +31,7 @@ extern socd_policy_t g_policy;
 # include "keymap_common.h" // lyon customize keycode
 #define draftShift	0 //
 #include "feature.h"
-#define TRAVEL_STEPS 100
+#define TRAVEL_STEPS 350
 
 //
 extern led_runMode_t currentLED_RunMode, lastLED_RunMode;
@@ -536,7 +536,7 @@ uint16_t currentMatrix_CRC, lastMatrix_CRC;
 
 rapidTriggerKey_config_t rapidTriggerKey[RAPID_TRIGGER_COUNT];
 
-int16_t keyMatrixTriggerLevel = 1500, keyMatrixReleaseLevel; // move to matrix.h for using in via.c //
+int16_t keyMatrixTriggerLevel = 50, keyMatrixReleaseLevel; // move to matrix.h for using in via.c //
 
 uint8_t currentKeyMatrixMode = keyMatrixMode_Normal;
 //uint8_t currentKeyMatrixMode = keyMatrixMode_TravelPostionCalc;
@@ -2273,8 +2273,8 @@ if (!reset_checked) {
 			if (adcPre < 0){
 				adcPre = 0;
 			}
-			if (adcPre >= 100){
-				adcPre = 100;
+			if (adcPre >= TRAVEL_STEPS){
+				adcPre = TRAVEL_STEPS;
 			}
 
 			if (adcCalc < 0)
@@ -2369,8 +2369,8 @@ if (!reset_checked) {
 
 				//if (keyLocation.rowA == -1 || keyLocation.colA == -1) { return; }
 
-				if (adcPre>50){//DEFAULT_TRIGGER_LEVEL){ // lyon change DEFAULT_TRIGGER_LEVEL to original daytona value 150
-					adcPre -= 50;//DEFAULT_TRIGGER_LEVEL;
+				if (adcPre>150){//DEFAULT_TRIGGER_LEVEL){ // lyon change DEFAULT_TRIGGER_LEVEL to original daytona value 150
+					adcPre -= DEFAULT_TRIGGER_LEVEL;
 					EffectranbowColor = rainbowColor[group];
 					if (adcPre > 80)
 					{
@@ -4168,6 +4168,41 @@ bool hook_matrix_change(keyrecord_t record)
 
 	//uprintf ("Layer state:%d keycode:%04X\r\n", biton32(layer_state),keycode);
 
+	void dump_eeprom(void)
+	{
+		uint8_t buffer[32];
+
+		uprintf("\r\n=== EEPROM DUMP START ===\r\n");
+
+		for (uint16_t addr = 0; addr < 1024/*EEPROM_SIZE*/; addr += 32)
+		{
+			eeprom_read_block(buffer, (const void*)addr, 32);
+
+			uprintf("%04X: ", addr);
+
+			for (uint8_t i = 0; i < 32; i++)
+			{
+				uprintf("%02X ", buffer[i]);
+			}
+
+			uprintf("\r\n");
+			chThdSleepMilliseconds(1);  // 避免卡死
+		}
+
+		uprintf("=== EEPROM DUMP END ===\r\n");
+	}
+	void eeprom_write8_verify(uint16_t addr, uint8_t value)
+	{
+		uint8_t before = eeprom_read_byte((const uint8_t*)addr);
+
+		eeprom_update_byte((uint8_t*)addr, value);
+
+		uint8_t after  = eeprom_read_byte((const uint8_t*)addr);
+
+		uprintf("[EEP] W8  addr=0x%04X  before=0x%02X  write=0x%02X  after=0x%02X  %s\r\n",
+				addr, before, value, after, (after == value) ? "OK" : "FAIL");
+	}
+
 		if (record.event.pressed){
 			//uprintf ("keymatrix change pressed code:%04X\r\n",keycode);
 			switch(keycode){
@@ -4214,7 +4249,12 @@ bool hook_matrix_change(keyrecord_t record)
 				// }
 				// return true;
 					// send_string("abcdefghijklmnopqrstuvwxyz\n"); /**/
-					send_A_to_Z();
+					// send_A_to_Z();
+					dump_eeprom();
+				break;
+				case KC_M2:
+					// eeprom_write8_verify
+					eeprom_write8_verify(KB_COLOR_MAGIC_ADDR, 0xFA);
 				break;
 //			case KC_BRIU:
 //				send_consumer(0x00BD);

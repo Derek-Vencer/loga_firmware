@@ -33,6 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 enum custom_keycodes{
     KC_M1 = 0x5F00,
+    KC_M2,
 };
 
 #ifdef  KEYMAP_IN_EEPROM_ENABLE

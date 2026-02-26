@@ -1242,12 +1242,21 @@ uint8_t socd_fill_report(uint8_t *buf) {
     if (idx >= SOCD_SLOT_COUNT) return 0;
 
     socd_config_t *c = &socd_slots[idx];
-    buf[0] = idx;
-    buf[1] = c->kc_a & 0xFF;
-    buf[2] = c->kc_a >> 8;
-    buf[3] = c->kc_b & 0xFF;
-    buf[4] = c->kc_b >> 8;
-    buf[5] = c->mode;
+    buf[0] = c->a_layer;
+    buf[1] = c->a_row;
+    buf[2] = c->a_col;
+    buf[3] = c->b_layer;
+    buf[4] = c->b_row;
+    buf[5] = c->b_col;
+    buf[6] = c->mode;
+    buf[7] = idx;
+
+    // buf[0] = idx;
+    // buf[1] = c->kc_a & 0xFF;
+    // buf[2] = c->kc_a >> 8;
+    // buf[3] = c->kc_b & 0xFF;
+    // buf[4] = c->kc_b >> 8;
+    // buf[5] = c->mode;
     return 6;
 }
 
@@ -1264,16 +1273,16 @@ void socd_apply_report(const uint8_t *buf) {
     // eeconfig_write_socd(idx, &c);
     // socd_slots[idx] = c;
     // memset(&socd_rt[idx], 0, sizeof(socd_rt[idx]));
-    uint8_t idx = buf[0];
+    uint8_t idx = buf[7];
     if (idx >= SOCD_SLOT_COUNT) return;
 
-    uint8_t pri_layer = buf[1];
-    uint8_t pri_row   = buf[2];
-    uint8_t pri_col   = buf[3];
-    uint8_t sec_layer = buf[4];
-    uint8_t sec_row   = buf[5];
-    uint8_t sec_col   = buf[6];
-    uint8_t mode      = buf[7];
+    uint8_t pri_layer = buf[0];
+    uint8_t pri_row   = buf[1];
+    uint8_t pri_col   = buf[2];
+    uint8_t sec_layer = buf[3];
+    uint8_t sec_row   = buf[4];
+    uint8_t sec_col   = buf[5];
+    uint8_t mode      = buf[6];
 
     uint16_t kc_a = keymaps[pri_layer][pri_row][pri_col];//keymap_get_keycode(pri_layer, pri_row, pri_col);
     uint16_t kc_b = keymaps[sec_layer][sec_row][sec_col];//keymap_get_keycode(sec_layer, sec_row, sec_col);
@@ -1282,6 +1291,12 @@ void socd_apply_report(const uint8_t *buf) {
         .enable = 1,
         .kc_a   = kc_a,
         .kc_b   = kc_b,
+        .a_layer = pri_layer,
+        .a_row  = pri_row,
+        .a_col  = pri_col,
+        .b_layer = sec_layer,
+        .b_row  = sec_row,
+        .b_col  = sec_col,
         .mode   = mode,
     };
 

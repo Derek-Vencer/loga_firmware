@@ -7,7 +7,7 @@
 #define VENDOR_ID       0x195d
 #define PRODUCT_ID      0x2100//0x2092
 #define DEVICE_VER      0x000E//14//0x000E
-#define DEVICE_VER_FIX  0x0E // 14
+#define DEVICE_VER_FIX  0x0F // 15
 /* in python2: list(u"whatever".encode('utf-16-le')) */
 /*   at most 32 characters or the ugly hack in usb_main.c borks */
 #define MANUFACTURER "iOne Innovation"
@@ -18,7 +18,7 @@
 #define USBSTR_SERIAL 		   '0', '\x00', '1', '\x00', '2', '\x00', '3', '\x00'
 
 //#define minTriggerCheck
-#define DEFAULT_TRIGGER_LEVEL	50//400//500//150  //350 可以，但是500為了看log
+#define DEFAULT_TRIGGER_LEVEL	100//400//500//150  //350 可以，但是500為了看log
 #define DEFAULT_RELEASE_LEVEL	0
 
 /* key matrix size */
@@ -49,6 +49,13 @@
 #define EECONFIG_ModelName (uint8_t *)(EECONFIG_Start)
 #define EECONFIG_SerialNo (uint32_t *)(EECONFIG_ModelName + 25)
 #define EECONFIG_kbColor (uint8_t *)(EECONFIG_SerialNo + 11)
+
+#define EECONFIG_KB_HUE   (uint8_t *)(EECONFIG_kbColor + 0)
+#define EECONFIG_KB_SAT   (uint8_t *)(EECONFIG_kbColor + 1)
+#define EECONFIG_KB_VAL   (uint8_t *)(EECONFIG_kbColor + 2)
+#define EECONFIG_KB_MAGIC (uint8_t *)(EECONFIG_kbColor + 3)
+#define KB_COLOR_MAGIC_ADDR  0x007F
+#define KB_COLOR_MAGIC    0x7F
 
 #define KEYMAP_SIZE (sizeof(uint16_t) * FN_ACTIONS_COUNT + sizeof(uint16_t) * KEYS_COUNT)
 
@@ -139,7 +146,7 @@
 #define I2C1_SDA_PAL_MODE 4
 #define I2C_START_RETRY_COUNT 10
 #define I2C_TIMEOUT 1000 // milliseconds
-#define I2C1_CLOCK_SPEED 1000000 /* 400000 */
+#define I2C1_CLOCK_SPEED 400000 /* 400000 */ //
 
 //#define CRC_USE_DMA	TRUE
 
@@ -152,7 +159,7 @@
 //#define I2C1_TIMINGR_SCLH 120U
 //#define I2C1_TIMINGR_SCLL 138U
 
-//1000Khz
+//1000Khz //
 #define I2C1_TIMINGR_SCLH 45U
 #define I2C1_TIMINGR_SCLL 50U
 

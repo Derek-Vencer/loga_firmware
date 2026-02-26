@@ -305,7 +305,7 @@ bool effectRandowColorProcess(void)
 //            ledTemp.blue = randColor.LED.blue * brightTemp;
             led_updateFrameBufferSingle(0, LedNumbers, &randColor.LED);
             break;
-        case ranbow:
+        case ranbow://
 //            ledTemp.red = rainbowColor[randColor.ranbowIndex].red * brightTemp;
 //            ledTemp.green = rainbowColor[randColor.ranbowIndex].green * brightTemp;
 //            ledTemp.blue = rainbowColor[randColor.ranbowIndex].blue * brightTemp;

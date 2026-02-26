@@ -213,6 +213,8 @@ enum ione_api_command {
 	ione_api_cmd_set_rappy_snappy		= 0x010F,
 	ione_api_cmd_get_rappy_snappy		= 0x018F,
 	ione_api_cmd_set_factory_reset		= 0x0201,
+	ione_api_cmd_get_rapid_trigger_value_mm   = 0x028B,
+	ione_api_cmd_set_rapid_trigger_value_mm   = 0x020B,
 	ione_api_cmd_get_eeprom_max_trigger_value = 0x0282, // lyon add
 	ione_api_cmd_set_test_mode			= 0x0700,
 

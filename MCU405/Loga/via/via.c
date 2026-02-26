@@ -527,8 +527,9 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length) {
 			}
 			*payload_length = 2;
 		break;
-		case ione_api_cmd_set_rapid_trigger_value:
-            uprintf("API=>Set rapid trigger value:\r\n");
+		// case ione_api_cmd_set_rapid_trigger_value:
+        case ione_api_cmd_set_rapid_trigger_value_mm:
+            uprintf("API=>Set rapid trigger value mm:\r\n");
             if (*payload_length == 4) {             
                 *send_status = ione_api_status_success;              
                 uprintf ("recive_payload:%d\r\an",recive_payload[0]);
@@ -560,8 +561,9 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length) {
             }
             *payload_length = 1;
 		break;
-		case ione_api_cmd_get_Rapid_trigger_value:
-            uprintf ("API=>Get Rapid Trigger Value:\r\n");
+		// case ione_api_cmd_get_Rapid_trigger_value:
+        case ione_api_cmd_get_rapid_trigger_value_mm:
+            uprintf ("API=>Get Rapid Trigger Value mm:\r\n");
 			if (*payload_length == 0){
 			*send_status = ione_api_status_success;
 			*send_data = (keyMatrixTriggerLevel >> 8) & 0xFF;// press high byte
@@ -951,20 +953,37 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length) {
 
                 rappy_snappy_pair_t *p = &g_rappy_pairs[index];
 
+                if (recive_payload[1] == 0xFF &&
+                    recive_payload[2] == 0xFF &&
+                    recive_payload[4] == 0xFF &&
+                    recive_payload[5] == 0xFF) {
+
+                    p->enable = 0;
+                    p->state  = RS2_IDLE;
+
+                    *send_status = ione_api_status_success;
+                    *payload_length = 1;
+                    break;
+                }
+
                 p->enable = 1;
 
                 // Key A
+                p->lay_a = recive_payload[0];
                 p->row_a = recive_payload[1];
                 p->col_a = recive_payload[2];
                 // p->kc_a  = keymap_get_keycode(0, p->row_a, p->col_a);
-                p->kc_a = eepromKeyBuffer[0][p->row_a][p->col_a];
+                // p->kc_a = eepromKeyBuffer[0][p->row_a][p->col_a];
+                p->kc_a = keymaps[p->lay_a][p->row_a][p->col_a];
+                
 
                 // Key B
+                p->lay_b = recive_payload[3];
                 p->row_b = recive_payload[4];
                 p->col_b = recive_payload[5];
                 // p->kc_b  = keymap_get_keycode(0, p->row_b, p->col_b);
-                p->kc_b = eepromKeyBuffer[0][p->row_b][p->col_b];
-
+                // p->kc_b = eepromKeyBuffer[0][p->row_b][p->col_b];
+                p->kc_b = keymaps[p->lay_b][p->row_b][p->col_b];
                 // 新版 rappy snappy：固定使用 Analog Depth Priority
                 p->hysteresis = 40;     // 你之後可調
                 p->state      = RS2_IDLE;
@@ -1000,12 +1019,12 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length) {
                 *send_status = ione_api_status_success;
 
                 // Key A
-                *send_data++ = 0;           // layer (暫固定 0)
+                *send_data++ = p->lay_a;
                 *send_data++ = p->row_a;
                 *send_data++ = p->col_a;
 
                 // Key B
-                *send_data++ = 0;           // layer (暫固定 0)
+                *send_data++ = p->lay_b;
                 *send_data++ = p->row_b;
                 *send_data++ = p->col_b;
 

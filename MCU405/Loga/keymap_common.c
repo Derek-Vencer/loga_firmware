@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 //};
 
-const uint16_t keymaps[KEYMAPS_COUNT][MATRIX_ROWS][MATRIX_COLS] __attribute__ ((section (".keymap.keymaps"))) = {
+const uint16_t keymaps[KEYMAPS_COUNT][MATRIX_ROWS][MATRIX_COLS] __attribute__ ((section (".keymap.keymaps"))) = {//
 //Profile 1
 	KEYMAP(
 			ESC,   F1,   F2,   F3,   F4,   F5,   F6,   F7,   F8,   F9,   F10,   F11,   F12,   PSCR,\
@@ -69,7 +69,7 @@ const uint16_t keymaps[KEYMAPS_COUNT][MATRIX_ROWS][MATRIX_COLS] __attribute__ ((
 			TRNS,  0,  TRNS,  TRNS,  TRNS,  TRNS,  TRNS,  TRNS,  TRNS,  TRNS,  TRNS,  TRNS,  TRNS,  TRNS,  TRNS,\
 			TRNS,  TRNS,  TRNS,  TRNS,  TRNS,  TRNS,  TRNS,  TRNS,  TRNS,  TRNS,  TRNS,  TRNS,  TRNS,  TRNS, \
 			RGB_MODE_COLORSHIFT,  TRNS,  TRNS,  TRNS,  TRNS,  TRNS,  TRNS,  TRNS,  TRNS,  TRNS,  TRNS,  TRNS,  RGB_VAI,\
-			RGB_MODE_RAINBOWFLOW,  TRNS,  TRNS,  TRNS,  TRNS,  TRNS,  MO2,  TRNS,  M1, M1),//RGB_VAD
+			RGB_MODE_RAINBOWFLOW,  TRNS,  TRNS,  TRNS,  TRNS,  TRNS,  MO2,  TRNS,  M2, M1),//RGB_VAD
 
 	KEYMAP(
 			BTLD,   TRNS,  TRNS,  TRNS,  TRNS,  TRNS,  TRNS,  TRNS,  TRNS, MEDIA_STOP,  MEDIA_PREV_TRACK,  MEDIA_PLAY_PAUSE,  MEDIA_NEXT_TRACK,  TRNS,\

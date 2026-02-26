@@ -84,6 +84,7 @@ void rappy_snappy_process_all(void)
 
         if (da < 0) da = 0;
         if (db < 0) db = 0;
+        // uprintf("da value is %d, db value is %d\r\n", da, db);
 
         rappy_snappy_process_pair(p, da, db);
     }
