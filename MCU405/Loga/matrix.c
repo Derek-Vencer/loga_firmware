@@ -38,6 +38,10 @@ extern led_runMode_t currentLED_RunMode, lastLED_RunMode;
 extern binary_semaphore_t ledUpdateSem;
 extern led_config_t LED_Datas[LedNumbers];
 extern report_gamepad_report extra_game_report;
+extern EffectMosArt_t mosArt; //lyon for changing color keycode
+hsv_t hsv;
+bool isKEYLOCK = false; // for toggle lock key
+bool isCtrl = true;
 // enum custom_keycodes{ //define in keymap_common.h
 // 	KC_M1 = SAFE_RANGE,
 // };
@@ -118,7 +122,7 @@ bool defaultLayerChanged = false;
 
 extern uint16_t eepromTriggerBuffer[MATRIX_ROWS][MATRIX_COLS];
 
-uint8_t knobState = 0; // lyon for encoder
+uint8_t knobState;// = 0; // lyon for encoder//
 static uint32_t last_layer_state = 0; //keyboard_taskTMR (prooblem ctrl + mo(1))
 #ifdef socd
 typedef struct {
@@ -245,10 +249,10 @@ bool winLock, altTabLock, altF4Lock = false;
 
 // 同時支援的 Mod-Tap 鍵數 / 同時按住的 Mod-Tap 鍵數
 #ifndef MT_CAP_MAP
-#  define MT_CAP_MAP    32
+#  define MT_CAP_MAP    8
 #endif
 #ifndef MT_CAP_ACTIVE
-#  define MT_CAP_ACTIVE 16
+#  define MT_CAP_ACTIVE 4
 #endif
 
 // typedef struct { uint8_t L,R,C,hold,click; bool used; } mt_entry_t; // in matrix.h
@@ -277,6 +281,7 @@ static inline void mt_set(uint8_t L,uint8_t R,uint8_t C,uint8_t hold,uint8_t cli
     int k=mt_find(L,R,C); if (k<0) k=mt_alloc();
 	// uprintf("pass set\r\n");
     mt_map[k]=(mt_entry_t){.L=L,.R=R,.C=C,.hold=hold,.click=click,.used=true};
+	eeconfig_write_modtap(k, &mt_map[k]);
 }
 static inline bool mt_active(uint8_t L,uint8_t R,uint8_t C){ return mt_find(L,R,C) >= 0; }
 
@@ -328,7 +333,7 @@ static inline void mt_tick(uint8_t L){
 // 排程修改：避免在事件回呼內直接改表（防重入/卡死）
 static bool    mt_pending=false;
 static uint8_t pL,pR,pC,pHold,pClick;
-void mt_schedule_set(uint8_t L,uint8_t R,uint8_t C,uint8_t h,uint8_t k){
+void mt_schedule_set(uint8_t L,uint8_t R,uint8_t C,uint8_t h,uint8_t k){ // 1
     pL=L; pR=R; pC=C; pHold=h; pClick=k; mt_pending=true;
 	// uprintf("original %d %d %d %d %d %d\r\n",L, R, C, h, k, mt_pending);
 	// uprintf("-- new --%d %d %d %d %d %d\r\n",pL, pR, pC, pHold, pClick, mt_pending);
@@ -348,19 +353,67 @@ static inline void mt_apply_pending(void){
     }
 }
 
-// 啟動時確保 P 不是 Mod-Tap（避免舊設定殘留）
-// __attribute__((weak)) void mt_init_defaults(void){ 不用
-//     mt_set(0, P_ROW, P_COL, 0, 0); // 清 P
-//     // 也可在這裡先給 A 預設（通常不用）
-//     // mt_set(0, A_ROW, A_COL, 0xE0, 0x04);
-// }
+void eeconfig_write_modtap(uint8_t idx, const mt_entry_t* in)
+{
+    if (idx >= MT_CAP_MAP) return;
 
-static void mt_dump_map(void){ //測試用
-    for (int i=0;i<MT_CAP_MAP;i++){
-        if (mt_map[i].used)
-            uprintf("[MT] MAP[%d]: L%u R%u C%u hold=0x%02X click=0x%02X\r\n",
-                    i, mt_map[i].L, mt_map[i].R, mt_map[i].C, mt_map[i].hold, mt_map[i].click);
+    eeprom_update_block(
+        in,
+        (void*)(EECONFIG_MODTAP_ADDR + idx * sizeof(mt_entry_t)),
+        sizeof(mt_entry_t)
+    );
+}
+
+void eeconfig_read_modtap(uint8_t idx, socd_config_t* out)
+{
+    if (idx >= MT_CAP_MAP) {
+        memset(out, 0, sizeof(*out));
+        return;
     }
+
+    eeprom_read_block(
+        out,
+        (const void*)(EECONFIG_MODTAP_ADDR + idx * sizeof(mt_entry_t)),
+        sizeof(mt_entry_t)
+    );
+}
+
+void modtap_load_form_eeprom(void)
+{
+	for(uint8_t i = 0; MT_CAP_MAP > i; i++){
+		mt_entry_t *m = &mt_map[i];
+		eeconfig_read_modtap(i, m);
+
+		// typedef struct {
+		// 	uint8_t L, R, C;           // 建議之後可改成 layer,row,col 比較清楚
+		// 	uint8_t hold, click;
+		// 	bool    used;
+		// } mt_entry_t;
+
+		// uprintf("EEPROM READ MODTAP: number= %d, layer=%d, row=%d, col=%d, hold=%d, click=%d, used=%d\r\n",
+		// 		i,
+		// 		m.L,
+		// 		m.R,
+		// 		m.C,
+		// 		m.hold,
+		// 		m.click,
+		// 		m.used
+		// 	);
+	}
+}
+
+void eeconfig_modtap_clear(void){
+	// mt_entry_t *m = &mt_map[i];
+	mt_entry_t empty;
+    memset(&empty, 0xff, sizeof(empty));
+
+    for (uint8_t i = 0; i < MT_CAP_MAP; i++) {
+        eeconfig_write_modtap(i, &empty);
+
+        memset(&mt_map[i], 0xFF, sizeof(mt_map[i]));
+        mt_map[i] = empty;
+    }
+
 }
 #endif // modTap
 
@@ -614,7 +667,7 @@ void led_ctrl(bool sw){
 #ifdef socd
 // extern socd_keyrecord_t firstSnap; // no need?
 // extern SOCDPair_t; old dont need ?
-
+bool isSOCD = true; // for toggle key
 
 
 
@@ -861,17 +914,32 @@ void hook_late_init()
 	// toggle_key_set(0, 2, 2, 0x00);   // 0x04 = KC_A
 	#endif // toggleKey
 
-	// palSetPad(GPIOB, 3);
-    // palSetPad(GPIOB, 4);
 
-    // // 例如：Layer 0, row 4 col 1 / col 2，對應 Z / X
-    // uint8_t idx = socd_add_pair(
-    //     0, 4, 1, KC_Z,
-    //     0, 4, 2, KC_X,
-    //     SOCD_MODE_LAST_INPUT
-    // );
 
-    // uprintf("SOCD feature index=%d, total features=%d\r\n", idx, g_feature_count);
+	uint8_t FACTORY_INIT_MAGIC = 0xF1;
+    uint8_t flag = eeprom_read_byte((uint8_t *)EEPROM_FACTORY_INIT_FLAG_ADDR);
+
+    // uprintf("=============factory init flag = %u\n", flag);
+
+    if (flag != FACTORY_INIT_MAGIC) {
+		//
+		eeprom_write_word(EEPROM_FACTORY_INIT_FLAG_ADDR, 0xF1);
+		eeprom_write_word(EECONFIG_KEYMAP_TRIGGER_LEVEL, 0x00C8);
+	    eeprom_write_word(EECONFIG_KEYMAP_RELEASE_LEVEL, 0x0000);
+		// eeprom_write_word(EECONFIG_KEYMAP_TRIGGER_LEVEL, keyMatrixTriggerLevel);
+	    // eeprom_write_word(EECONFIG_KEYMAP_RELEASE_LEVEL, keyMatrixReleaseLevel);
+		rapidKeyEnable = eeprom_read_byte(RAPID_KEY_ENABLE_ADDR);
+		eeprom_update_byte(KB_COLOR_MODE_ADDR, 8);
+		
+		
+	}
+	load_all_rappy_snappy();
+	modtap_load_form_eeprom();
+	if(eeprom_read_word(IS_SOCD_ON_ADD) == 0x01){
+		isSOCD = true;
+	} else {
+		isSOCD = false;
+	}
 }
 
 
@@ -2369,16 +2437,16 @@ if (!reset_checked) {
 
 				//if (keyLocation.rowA == -1 || keyLocation.colA == -1) { return; }
 
-				if (adcPre>150){//DEFAULT_TRIGGER_LEVEL){ // lyon change DEFAULT_TRIGGER_LEVEL to original daytona value 150
-					adcPre -= DEFAULT_TRIGGER_LEVEL;
+				if (adcCalc>150){//DEFAULT_TRIGGER_LEVEL){ // lyon change DEFAULT_TRIGGER_LEVEL to original daytona value 150
+					adcCalc -= 150;
 					EffectranbowColor = rainbowColor[group];
-					if (adcPre > 80)
+					if (adcCalc > 600)
 					{
 						mult = 1;
 					}
 					else
 					{
-						mult = (float)adcPre / 80;         //OP*2	nonOP*10
+						mult = (float)adcCalc / 600;         //OP*2	nonOP*10
 					}
 					EffectranbowColor.red *= mult;
 					EffectranbowColor.green *= mult;
@@ -2393,6 +2461,8 @@ if (!reset_checked) {
 					chBSemSignal(&ledUpdateSem);
 				}
 			}
+				// uprintf("KEY row=%d col=%d layer=%d kc=%04X pressed=%d\r\n",
+				// 	keyLocation.rowA, keyLocation.colA, get_highest_layer(layer_state), keycode, pressed);
 
 			#ifdef rappySnappy
 			// ✅ 若此鍵是 Snappy 指定的，跳過掃描觸發處理 //lyon
@@ -2466,7 +2536,10 @@ if (!reset_checked) {
 			bool pressed_now = calc_pressed_now(keyLocation.rowA, keyLocation.colA, adcCalc);
 
 			/* ① 先通知 SOCD */
-			void on_key_changed(uint8_t row, uint8_t col, bool pressed);
+			if(isSOCD){
+				void on_key_changed(uint8_t row, uint8_t col, bool pressed);
+			}
+			
 
 			// uint8_t layer = 0;//get_highest_layer(layer_state);
 			// int8_t slot = socd_find_slot(layer, keyLocation.rowA, keyLocation.colA);
@@ -3430,7 +3503,7 @@ static THD_FUNCTION(ADC_ProcessThread, arg)
 	// adcsampleIndex = 1;
 	gptStartOneShot(&GPTD9, 100);			//check gpt min 9
 	via_init();
-//	LED_init();
+	LED_init();
 	led_ctrl(true);
 //    currentLED_RunMode.type = offMode;
 #ifdef socd
@@ -3484,20 +3557,20 @@ static THD_FUNCTION(ADC_ProcessThread, arg)
 
 
 	// 在 LED 相關 thread 啟動之後 // lyon add
-	if(!lampArrayDisable){
-		// uprintf(">>>>>>>>>>8\r\n");
-		chThdSleepMilliseconds(300);
-		buildNormalModes();
-		// currentLED_RunMode.type = normalMode;
-		currentLED_RunMode.mode = 8;//0;// RED
-		currentLED_RunMode.brightness = 5;
-		currentLED_RunMode.speed = 1;
-		setRunMode(currentLED_RunMode);
-	}
+	// if(!lampArrayDisable){
+	// 	// uprintf(">>>>>>>>>>8\r\n");
+	// 	chThdSleepMilliseconds(300);
+    // 	buildNormalModes();
+	// 	// currentLED_RunMode.type = normalMode;
+	// 	currentLED_RunMode.mode = eeprom_read_byte(KB_COLOR_MODE_ADDR);//8;//0;// RED
+	// 	currentLED_RunMode.brightness = 5;
+	// 	currentLED_RunMode.speed = 1;
+	// 	setRunMode(currentLED_RunMode);
+	// }
 	
 
 	#ifdef FORCE_HARDCODE_RT_PROFILE
-	rapidTriggerKey[0].key.enable = 1;
+	rapidTriggerKey[0].key.enable = 0;
 	rapidTriggerKey[0].key.row    = 3;
 	rapidTriggerKey[0].key.col    = 1;
 	rapidTriggerKey[0].key.counts = 5;
@@ -3646,7 +3719,7 @@ void rapidTriggerProcess(bool mode, uint8_t key){
 //    uint16_t lastKeycode;
 //} rapidTrigger_config_t;
 
-void matrix_init(void)
+void matrix_init(void)//
 {
 	//uprintf ("rapidTrigger_config_t size:%d\r\n",sizeof(rapidTrigger_config_t));
 
@@ -3735,11 +3808,13 @@ void matrix_init(void)
     	write_Release_to_eeprom();
     	eeconfig_rapidTrigger_init();
     	adcOffsetCalc(true, true, 1500);
+		eeconfig_socd_clear();
     	uprintf("Factory Reset end\r\n");
 //    	NVIC_SystemReset();
     }
     chThdCreateStatic(waADC_ProcessThread, sizeof(waADC_ProcessThread), NORMALPRIO - 4, ADC_ProcessThread, NULL);
-    LED_init();
+    // LED_init();
+	knobState = eeprom_read_byte(KB_ENCODER_MODE_ADDR);
 	#ifdef test8_thread
 	chThdCreateStatic(waReportThread, sizeof(waReportThread), NORMALPRIO - 3, ReportThread, NULL);
 	#endif
@@ -4132,6 +4207,8 @@ bool hook_matrix_change(keyrecord_t record)
 {
 	uint16_t keycode = keymap_key_to_keycode(biton32(layer_state),record.event.key);
 	static uint16_t counts = 0;
+	uprintf("KEY row=%d col=%d kc=%04X pressed=%d\r\n",
+					keyLocation.rowA, keyLocation.colA, keycode, record.event.pressed);
 //	uprintf ("Layer:%d keycode:%04x\r\n", biton32(layer_state), keycode);
 
 //    action_t action = layer_switch_get_action(record.event.key);
@@ -4139,11 +4216,13 @@ bool hook_matrix_change(keyrecord_t record)
 //    uprintf ("action keycode:%X modes:%X kid_id:%X\r\n",code,action.key.mods,action.kind.id);
 
 	#ifdef socd
-	int8_t slot = socd_find_slot_by_keycode(keycode);
-    if (slot >= 0) {
-        socd_post_event(slot, keycode, record.event.pressed);
-        return false;   // SOCD 接管
-    }
+	if(isSOCD){
+		int8_t slot = socd_find_slot_by_keycode(keycode);
+		if (slot >= 0) {
+			socd_post_event(slot, keycode, record.event.pressed);
+			return false;   // SOCD 接管
+		}
+	}
 	#endif
 
 	bool resault;
@@ -4174,7 +4253,7 @@ bool hook_matrix_change(keyrecord_t record)
 
 		uprintf("\r\n=== EEPROM DUMP START ===\r\n");
 
-		for (uint16_t addr = 0; addr < 1024/*EEPROM_SIZE*/; addr += 32)
+		for (uint16_t addr = 0; addr < 16384/*EEPROM_SIZE*/; addr += 32)
 		{
 			eeprom_read_block(buffer, (const void*)addr, 32);
 
@@ -4201,6 +4280,78 @@ bool hook_matrix_change(keyrecord_t record)
 
 		uprintf("[EEP] W8  addr=0x%04X  before=0x%02X  write=0x%02X  after=0x%02X  %s\r\n",
 				addr, before, value, after, (after == value) ? "OK" : "FAIL");
+	}
+	// static inline uint8_t clamp_u8_i16(int16_t x)
+	// {
+	// 	if (x < 0)   return 0;
+	// 	if (x > 255) return 255;
+	// 	return (uint8_t)x;
+	// }
+	void plusHue(led_config_t in){
+		hsv = rgb_to_hsv(in);
+		hsv.h += 15;   // 每幀轉動色相
+		mosArt.LED = hsv_to_rgb(hsv);
+	}
+	void minusHue(led_config_t in){
+		hsv = rgb_to_hsv(in);
+		hsv.h -= 15;   // 每幀轉動色相
+		mosArt.LED = hsv_to_rgb(hsv);
+	}
+	void plusSat(led_config_t in){
+		hsv = rgb_to_hsv(in);
+		// hsv.s += 5;
+		// hsv.s = clamp_u8_i16((int16_t)hsv.s + 5);
+		if(hsv.s > 225){
+			hsv.s = 255;
+		} else {
+			hsv.s += 16;
+		}
+		uprintf("HSV H is %d, S is %d, V is %d\r\n", hsv.h, hsv.s, hsv.v);
+		// if (hsv.s + 5 < 0)   hsv.s = 0;
+    	// if (hsv.s > 255) hsv.s = 255;
+		mosArt.LED = hsv_to_rgb(hsv);
+		uprintf("**************mosArt R is %d, G is %d, B is %d\r\n", mosArt.LED.red, mosArt.LED.green, mosArt.LED.blue);
+	}
+	void minusSat(led_config_t in){
+		hsv = rgb_to_hsv(in);
+		// hsv.s -= 5;
+		// hsv.s = clamp_u8_i16((int16_t)hsv.s - 5);
+		if(hsv.s < 30){
+			hsv.s = 0;
+		} else {
+			hsv.s -= 16;
+		}
+		uprintf("hsv h is %d, s is %d, v is %d\r\n", hsv.h, hsv.s, hsv.v);
+		// if (hsv.s < 0)   hsv.s = 0;
+    	// if (hsv.s > 255) hsv.s = 255;
+		mosArt.LED = hsv_to_rgb(hsv);
+		uprintf("**************mosArt R is %d, G is %d, B is %d\r\n", mosArt.LED.red, mosArt.LED.green, mosArt.LED.blue);
+	}
+	void plusBri(led_config_t in){
+		hsv = rgb_to_hsv(in);
+		// hsv.v += 5;
+		// hsv.s = clamp_u8_i16((int16_t)hsv.v + 5);
+		if(hsv.v > 225){
+			hsv.v = 255;
+		} else {
+			hsv.v += 16;
+		}
+		uprintf("hsv h is %d, s is %d, v is %d\r\n", hsv.h, hsv.s, hsv.v);
+		mosArt.LED = hsv_to_rgb(hsv);
+		uprintf("**************mosArt R is %d, G is %d, B is %d\r\n", mosArt.LED.red, mosArt.LED.green, mosArt.LED.blue);
+	}
+	void minusBri(led_config_t in){
+		hsv = rgb_to_hsv(in);
+		// hsv.v -= 5;
+		// hsv.s = clamp_u8_i16((int16_t)hsv.v - 5);
+		if(hsv.v < 30){
+			hsv.v = 0;
+		} else {
+			hsv.v -= 16;
+		}
+		uprintf("hsv h is %d, s is %d, v is %d\r\n", hsv.h, hsv.s, hsv.v);
+		mosArt.LED = hsv_to_rgb(hsv);
+		uprintf("**************mosArt R is %d, G is %d, B is %d\r\n", mosArt.LED.red, mosArt.LED.green, mosArt.LED.blue);
 	}
 
 		if (record.event.pressed){
@@ -4244,17 +4395,126 @@ bool hook_matrix_change(keyrecord_t record)
 					// mt_dump_map();
 					// uprintf ("Trigger Level:%d output:%d btn:%d release Level:%d\r\n",keyMatrixTriggerLevel, keycodeOutput, readPin(A15),keyMatrixReleaseLevel);
 				break;
-				case KC_M1:
+				case KC_MBRI:
 				// 	return false; // 我已處理
 				// }
 				// return true;
 					// send_string("abcdefghijklmnopqrstuvwxyz\n"); /**/
 					// send_A_to_Z();
-					dump_eeprom();
+					// dump_eeprom();
+					minusBri(mosArt.LED);
+					uprintf("load_all_rappy_snappy\r\n");
+					void load_all_rappy_snappy(void);
+				break;
+				case KC_PBRI:
+					// eeprom_write8_verify
+					// eeprom_write8_verify(EECONFIG_SOCD_ADDR_END, 0xFA);
+					// uprintf("EECONFIG_SOCD_ADDR_END address is %d", EECONFIG_SOCD_ADDR_END);
+					plusBri(mosArt.LED);
+					// hsv = rgb_to_hsv(mosArt.LED);
+					// hsv.h += 2;   // 每幀轉動色相
+					// mosArt.LED = hsv_to_rgb(hsv);
+				break;
+				case KC_MSAT:
+					minusSat(mosArt.LED);
+				break;
+				case KC_PSAT:
+					plusSat(mosArt.LED);
+				break;
+				case KC_MHUE:
+					minusHue(mosArt.LED);
+				break;
+				case KC_PHUE:
+					plusHue(mosArt.LED);
+				break;
+				case KC_LM1:
+					uprintf("LM1\r\n");
+					if(isCtrl){
+						currentLED_RunMode.mode = 0x00;
+						setRunMode(currentLED_RunMode);
+						eeprom_update_byte(KB_COLOR_MODE_ADDR, 0);
+					}
+				break;
+				case KC_LM2:
+					uprintf("LM2\r\n");
+					if(isCtrl){
+						currentLED_RunMode.mode = 0x01;
+						setRunMode(currentLED_RunMode);
+						eeprom_update_byte(KB_COLOR_MODE_ADDR, 1);
+					}
+				break;
+				case KC_LM3:
+					uprintf("LM3\r\n");
+					if(isCtrl){
+						currentLED_RunMode.mode = 0x02;
+						setRunMode(currentLED_RunMode);
+						eeprom_update_byte(KB_COLOR_MODE_ADDR, 2);
+					}
+				break;
+				case KC_LM4:
+					uprintf("LM4\r\n");
+					if(isCtrl){
+						currentLED_RunMode.mode = 0x03;
+						setRunMode(currentLED_RunMode);
+						eeprom_update_byte(KB_COLOR_MODE_ADDR, 3);
+					}
+				break;
+				case KC_LM5:
+					uprintf("L5\r\n");
+					if(isCtrl){
+						currentLED_RunMode.mode = 0x04;
+						setRunMode(currentLED_RunMode);
+						eeprom_update_byte(KB_COLOR_MODE_ADDR, 4);
+					}
+				break;
+				case KC_LM6:
+				break;
+				case KC_LM7:
+				break;
+				case KC_LM8:
+				break;
+				case KC_LM9:
+				break;
+				case KC_M1:
+				// at keycode i 
+					uprintf("load_all_rappy_snappy\r\n");
+					void load_all_rappy_snappy(void);
+					uprintf("modtap_load_form_eeprom\r\n");
+					void modtap_load_form_eeprom(void);
 				break;
 				case KC_M2:
-					// eeprom_write8_verify
-					eeprom_write8_verify(KB_COLOR_MAGIC_ADDR, 0xFA);
+					uprintf("matrix (%d)_(%d)_(%d),(%d)_(%d)_(%d)\r\n",
+						g_rappy_pairs[0].lay_a, g_rappy_pairs[0].row_a, g_rappy_pairs[0].col_a,
+						g_rappy_pairs[0].lay_b, g_rappy_pairs[0].row_b, g_rappy_pairs[0].col_b);
+				break;
+				case KC_M3:
+					eeconfig_rappy_snappy_clear();
+				break;
+				case KC_SOCD_TOGG:
+					if(isSOCD){//IS_SOCD_ON_ADD == 0x01){
+						isSOCD = false;
+					} else {
+						isSOCD = true;
+					}
+				break;
+				case KC_WIN_LOCK:
+				//eeprom keylock
+				uprintf("before, KEYLOCK is %d\r\n", isKEYLOCK);
+					if (isKEYLOCK) {      
+						uint8_t mask = 0x00;
+						winLock    = (mask & 0x01u) != 0;
+						altTabLock = (mask & 0x02u) != 0;
+						altF4Lock  = (mask & 0x04u) != 0;
+						isKEYLOCK = false;
+						// write to eeprom?
+					} else {
+						uint8_t mask = 0x01;
+						winLock    = (mask & 0x01u) != 0;
+						altTabLock = (mask & 0x02u) != 0;
+						altF4Lock  = (mask & 0x04u) != 0;
+						isKEYLOCK = true;
+					}
+				uprintf("after, KEYLOCK is %d\r\n", isKEYLOCK);
 				break;
 //			case KC_BRIU:
 //				send_consumer(0x00BD);

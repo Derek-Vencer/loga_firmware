@@ -125,11 +125,12 @@ void socd_load_all_from_eeprom(void)
 #endif
 
 typedef enum {
-    SOCD_DISABLE = 0,
-    SOCD_PRIORITY_NEUTRAL,
+    // SOCD_DISABLE = 0,
+    SOCD_PRIORITY_LAST_INPUT = 0,
     SOCD_PRIORITY_PRIMARY,
     SOCD_PRIORITY_SECONDARY,
-    SOCD_PRIORITY_LAST_INPUT,
+    SOCD_PRIORITY_NEUTRAL,
+    SOCD_DISABLE,
 } socd_policy_t;
 
 /* ===== 每一組 SOCD 的設定（只存 keycode） ===== */

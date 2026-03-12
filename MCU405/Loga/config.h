@@ -1,13 +1,13 @@
 #ifndef CONFIG_H
 #define CONFIG_H
-
+#include "socd.h"
 #define AT32F405RCT7
 
 /* USB Device descriptor parameter */
 #define VENDOR_ID       0x195d
 #define PRODUCT_ID      0x2100//0x2092
 #define DEVICE_VER      0x000E//14//0x000E
-#define DEVICE_VER_FIX  0x0F // 15
+#define DEVICE_VER_FIX  0x10 // 16
 /* in python2: list(u"whatever".encode('utf-16-le')) */
 /*   at most 32 characters or the ugly hack in usb_main.c borks */
 #define MANUFACTURER "iOne Innovation"
@@ -18,7 +18,7 @@
 #define USBSTR_SERIAL 		   '0', '\x00', '1', '\x00', '2', '\x00', '3', '\x00'
 
 //#define minTriggerCheck
-#define DEFAULT_TRIGGER_LEVEL	100//400//500//150  //350 可以，但是500為了看log
+#define DEFAULT_TRIGGER_LEVEL	150//400//500//150  //350 可以，但是500為了看log
 #define DEFAULT_RELEASE_LEVEL	0
 
 /* key matrix size */
@@ -54,6 +54,15 @@
 #define EECONFIG_KB_SAT   (uint8_t *)(EECONFIG_kbColor + 1)
 #define EECONFIG_KB_VAL   (uint8_t *)(EECONFIG_kbColor + 2)
 #define EECONFIG_KB_MAGIC (uint8_t *)(EECONFIG_kbColor + 3)
+#define IS_SOCD_ON_ADD                0x0071
+#define TACHYON_MODE_ADD              0x0072
+#define RAPID_KEY_ENABLE_ADDR         0x0073
+#define EEPROM_FACTORY_INIT_FLAG_ADDR 0x0074
+#define KB_ENCODER_MODE_ADDR          0x0075
+#define KB_COLOR_RED_ADDR             0x007B
+#define KB_COLOR_GREEN_ADDR           0x007C
+#define KB_COLOR_BLUE_ADDR            0x007D
+#define KB_COLOR_MODE_ADDR            0x007E
 #define KB_COLOR_MAGIC_ADDR  0x007F
 #define KB_COLOR_MAGIC    0x7F
 
@@ -83,10 +92,18 @@
 
 /* SOCD */
 #define EECONFIG_SOCD_ADDR                  (DYNAMIC_MACRO_EEPROM_BLOCK0_ADDR_END)
-
 #define EECONFIG_SOCD_SIZE                  (sizeof(socd_config_t) * SOCD_SLOT_COUNT)
+#define EECONFIG_SOCD_ADDR_END              (EECONFIG_SOCD_ADDR + EECONFIG_SOCD_SIZE) //0x3BAC not sure after fix (socd_config_t)
 
-#define EECONFIG_SOCD_ADDR_END              (EECONFIG_SOCD_ADDR + EECONFIG_SOCD_SIZE)
+// modTap
+#define EECONFIG_MODTAP_ADDR                (EECONFIG_SOCD_ADDR_END)
+#define EECONFIG_MODTAP_SIZE                (sizeof(mt_entry_t) * MT_CAP_MAP)
+#define EECONFIG_MODTAP_ADDR_END            (EECONFIG_MODTAP_ADDR + EECONFIG_MODTAP_SIZE)
+
+// rappy snappy
+#define EECONFIG_RAPPYSNAPPY_ADDR           (EECONFIG_MODTAP_ADDR_END)
+#define EECONFIG_RAPPYSNAPPY_SIZE           (sizeof(rappy_snappy_pair_t) * RAPPY_SNAPPY_PAIR_COUNT)
+#define EECONFIG_RAPPYSNAPPY_ADDR_END       (EECONFIG_RAPPYSNAPPY_ADDR + EECONFIG_RAPPYSNAPPY_SIZE)
 
 // #define EECONFIG_KEYMAP_TRAVEL_2MM 	        (uint16_t*)(DYNAMIC_MACRO_EEPROM_BLOCK0_ADDR+2)
 

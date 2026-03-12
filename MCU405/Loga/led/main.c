@@ -302,7 +302,7 @@ static const ADCConversionGroup adcgrpcfg2 = {
 //}
 
 int main(void)
-{
+{//
     uint16_t blVerNumber, fwVerNumber;
     uint16_t temp;
     temp = *((uint16_t *)(verAddress));

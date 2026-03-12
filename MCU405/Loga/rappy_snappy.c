@@ -89,3 +89,74 @@ void rappy_snappy_process_all(void)
         rappy_snappy_process_pair(p, da, db);
     }
 }
+void rappy_snappy_apply_config(uint8_t index, const rappy_snappy_pair_t *in){
+    g_rappy_pairs[index] = *in;
+    // uprintf("g_rappy_pairs a layer %d row %d col %d, b layer %d, row %d col %d\r\n",
+    //     g_rappy_pairs[index].lay_a,
+    //     g_rappy_pairs[index].row_a,
+    //     g_rappy_pairs[index].col_a,
+    //     g_rappy_pairs[index].lay_b,
+    //     g_rappy_pairs[index].row_b,
+    //     g_rappy_pairs[index].col_b);
+
+    // 清 runtime 狀態
+    // memset(&g_rappy_pairs[index], 0, sizeof(g_rappy_pairs[index]));
+}
+
+void eeconfig_read_rappy_snappy(uint8_t idx, rappy_snappy_pair_t* out)
+{
+    if (idx >= RAPPY_SNAPPY_PAIR_COUNT) {
+        memset(out, 0, sizeof(*out));
+        return;
+    }
+
+    eeprom_read_block(
+        out,
+        (const void*)(EECONFIG_RAPPYSNAPPY_ADDR + idx * sizeof(rappy_snappy_pair_t)),
+        sizeof(rappy_snappy_pair_t)
+    );
+}
+
+void eeconfig_write_rappy_snappy(uint8_t idx, const rappy_snappy_pair_t* in)
+{
+    if (idx >= RAPPY_SNAPPY_PAIR_COUNT) return;
+
+    eeprom_update_block(
+        in,
+        (void*)(EECONFIG_RAPPYSNAPPY_ADDR + idx * sizeof(rappy_snappy_pair_t)),
+        sizeof(rappy_snappy_pair_t)
+    );
+    rappy_snappy_apply_config(idx, in);
+}
+
+void eeconfig_rappy_snappy_clear(void) {
+    rappy_snappy_pair_t empty;
+    memset(&empty, 0xff, sizeof(empty));
+
+    for (uint8_t i = 0; i < RAPPY_SNAPPY_PAIR_COUNT; i++) {
+        
+        eeconfig_write_rappy_snappy(i, &empty);
+        // RAM 同步 + 解除可能卡住的輸出
+        // if (socd_rt[i].activeKC) {
+        //     unregister_code(socd_rt[i].activeKC);
+        // }
+        // memset(&socd_rt[i], 0, sizeof(socd_rt[i]));
+        // socd_slots[i] = empty;
+    }
+}
+
+void load_all_rappy_snappy(void){
+    for (int i = 0; i < RAPPY_SNAPPY_PAIR_COUNT; i++) {
+        rappy_snappy_pair_t *p = &g_rappy_pairs[i];
+        eeconfig_read_rappy_snappy(i, p);
+        rappy_snappy_apply_config(i, p);
+
+        // if (!g_rappy_pairs[i].enable) continue;
+        // if ((g_rappy_pairs[i].row_a == row &&
+        //      g_rappy_pairs[i].col_a == col) ||
+        //     (g_rappy_pairs[i].row_b == row &&
+        //      g_rappy_pairs[i].col_b == col))
+        //     return true;
+    }
+    // return true;
+}

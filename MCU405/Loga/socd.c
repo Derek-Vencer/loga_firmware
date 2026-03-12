@@ -1065,12 +1065,17 @@ void socd_load_all_from_eeprom(void)
         socd_config_t tmp;
         eeconfig_read_socd(i, &tmp);
 
-        uprintf("EEPROM READ: slot%d ena=%d A=%04X B=%04X mode=%d\r\n",
-                i,
-                socd_slots[i].enable,
-                socd_slots[i].kc_a,
-                socd_slots[i].kc_b,
-                socd_slots[i].mode);
+        // uprintf("EEPROM READ: slot%d ena=%d A=%04X B=%04X mode=%d\r\n",
+        //         i,
+        //         // socd_slots[i].enable,
+        //         // socd_slots[i].kc_a,
+        //         // socd_slots[i].kc_b,
+        //         // socd_slots[i].mode
+        //         tmp.enable,
+        //         tmp.kc_a,
+        //         tmp.kc_b,
+        //         tmp.mode
+        //     );
 
         /* 基本防呆 */
         // if (!socd_slots[i].enable) {
@@ -1342,6 +1347,21 @@ void socd_test_write_eeprom_once(void)
 
     uprintf("EEPROM WRITE: slot0 A=%04X B=%04X mode=%d\r\n",
             test.kc_a, test.kc_b, test.mode);
+}
+
+void eeconfig_socd_clear(void) {
+    socd_config_t empty;
+    memset(&empty, 0xFF, sizeof(empty));
+
+    for (uint8_t i = 0; i < SOCD_SLOT_COUNT; i++) {
+        eeconfig_write_socd(i, &empty);
+        // RAM 同步 + 解除可能卡住的輸出
+        if (socd_rt[i].activeKC) {
+            unregister_code(socd_rt[i].activeKC);
+        }
+        memset(&socd_rt[i], 0xFF, sizeof(socd_rt[i]));
+        socd_slots[i] = empty;
+    }
 }
 
 // void socd_thread_init(void)

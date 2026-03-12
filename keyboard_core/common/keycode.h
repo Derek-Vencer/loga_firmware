@@ -527,7 +527,7 @@ enum internal_special_keycodes {
   KC_MEDIA_SELECT,
   KC_MEDIA_EJECT, // 0xB0
   KC_MAIL,
-  KC_CALCULATOR,
+  KC_CALCULATOR, //
   KC_MY_COMPUTER,
   KC_WWW_SEARCH,
   KC_WWW_HOME,
@@ -666,7 +666,7 @@ enum internal_special_keycodes {
   KC_RGB_TOG = 0x5CC2,     // 5CC2
   KC_RGB_MODE_FORWARD,     // 5CC3
   KC_RGB_MODE_REVERSE,     // 5CC4
-  KC_RGB_HUI,              // 5CC5
+  KC_RGB_HUI,              // 5CC5//
   KC_RGB_HUD,              // 5CC6
   KC_RGB_SAI,              // 5CC7
   KC_RGB_SAD,              // 5CC8

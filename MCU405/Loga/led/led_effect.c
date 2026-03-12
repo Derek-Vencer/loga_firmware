@@ -72,6 +72,9 @@ static THD_FUNCTION(LED_EffectThread, arg)
     	case EffectTypeChangeProfile:
     	enable = EffectTypeChangeProfileProcess();
     	break;
+        // case EffectTypeWheel:
+        // enable = EffectWheelProcess();
+        // break;
     	case EffectTypeOff:
         break;
     	case EffectIdle:
@@ -400,7 +403,7 @@ bool effectMosArtProcess(void)
             case 2:
                 Calculate_Flashing_Volume(mosArt.Speed, mosArt.TimerBase, &bright);
                 break;
-            case 3:{
+            case 3:{//WAVE
                 // === 參數 ===
                 const uint8_t  WAVE_WAVELENGTH_COLS = 12;   // 幾欄一個亮暗週期
                 const uint8_t  WAVE_WAVELENGTH_ROWS = 0;    // 0=不做列向；>0 可做斜向
@@ -528,6 +531,39 @@ bool EffectTypeRainbowFlowProcess(void)
         effectStatus.effect = EffectIdle;
     }
     return false;
+}
+
+bool EffectWheelProcess(void)
+{
+    uint8_t row, col;
+    uint32_t tb = rainbowBase;   // 你專案已經有 extern rainbowBase :contentReference[oaicite:3]{index=3}
+    led_config_t c;
+
+    // 依 speed/方向推進 timebase
+    // speed 越大，色相轉得越快
+    if (effectStatus.direction) {
+        tb += mosArt.TimerBase * (rainbowBase + 4);
+    } else {
+        tb -= mosArt.TimerBase * (rainbowBase + 4);
+    }
+
+    for (col = 0; col < LED_MATRIX_COLS; col++) {
+        for (row = 0; row < LED_MATRIX_ROWS; row++) {
+
+            // 位置 offset：讓每顆 LED hue 不一樣，才像 Wheel
+            uint32_t local_tb = tb + (col * 50) + (row * 20);
+
+            // 用你現有的彩虹計算（會填入 c）
+            Calculate_Colorful_Color(0, local_tb, &c);  // :contentReference[oaicite:4]{index=4}
+
+            // 寫到對應鍵位（逐顆）
+            setRemapLED(row, col, c);                   // :contentReference[oaicite:5]{index=5}
+        }
+    }
+
+    mosArt.TimerBase += (effectStatus.speed / ledUpdateInterval); // 或固定 +10 也行
+    chBSemSignal(&ledUpdateSem);                                  // 刷新 LED :contentReference[oaicite:6]{index=6}
+    return true;
 }
 
 
@@ -758,27 +794,124 @@ void buildNormalModes(void){
 	//	LED_ModesBuilder(addPresetEffect , true,EffectTypeRandColor, true, 0, ranbow, 0,  rainbowColor[green], normalBrightness, normalSpeed, 0);
 
 	// LED_ModesBuilder(newPreset , false,EffectTypeMosArt, true, 5000, ranbow, mosArtStatic,  rainbowColor[red], normalBrightness, normalSpeed, 0);
-    LED_ModesBuilder(newPreset , false,EffectTypeMosArt, true, 5000, single, mosArtStatic,  rainbowColor[red], normalBrightness, normalSpeed, 0); // lyon change
+    LED_ModesBuilder(newPreset , false,EffectTypeMosArt, true, 5000, single, mosArtStatic,  LED_NULL, normalBrightness, normalSpeed, 0); // lyon change
     // LED_ModesBuilder(newPreset , false,EffectTypeMosArt, true, 5000, single, mosArtStatic,  {0,0,0}, normalBrightness, normalSpeed, 0); // lyon change
 
 	// LED_ModesBuilder(addPresetEffect , false,EffectTypeMosArt, true, 5000, ranbow, mosArtBreath,  rainbowColor[green], normalBrightness, normalSpeed, 0);
-    LED_ModesBuilder(addPresetEffect , false,EffectTypeMosArt, true, 5000, single, mosArtWave,  c, normalBrightness, normalSpeed, 0);
+    LED_ModesBuilder(addPresetEffect , false,EffectTypeMosArt, true, 5000, single, mosArtStatic,  c, normalBrightness, normalSpeed, 0);
 
 	// LED_ModesBuilder(addPresetEffect , false,EffectTypeMosArt, true, 5000, single, mosArtFlash,  rainbowColor[blue], normalBrightness, normalSpeed, 0);
-    LED_ModesBuilder(addPresetEffect , false,EffectTypeMosArt, true, 5000, single, mosArtBreath,  rainbowColor[blue], normalBrightness, normalSpeed, true);
+    LED_ModesBuilder(addPresetEffect , false,EffectTypeMosArt, true, 5000, single, mosArtBreath,  c, normalBrightness, normalSpeed, true);
 
-	LED_ModesBuilder(addPresetEffect , false,EffectTypeMosArt, true, 5000, ranbow, mosArtFlash,  rainbowColor[yellow], normalBrightness, normalSpeed, 0);
-	LED_ModesBuilder(addPresetEffect , false,EffectTypeMosArt, true, 5000, single, mosArtStatic,  rainbowColor[white], normalBrightness, normalSpeed, 0);
+	// LED_ModesBuilder(addPresetEffect , false,EffectTypeMosArt, true, 5000, ranbow, mosArtFlash,  rainbowColor[yellow], normalBrightness, normalSpeed, 0);
+    // LED_ModesBuilder(addPresetEffect, false, EffectTypeWheel, true, 0, 0, 0, LED_NULL, normalBrightness, normalSpeed, true /* direction */);
+    LED_ModesBuilder(addPresetEffect , false,EffectTypeRainbowFlow, true, 5000, 0, 0,  LED_NULL, normalBrightness, normalSpeed, false);
+
+	LED_ModesBuilder(addPresetEffect , false,EffectTypeMosArt, true, 5000, single, mosArtWave,  c, normalBrightness, normalSpeed, 0);
 	LED_ModesBuilder(addPresetEffect , false,EffectTypeMosArt, true, 5000, single, mosArtStatic,  rainbowColor[orange], normalBrightness, normalSpeed, 0);
 	LED_ModesBuilder(addPresetEffect , false,EffectTypeMosArt, true, 5000, single, mosArtStatic,  rainbowColor[indigo], normalBrightness, normalSpeed, 0);
 	LED_ModesBuilder(addPresetEffect , false,EffectTypeMosArt, true, 5000, single, mosArtStatic,  rainbowColor[violet], normalBrightness, normalSpeed, 0);
 	LED_ModesBuilder(addPresetEffect , false,EffectTypeRainbowFlow, true, 5000, 0, 0,  LED_NULL, normalBrightness, normalSpeed, false);
 	LED_ModesBuilder(addPresetEffect , false,EffectTypeRainbowFlow, true, 5000, 0, 0,  LED_NULL, normalBrightness, normalSpeed, true);
-	LED_ModesBuilder(addPresetEffect, false, EffectTypeKeytest, true, 5000, 0, 0,  LED_NULL, normalBrightness, normalSpeed, true);
+	LED_ModesBuilder(addPresetEffect , false, EffectTypeKeytest, true, 5000, 0, 0,  LED_NULL, normalBrightness, normalSpeed, true);
 	LED_ModesBuilder(addPresetEffect , false,EffectTypeChangeProfile, true, 5000, 0, 0,  LED_NULL, normalBrightness, normalSpeed, true);
 
 
 
+}
+
+static inline uint8_t u8_max3(uint8_t a, uint8_t b, uint8_t c) {
+    uint8_t m = (a > b) ? a : b;
+    return (m > c) ? m : c;
+}
+static inline uint8_t u8_min3(uint8_t a, uint8_t b, uint8_t c) {
+    uint8_t m = (a < b) ? a : b;
+    return (m < c) ? m : c;
+}
+
+hsv_t rgb_to_hsv(led_config_t rgb)
+{
+    hsv_t hsv;
+    uint8_t r = rgb.red, g = rgb.green, b = rgb.blue;
+
+    uint8_t max = u8_max3(r, g, b);
+    uint8_t min = u8_min3(r, g, b);
+    uint8_t delta = (uint8_t)(max - min);
+
+    hsv.v = max;
+
+    // S
+    if (max == 0) {
+        hsv.s = 0;
+        hsv.h = 0;
+        return hsv;
+    }
+    hsv.s = (uint8_t)((uint16_t)delta * 255 / max);
+
+    // H
+    if (delta == 0) {
+        hsv.h = 0;   // 無彩色：h 無意義，給 0
+        return hsv;
+    }
+
+    int16_t h; // 暫存允許負數
+    if (max == r) {
+        // h = 60 * (g-b)/delta  (mod 360)
+        h = (int16_t)(60 * (int16_t)(g - b) / delta);
+    } else if (max == g) {
+        // h = 120 + 60*(b-r)/delta
+        h = (int16_t)(120 + (60 * (int16_t)(b - r) / delta));
+    } else {
+        // max == b
+        // h = 240 + 60*(r-g)/delta
+        h = (int16_t)(240 + (60 * (int16_t)(r - g) / delta));
+    }
+
+    if (h < 0) h += 360;
+    if (h >= 360) h -= 360;
+
+    hsv.h = (uint16_t)h;
+    return hsv;
+}
+
+led_config_t hsv_to_rgb(hsv_t hsv)
+{
+    led_config_t rgb;
+
+    uint8_t s = hsv.s;
+    uint8_t v = hsv.v;
+
+    if (s == 0) {
+        // 灰階
+        rgb.red = v;
+        rgb.green = v;
+        rgb.blue = v;
+        return rgb;
+    }
+
+    // Hue 0..359
+    uint16_t h = hsv.h % 360;
+
+    // region: 0..5
+    uint8_t region = h / 60;
+    uint16_t f_deg = h - (uint16_t)region * 60; // 0..59
+
+    // 用 0..255 的 fraction 近似
+    uint16_t f = (f_deg * 255) / 60; // 0..250(左右)
+
+    uint8_t p = (uint16_t)v * (255 - s) / 255;
+    uint8_t q = (uint16_t)v * (255 - ((uint16_t)s * f / 255)) / 255;
+    uint8_t t = (uint16_t)v * (255 - ((uint16_t)s * (255 - f) / 255)) / 255;
+
+    switch (region) {
+        case 0: rgb.red = v; rgb.green = t; rgb.blue = p; break;
+        case 1: rgb.red = q; rgb.green = v; rgb.blue = p; break;
+        case 2: rgb.red = p; rgb.green = v; rgb.blue = t; break;
+        case 3: rgb.red = p; rgb.green = q; rgb.blue = v; break;
+        case 4: rgb.red = t; rgb.green = p; rgb.blue = v; break;
+        default: rgb.red = v; rgb.green = p; rgb.blue = q; break; // region 5
+    }
+    return rgb;
 }
 
 //bool setRunMode(uint8_t runMode, int8_t mode, uint8_t brightness, uint8_t speed){
@@ -857,13 +990,20 @@ bool setRunMode(led_runMode_t runMode){
 	}
 }
 
-void LED_init(void){
-	led_creatTask();
+void LED_init(void){//
+
+
+    c.red = eeprom_read_byte(KB_COLOR_RED_ADDR);
+    c.green = eeprom_read_byte(KB_COLOR_GREEN_ADDR);
+    c.blue = eeprom_read_byte(KB_COLOR_BLUE_ADDR);
+    // uprintf("c color red is %d, green is %d, blue is %d\r\n", c.red, c.green, c.blue);
+    led_creatTask();
 
 	buildDemoModes();
 	buildNormalModes();
 	chThdCreateStatic(waLED_EffectThread, sizeof(waLED_EffectThread), NORMALPRIO - 3, LED_EffectThread, NULL); //original -3 test +７
-    currentLED_RunMode.mode = 8;
+    currentLED_RunMode.mode = eeprom_read_byte(KB_COLOR_MODE_ADDR);//8;//
+    
 	currentLED_RunMode.type = normalMode;
     setRunMode(currentLED_RunMode);
 	//leRemapLocationTest(500);

@@ -43,7 +43,7 @@ enum {
 };
 
 typedef struct {
-    uint8_t h;   // 0~255  (對應 0~360°)
+    uint16_t h;  // 0~360  (對應 0~360°)
     uint8_t s;   // 0~255
     uint8_t v;   // 0~255
 } hsv_t;
@@ -144,6 +144,7 @@ enum effectTypes{
 	EffectTypeColorBrith,
 	EffectTypeKeytest,
 	EffectTypeChangeProfile,
+	EffectTypeWheel,
 	EffectTypeOff,
 };
 

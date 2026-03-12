@@ -353,6 +353,7 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length) {
 
                 currentLED_RunMode.mode = recive_payload[0];
                 setRunMode(currentLED_RunMode);
+                eeprom_update_byte(KB_COLOR_MODE_ADDR, recive_payload[0]);
 
                 // uint8_t effect = recive_payload[0];
 
@@ -382,7 +383,7 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length) {
             uprintf("API=>Get Lighting Effect:\r\n");
             if (*payload_length == 0) {
                 *send_status = ione_api_status_success;
-                *send_data = currentLED_RunMode.mode;
+                *send_data = eeprom_read_byte(KB_COLOR_MODE_ADDR);//currentLED_RunMode.mode;
                 uprintf("Current Lighting Effect: %d\r\n", currentLED_RunMode.mode);
             } else {
                 *send_status = ione_api_status_fail;
@@ -405,6 +406,10 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length) {
                 mosArt.LED.green = recive_payload[6];
                 mosArt.LED.blue = recive_payload[7];
 
+                eeprom_update_byte(KB_COLOR_RED_ADDR, recive_payload[1]);
+                eeprom_update_byte(KB_COLOR_GREEN_ADDR, recive_payload[2]);
+                eeprom_update_byte(KB_COLOR_BLUE_ADDR, recive_payload[3]);
+
                 effectStatus.effect = EffectTypeMosArt;
                 effectStatus.mode = mosArtStatic;
                 chBSemSignal(&ledEffetSem);  // 通知 LED_EffectThread 執行
@@ -423,11 +428,11 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length) {
                 *send_status = ione_api_status_success;
                 *send_data = 0xa1; // alpha
                 send_data++;
-                *send_data = LED_Datas[0].red;
+                *send_data = eeprom_read_byte(KB_COLOR_RED_ADDR);//LED_Datas[0].red;
                 send_data++;
-                *send_data = LED_Datas[0].green;
+                *send_data = eeprom_read_byte(KB_COLOR_GREEN_ADDR);//LED_Datas[0].green;
                 send_data++;
-                *send_data = LED_Datas[0].blue;
+                *send_data = eeprom_read_byte(KB_COLOR_BLUE_ADDR);//LED_Datas[0].blue;
                 send_data++;
                 *send_data = 0xa2; // alpha
                 send_data++;
@@ -447,6 +452,7 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length) {
         case ione_api_cmd_set_konb_state:
             if (*payload_length == 1){
                 knobState = recive_payload[0];
+                eeprom_update_byte(KB_ENCODER_MODE_ADDR, knobState);
             } else {
                 *send_status = ione_api_status_fail;
             }
@@ -456,7 +462,7 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length) {
             uprintf ("API=>Get Konb state:\r\n");
 			if (*payload_length == 0){
 			*send_status = ione_api_status_success;
-			*send_data = knobState;
+			*send_data = eeprom_read_byte(KB_ENCODER_MODE_ADDR);//knobState;
 			uprintf ("Current knob state:%d\r\n",knobState);
 			} else {
 				*send_status = ione_api_status_fail;
@@ -483,6 +489,7 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length) {
                 winLock    = (mask & 0x01u) != 0;
                 altTabLock = (mask & 0x02u) != 0;
                 altF4Lock  = (mask & 0x04u) != 0;
+                // eeprom_update_byte(KEYLOCK_ADDR, mask);
             } else {
                 *send_status = ione_api_status_fail;
                 uprintf("Payload should be empty\r\n");
@@ -508,7 +515,8 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length) {
         uprintf("API=>Set Rapid Trigger State:\r\n");
             if (*payload_length == 1) {             
                 *send_status = ione_api_status_success;
-                rapidKeyEnable = recive_payload[0];
+                rapidKeyEnable = recive_payload[0]; //
+                eeprom_update_byte(RAPID_KEY_ENABLE_ADDR, rapidKeyEnable);
             } else {
                 *send_status = ione_api_status_fail;
                 uprintf("Payload should be empty\r\n");
@@ -519,7 +527,7 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length) {
             uprintf ("API=>Get Rapid Trigger State:\r\n");
 			if (*payload_length == 0){
 			*send_status = ione_api_status_success;
-			*send_data = rapidKeyEnable; // test for rapid trigger state
+			*send_data = eeprom_read_byte(RAPID_KEY_ENABLE_ADDR);//rapidKeyEnable; // test for rapid trigger state
 			uprintf ("Get Rapid Trigger State:%d\r\n",*send_data++);
 			} else {
 				*send_status = ione_api_status_fail;
@@ -589,11 +597,14 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length) {
             if (*payload_length == 1) {             
                 *send_status = ione_api_status_success;     
                 if(recive_payload[0] == 0x01){
-                    currentLED_RunMode.mode = 1;
+                    currentLED_RunMode.mode = 0;
+                    eeprom_update_byte(KB_COLOR_MODE_ADDR, currentLED_RunMode.mode);
+                    eeprom_update_byte(TACHYON_MODE_ADD, 0x01);
                     setRunMode(currentLED_RunMode);  
                 } else {
-                    currentLED_RunMode.mode = 8;
-                    setRunMode(currentLED_RunMode);  
+                    currentLED_RunMode.mode = eeprom_read_byte(KB_COLOR_MODE_ADDR);//8;
+                    setRunMode(currentLED_RunMode);
+                    eeprom_update_byte(TACHYON_MODE_ADD, 0x00);
                 }
             } else {
                 *send_status = ione_api_status_fail;
@@ -605,7 +616,7 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length) {
             uprintf("API=>get tachyon_mode:\r\n");
             if (*payload_length == 0) {             
                 *send_status = ione_api_status_success;     
-                if(currentLED_RunMode.mode == 1){
+                if(eeprom_read_byte(TACHYON_MODE_ADD) == 0x01){
                     *send_data = 0x01;
                 } else {
                     *send_data = 0x00;
@@ -936,7 +947,7 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length) {
         break;}
         #endif
 #endif // modTap
-#ifdef rappySnappy
+#ifdef rappySnappy //
         case ione_api_cmd_set_rappy_snappy:
         {
             uprintf("API=>Set Rappy Snappy (Analog Pair)\r\n");
@@ -989,6 +1000,16 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length) {
                 p->state      = RS2_IDLE;
 
                 *send_status = ione_api_status_success;
+                eeconfig_write_rappy_snappy(index, p);
+                // uprintf("g_rappy_pairs[index].enable is %d\r\n",g_rappy_pairs[index].enable);
+                // uprintf("p->enable is %d\r\n",p->enable);
+                // uprintf("set print a layer %d row %d col %d, b layer %d, row %d col %d\r\n",
+                //     g_rappy_pairs[index].lay_a,
+                //     g_rappy_pairs[index].row_a,
+                //     g_rappy_pairs[index].col_a,
+                //     g_rappy_pairs[index].lay_b,
+                //     g_rappy_pairs[index].row_b,
+                //     g_rappy_pairs[index].col_b);
             }
             else {
                 *send_status = ione_api_status_fail;
@@ -1002,12 +1023,13 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length) {
         {
             uprintf("API=>Get Rappy Snappy (Analog Pair)\r\n");
 
-            if (*payload_length == 1) {
+            if (*payload_length == 0) {
 
-                uint8_t index = recive_payload[0];
+                uint8_t index = 0;//recive_payload[0];
 
                 if (index >= RAPPY_SNAPPY_PAIR_COUNT ||
                     !g_rappy_pairs[index].enable) {
+                    // uprintf("g_rappy_pairs[index].enable?%d\r\n", g_rappy_pairs[index].enable);
 
                     *send_status = ione_api_status_fail;
                     *payload_length = 1;
@@ -1015,7 +1037,14 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length) {
                 }
 
                 rappy_snappy_pair_t *p = &g_rappy_pairs[index];
-
+                // eeconfig_read_rappy_snappy();
+                // uprintf("set print a layer %d row %d col %d, b layer %d, row %d col %d\r\n",
+                //     g_rappy_pairs[index].lay_a,
+                //     g_rappy_pairs[index].row_a,
+                //     g_rappy_pairs[index].col_a,
+                //     g_rappy_pairs[index].lay_b,
+                //     g_rappy_pairs[index].row_b,
+                //     g_rappy_pairs[index].col_b);
                 *send_status = ione_api_status_success;
 
                 // Key A
@@ -1045,9 +1074,15 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length) {
 				*payload_length = 1;
 				*send_status = ione_api_status_success;
 				uprintf("Start ");
+                knobState = 0;
+                eeprom_update_byte(KB_ENCODER_MODE_ADDR, knobState);
+                eeconfig_socd_clear();
+                eeconfig_rappy_snappy_clear();
+                eeconfig_modtap_clear();
 				currentLED_RunMode.mode = 8;
 				currentLED_RunMode.type = offMode;
 				setRunMode(currentLED_RunMode);
+                eeprom_update_byte(KB_COLOR_MODE_ADDR, currentLED_RunMode.mode);
 				uprintf (".");
 				*send_status = ione_api_status_success;
 				eeconfig_rapidTrigger_init();
@@ -1070,6 +1105,7 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length) {
 				*(data_start+3) |= 0x80;
 				raw_hid_send(data_start, length);
 				uprintf (".");
+                eeprom_write_word(EEPROM_FACTORY_INIT_FLAG_ADDR, 0xFA);
 				uprintf("\r\nEnd\r\n");
 				chThdSleepMilliseconds(1000);
 				NVIC_SystemReset();

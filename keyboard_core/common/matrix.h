@@ -97,7 +97,7 @@ typedef struct {
 
 #ifdef modTap
 
-#define MT_CAP_MAP 32          // 依你的實際大小
+#define MT_CAP_MAP 8          // 依你的實際大小
 
 typedef struct {
     uint8_t L, R, C;           // 建議之後可改成 layer,row,col 比較清楚

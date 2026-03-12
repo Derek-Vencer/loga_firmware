@@ -32,8 +32,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //#include "keymap_in_eeprom.h"
 
 enum custom_keycodes{
-    KC_M1 = 0x5F00,
+    KC_MBRI = 0x5F00,
+    KC_PBRI,
+    KC_MSAT,
+    KC_PSAT,
+    KC_SOCD_TOGG,
+    KC_WIN_LOCK,
+    KC_MHUE,
+    KC_PHUE,
+    KC_LM1,
+    KC_LM2,
+    KC_LM3,
+    KC_LM4,
+    KC_LM5,
+    KC_LM6,
+    KC_LM7,
+    KC_LM8,
+    KC_LM9,
+    KC_M1,
     KC_M2,
+    KC_M3,
 };
 
 #ifdef  KEYMAP_IN_EEPROM_ENABLE
