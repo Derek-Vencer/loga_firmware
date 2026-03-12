@@ -21,5 +21,8 @@ void buildNormalModes(void);
 void LED_init(void);
 void setChangeProfileEffect(bool enable, uint8_t row, uint8_t column, led_config_t color);
 
+hsv_t rgb_to_hsv(led_config_t rgb);
+led_config_t hsv_to_rgb(hsv_t hsv);
+
 extern led_config_t LED_NULL;
 #endif /* LED_EFFECT_H_ */

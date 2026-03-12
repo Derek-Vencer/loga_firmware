@@ -106,7 +106,7 @@ typedef struct {
 } mt_entry_t;
 
 extern mt_entry_t mt_map[MT_CAP_MAP];   // 只有宣告，沒有初始化
-#endif
+#endif //modTap
 
 // move from matrix.c because i want to use these in via.c (lyon)
 #define TriggerMax	1500

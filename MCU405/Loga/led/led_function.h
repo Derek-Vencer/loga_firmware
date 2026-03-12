@@ -43,6 +43,12 @@ enum {
 };
 
 typedef struct {
+    uint8_t h;   // 0~255  (對應 0~360°)
+    uint8_t s;   // 0~255
+    uint8_t v;   // 0~255
+} hsv_t;
+
+typedef struct {
 	uint8_t red;
 	uint8_t green;
 	uint8_t blue;

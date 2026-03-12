@@ -24,6 +24,7 @@ uint8_t LED_DemoModeIndex = 0,LED_DemoCurrentMode = 0;
 uint8_t LED_PresetModeIndex = 0,LED_PresetCurrentMode;
 EffectStruct_t	LED_DemoMode[LED_DemoModes], LED_PresetMode[LED_PresetModes];
 led_config_t LED_NULL;
+static led_config_t c;
 
 int8_t normalEffect;
 uint8_t normalBrightness = 3, normalSpeed = 2;
@@ -761,10 +762,10 @@ void buildNormalModes(void){
     // LED_ModesBuilder(newPreset , false,EffectTypeMosArt, true, 5000, single, mosArtStatic,  {0,0,0}, normalBrightness, normalSpeed, 0); // lyon change
 
 	// LED_ModesBuilder(addPresetEffect , false,EffectTypeMosArt, true, 5000, ranbow, mosArtBreath,  rainbowColor[green], normalBrightness, normalSpeed, 0);
-    LED_ModesBuilder(addPresetEffect , false,EffectTypeMosArt, true, 5000, single, mosArtWave,  rainbowColor[offreal], normalBrightness, normalSpeed, 0);
+    LED_ModesBuilder(addPresetEffect , false,EffectTypeMosArt, true, 5000, single, mosArtWave,  c, normalBrightness, normalSpeed, 0);
 
 	// LED_ModesBuilder(addPresetEffect , false,EffectTypeMosArt, true, 5000, single, mosArtFlash,  rainbowColor[blue], normalBrightness, normalSpeed, 0);
-    LED_ModesBuilder(addPresetEffect , false,EffectTypeMosArt, true, 5000, single, mosArtWave,  rainbowColor[blue], normalBrightness, normalSpeed, true);
+    LED_ModesBuilder(addPresetEffect , false,EffectTypeMosArt, true, 5000, single, mosArtBreath,  rainbowColor[blue], normalBrightness, normalSpeed, true);
 
 	LED_ModesBuilder(addPresetEffect , false,EffectTypeMosArt, true, 5000, ranbow, mosArtFlash,  rainbowColor[yellow], normalBrightness, normalSpeed, 0);
 	LED_ModesBuilder(addPresetEffect , false,EffectTypeMosArt, true, 5000, single, mosArtStatic,  rainbowColor[white], normalBrightness, normalSpeed, 0);
