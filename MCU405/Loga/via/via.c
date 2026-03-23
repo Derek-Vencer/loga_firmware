@@ -1083,6 +1083,7 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length) {
 				currentLED_RunMode.type = offMode;
 				setRunMode(currentLED_RunMode);
                 eeprom_update_byte(KB_COLOR_MODE_ADDR, currentLED_RunMode.mode);
+                eeprom_write_word(EECONFIG_POLLING_RATE, 0x00);
 				uprintf (".");
 				*send_status = ione_api_status_success;
 				eeconfig_rapidTrigger_init();
@@ -1116,8 +1117,66 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length) {
 			}
 			*payload_length = 1;
 		break;
-		case ione_api_cmd_set_test_mode:
-		break;
+        case ione_api_set_polling_rate:
+            uprintf("API=>Set Polling Rate:\r\n");
+            if(*payload_length == 1 && (recive_payload[0] < 4)){
+                *send_status = ione_api_status_success;
+                usb_set_polling_rate(recive_payload[0]);
+                eeprom_write_word(EECONFIG_POLLING_RATE, recive_payload[0]);
+            }else{
+                *send_status = ione_api_status_fail;
+				uprintf ("Fail\r\n");
+            }
+            *payload_length = 1;
+        break;
+        case ione_api_get_polling_rate:
+            uprintf("API=>Get Polling Rate:\r\n");
+            if(*payload_length == 0){
+                *send_status = ione_api_status_success;
+                *send_data = get_usb_poll_rate();
+                *payload_length = 2;
+            }else{
+                *send_status = ione_api_status_fail;
+				uprintf ("Fail\r\n");
+                *payload_length = 1;
+            }
+        break;
+        // case ione_api_cmd_set_macro_record:
+        // break;
+        // case ione_api_cmd_set_stop_macro_record:
+        // break;
+        // case ione_api_cmd_set_macro_playback:
+        // break;
+        // case ione_api_cmd_get_macro_playback:
+        // break;
+        // case ione_api_cmd_set_macro_data:
+        // break;
+        // case ione_api_cmd_get_macro_data:
+        // break;
+        // case ione_api_cmd_clear_macro:
+        // break;
+        case ione_api_cmd_reset_all_key:
+            uprintf("API=>Reset All Key:\r\n");
+			if (*payload_length == 0){
+				*payload_length = 1;
+				*send_status = ione_api_status_success;
+                write_keymap_to_eeprom();
+                } else {
+				*send_status = ione_api_status_fail;
+				uprintf ("Fail\r\n");
+			}
+			*payload_length = 1;
+        break;
+        // case ione_api_cmd_set_dead_zone_settings:
+        // break;
+        // case ione_api_cmd_get_dead_zone_settings:
+        // break;
+        // case ione_api_cmd_system_reset:
+        // break;
+        // case ione_api_cmd_factory_reset_and_system_reset:
+        // break;
+		// case ione_api_cmd_set_test_mode:
+		// break;
 
         case ione_api_cmd_get_eeprom_max_trigger_value:
             uprintf("API=>Get EEPROM Max Trigger Value:\r\n");

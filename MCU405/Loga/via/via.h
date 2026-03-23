@@ -204,6 +204,8 @@ enum ione_api_command {
 	ione_api_cmd_set_snap_tap_SOCD_Binding 	= 0x010B,
 	ione_api_cmd_get_snap_tap_SOCD_Binding	= 0x018B,
 	ione_api_test                           = 0x012B,
+	ione_api_set_polling_rate           = 0x0110,
+	ione_api_get_polling_rate           = 0x0190,
 	ione_api_cmd_set_dynamic_keystroke	= 0x010C,
 	ione_api_cmd_get_dynamic_keysytoke	= 0x018C,
 	ione_api_cmd_set_toggle_key			= 0x010D,
@@ -216,6 +218,18 @@ enum ione_api_command {
 	ione_api_cmd_get_rapid_trigger_value_mm   = 0x028B,
 	ione_api_cmd_set_rapid_trigger_value_mm   = 0x020B,
 	ione_api_cmd_get_eeprom_max_trigger_value = 0x0282, // lyon add
+	ione_api_cmd_set_macro_record       = 0x0202,
+	ione_api_cmd_set_stop_macro_record  = 0x0203,
+	ione_api_cmd_set_macro_playback     = 0x0204,
+	ione_api_cmd_get_macro_playback     = 0x0284,
+	ione_api_cmd_set_macro_data         = 0x0205,
+	ione_api_cmd_get_macro_data         = 0x0285,
+	ione_api_cmd_clear_macro            = 0x0206,
+	ione_api_cmd_reset_all_key          = 0x0207,
+	ione_api_cmd_set_dead_zone_settings = 0x0208,
+	ione_api_cmd_get_dead_zone_settings = 0x0288,
+	ione_api_cmd_system_reset           = 0x0209,
+	ione_api_cmd_factory_reset_and_system_reset = 0x020A,
 	ione_api_cmd_set_test_mode			= 0x0700,
 
 

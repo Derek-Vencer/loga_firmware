@@ -56,6 +56,15 @@ const uint32_t lampBoxDepth =   35000;
 const uint32_t lampKind = 0x01;                // 0x01:Keyboard 0x02:Mouse
 const uint32_t lampMinUpdateInterval = 0x2710; // 0x001F4 5ms //0x1388 5ms	//0x2710	10ms //0x08235; 33,333	33ms	 //0x0186a0	100ms
 
+typedef enum {
+    USB_POLL_8000 = 0,
+    USB_POLL_4000,
+    USB_POLL_2000,
+    USB_POLL_1000
+} usb_poll_mode_t;
+
+static usb_poll_mode_t g_usb_poll_mode = USB_POLL_8000;
+
 // const uint32_t lampPostionX[] = {
 //      3000, 4280, 5560, 6840, 8120, 9400,10680,11960,13240,14520,15800,17080,18360,19640,20920,22200,23480,24760,26040,27320,28600,29880,31160,32440,33720,35000,
 //      3000, 5133, 7266, 9399,11532,13665,15798,17931,20064,22197,24330,26463,28596,30729,32862,34995,
@@ -1743,8 +1752,242 @@ static const USBDescriptor extra_hid_report_descriptor = {
 #define NUM_INTERFACES (CONTROL_HID_DESC_NUM + 1)
 #define CONFIG1_DESC_SIZE (9 + (9 + 9 + 7) * NUM_INTERFACES - 9 + 7)		///////!!!! in out 9 -7 = 2
 
-static const uint8_t hid_configuration_descriptor_data[] = {
-    /* Configuration Descriptor (9 bytes) USB spec 9.6.3, page 264-266, Table 9-10 */
+// static const uint8_t hid_configuration_descriptor_data[] = {
+//     /* Configuration Descriptor (9 bytes) USB spec 9.6.3, page 264-266, Table 9-10 */
+//     USB_DESC_CONFIGURATION(CONFIG1_DESC_SIZE + USB_DESC_INTERFACE_ASSOCIATION_SIZE * 2, // wTotalLength
+//                            NUM_INTERFACES,                                              // bNumInterfaces
+//                            1,                                                           // bConfigurationValue
+//                            0,                                                           // iConfiguration
+//                            0xA0,                                                        // bmAttributes (RESERVED|REMOTEWAKEUP)
+//                            0xFA),                                                       // bMaxPower (500mA)
+
+//     IAD_HID_IF_DESC_SET(0, 1, HID_COMMUNICATION_INTERFACE_CLASS)
+
+//     /* Interface Descriptor (9 bytes) USB spec 9.6.5, page 267-269, Table 9-12 */
+//     USB_DESC_INTERFACE(KBD_INTERFACE, // bInterfaceNumber
+//                        0,             // bAlternateSetting
+//                        1,             // bNumEndpoints
+//                        0x03,          // bInterfaceClass: HID
+//                        0x01,          // bInterfaceSubClass: Boot
+//                        0x01,          // bInterfaceProtocol: Keyboard
+//                        0),            // iInterface
+
+//     /* HID descriptor (9 bytes) HID 1.11 spec, section 6.2.1 */
+//     USB_DESC_BYTE(9),                                     // bLength
+//     USB_DESC_BYTE(0x21),                                  // bDescriptorType (HID class)
+//     USB_DESC_BCD(0x0111),                                 // bcdHID: HID version 1.11
+//     USB_DESC_BYTE(0),                                     // bCountryCode
+//     USB_DESC_BYTE(1),                                     // bNumDescriptors
+//     USB_DESC_BYTE(0x22),                                  // bDescriptorType (report desc)
+//     USB_DESC_WORD(sizeof(keyboard_hid_report_desc_data)), // wDescriptorLength
+
+//     /* Endpoint Descriptor (7 bytes) USB spec 9.6.6, page 269-271, Table 9-13 */
+//     USB_DESC_ENDPOINT(KBD_ENDPOINT | 0x80, // bEndpointAddress
+//                       0x03,                // bmAttributes (Interrupt)
+//                       KBD_EPSIZE,          // wMaxPacketSize
+//                       1),                  // bInterval
+
+// #ifdef MOUSE_ENABLE
+//     /* Interface Descriptor (9 bytes) USB spec 9.6.5, page 267-269, Table 9-12 */
+//     USB_DESC_INTERFACE(MOUSE_INTERFACE, // bInterfaceNumber
+//                        0,               // bAlternateSetting
+//                        1,               // bNumEndpoints
+//                        0x03,            // bInterfaceClass (0x03 = HID)
+//                        // ThinkPad T23 BIOS doesn't work with boot mouse.
+//                        0x00, // bInterfaceSubClass (0x01 = Boot)
+//                        0x00, // bInterfaceProtocol (0x02 = Mouse)
+//                        /*
+//                           0x01,      // bInterfaceSubClass (0x01 = Boot)
+//                           0x02,      // bInterfaceProtocol (0x02 = Mouse)
+//                         */
+//                        0), // iInterface
+
+//     /* HID descriptor (9 bytes) HID 1.11 spec, section 6.2.1 */
+//     USB_DESC_BYTE(9),                                  // bLength
+//     USB_DESC_BYTE(0x21),                               // bDescriptorType (HID class)
+//     USB_DESC_BCD(0x0111),                              // bcdHID: HID version 1.11
+//     USB_DESC_BYTE(0),                                  // bCountryCode
+//     USB_DESC_BYTE(1),                                  // bNumDescriptors
+//     USB_DESC_BYTE(0x22),                               // bDescriptorType (report desc)
+//     USB_DESC_WORD(sizeof(mouse_hid_report_desc_data)), // wDescriptorLength
+
+//     /* Endpoint Descriptor (7 bytes) USB spec 9.6.6, page 269-271, Table 9-13 */
+//     USB_DESC_ENDPOINT(MOUSE_ENDPOINT | 0x80, // bEndpointAddress
+//                       0x03,                  // bmAttributes (Interrupt)
+//                       MOUSE_EPSIZE,          // wMaxPacketSize
+//                       1),                    // bInterval
+// #endif                                       /* MOUSE_ENABLE */
+
+// #ifdef RAW_ENABLE   //!!
+//     /* Interface Descriptor (9 bytes) USB spec 9.6.5, page 267-269, Table 9-12 */
+//     USB_DESC_INTERFACE(RAW_INTERFACE, // bInterfaceNumber
+//                        0,                 // bAlternateSetting
+//                         2,                 // bNumEndpoints
+// //                       1,                 // bNumEndpoints
+//                        0x03,              // bInterfaceClass: HID
+//                        0x00,              // bInterfaceSubClass: None
+//                        0x00,              // bInterfaceProtocol: None
+//                        0),                // iInterface
+
+//     /* HID descriptor (9 bytes) HID 1.11 spec, section 6.2.1 */
+//     USB_DESC_BYTE(9),                                    // bLength
+//     USB_DESC_BYTE(0x21),                                 // bDescriptorType (HID class)
+//     USB_DESC_BCD(0x0111),                                // bcdHID: HID version 1.11
+//     USB_DESC_BYTE(0),                                    // bCountryCode
+//     USB_DESC_BYTE(1),                                    // bNumDescriptors
+//     USB_DESC_BYTE(0x22),                                 // bDescriptorType (report desc)
+//     USB_DESC_WORD(sizeof(raw_hid_report_desc_data)),     // wDescriptorLength
+
+//     /* Endpoint Descriptor (7 bytes) USB spec 9.6.6, page 269-271, Table 9-13 */
+//      USB_DESC_ENDPOINT(RAW_IN_ENDPOINT | 0x80,   // bEndpointAddress
+//                        0x03,                     // bmAttributes (Interrupt)
+//                        RAW_EPSIZE,               // wMaxPacketSize
+//                        //!!
+//                        1),                       // bInterval
+
+//     /* Endpoint Descriptor (7 bytes) USB spec 9.6.6, page 269-271, Table 9-13 */                      
+//     USB_DESC_ENDPOINT(RAW_OUT_ENDPOINT,         // bEndpointAddress
+//                       0x03,                     // bmAttributes (Interrupt)
+//                       RAW_EPSIZE,               // wMaxPacketSize
+//                       1),                       // bInterval
+
+// #endif                                          /* RAW_ENABLE */
+
+// #ifdef CONSOLE_ENABLE
+//     /* Interface Descriptor (9 bytes) USB spec 9.6.5, page 267-269, Table 9-12 */
+//     USB_DESC_INTERFACE(CONSOLE_INTERFACE, // bInterfaceNumber
+//                        0,                 // bAlternateSetting
+//                        1,                 // bNumEndpoints
+//                        0x03,              // bInterfaceClass: HID
+//                        0x00,              // bInterfaceSubClass: None
+//                        0x00,              // bInterfaceProtocol: None
+//                        0),                // iInterface
+
+//     /* HID descriptor (9 bytes) HID 1.11 spec, section 6.2.1 */
+//     USB_DESC_BYTE(9),                                    // bLength
+//     USB_DESC_BYTE(0x21),                                 // bDescriptorType (HID class)
+//     USB_DESC_BCD(0x0111),                                // bcdHID: HID version 1.11
+//     USB_DESC_BYTE(0),                                    // bCountryCode
+//     USB_DESC_BYTE(1),                                    // bNumDescriptors
+//     USB_DESC_BYTE(0x22),                                 // bDescriptorType (report desc)
+//     USB_DESC_WORD(sizeof(console_hid_report_desc_data)), // wDescriptorLength
+
+//     /* Endpoint Descriptor (7 bytes) USB spec 9.6.6, page 269-271, Table 9-13 */
+//     USB_DESC_ENDPOINT(CONSOLE_ENDPOINT | 0x80, // bEndpointAddress
+//                       0x03,                    // bmAttributes (Interrupt)
+//                       CONSOLE_EPSIZE,          // wMaxPacketSize
+//                       1),                      // bInterval
+// #endif                                         /* CONSOLE_ENABLE */
+
+// #ifdef EXTRAKEY_ENABLE
+//     /* Interface Descriptor (9 bytes) USB spec 9.6.5, page 267-269, Table 9-12 */
+//     USB_DESC_INTERFACE(EXTRA_INTERFACE, // bInterfaceNumber
+//                        0,               // bAlternateSetting
+//                        1,               // bNumEndpoints
+//                        0x03,            // bInterfaceClass: HID
+//                        0x00,            // bInterfaceSubClass: None
+//                        0x00,            // bInterfaceProtocol: None
+//                        0),              // iInterface
+
+//     /* HID descriptor (9 bytes) HID 1.11 spec, section 6.2.1 */
+//     USB_DESC_BYTE(9),                                  // bLength
+//     USB_DESC_BYTE(0x21),                               // bDescriptorType (HID class)
+//     USB_DESC_BCD(0x0111),                              // bcdHID: HID version 1.11
+//     USB_DESC_BYTE(0),                                  // bCountryCode
+//     USB_DESC_BYTE(1),                                  // bNumDescriptors
+//     USB_DESC_BYTE(0x22),                               // bDescriptorType (report desc)
+//     USB_DESC_WORD(sizeof(extra_hid_report_desc_data)), // wDescriptorLength
+
+//     /* Endpoint Descriptor (7 bytes) USB spec 9.6.6, page 269-271, Table 9-13 */
+//     USB_DESC_ENDPOINT(EXTRA_ENDPOINT | 0x80, // bEndpointAddress
+//                       0x03,                  // bmAttributes (Interrupt)
+//                       EXTRA_EPSIZE,          // wMaxPacketSize
+//                       2),                    // bInterval
+// #endif                                       /* EXTRAKEY_ENABLE */
+
+// #ifdef NKRO_ENABLE
+//     /* Interface Descriptor (9 bytes) USB spec 9.6.5, page 267-269, Table 9-12 */
+//     USB_DESC_INTERFACE(NKRO_INTERFACE, // bInterfaceNumber
+//                        0,              // bAlternateSetting
+//                        1,              // bNumEndpoints
+//                        0x03,           // bInterfaceClass: HID
+//                        0x00,           // bInterfaceSubClass: None
+//                        0x00,           // bInterfaceProtocol: None
+//                        0),             // iInterface
+
+//     /* HID descriptor (9 bytes) HID 1.11 spec, section 6.2.1 */
+//     USB_DESC_BYTE(9),                                 // bLength
+//     USB_DESC_BYTE(0x21),                              // bDescriptorType (HID class)
+//     USB_DESC_BCD(0x0111),                             // bcdHID: HID version 1.11
+//     USB_DESC_BYTE(0),                                 // bCountryCode
+//     USB_DESC_BYTE(1),                                 // bNumDescriptors
+//     USB_DESC_BYTE(0x22),                              // bDescriptorType (report desc)
+//     USB_DESC_WORD(sizeof(nkro_hid_report_desc_data)), // wDescriptorLength
+
+//     /* Endpoint Descriptor (7 bytes) USB spec 9.6.6, page 269-271, Table 9-13 */
+//     USB_DESC_ENDPOINT(NKRO_ENDPOINT | 0x80, // bEndpointAddress
+//                       0x03,                 // bmAttributes (Interrupt)
+//                       NKRO_EPSIZE,          // wMaxPacketSize
+//                       1),                   // bInterval
+// #endif                                      /* NKRO_ENABLE */
+// #ifdef LAMP_ARRAY_ENABLE
+//     /* Interface Descriptor (9 bytes) USB spec 9.6.5, page 267-269, Table 9-12 */
+//     USB_DESC_INTERFACE(LAMP_ARRAY_INTERFACE, // bInterfaceNumber
+//                        0,                    // bAlternateSetting
+//                        1,                    // bNumEndpoints
+//                        0x03,                 // bInterfaceClass: HID
+//                        0x00,                 // bInterfaceSubClass
+//                        0x00,                 // bInterfaceProtocol
+//                        0),                   // iInterface
+
+//     /* HID descriptor (9 bytes) HID 1.11 spec, section 6.2.1 */
+//     USB_DESC_BYTE(9),                                       // bLength
+//     USB_DESC_BYTE(0x21),                                    // bDescriptorType (HID class)
+//     USB_DESC_BCD(0x0111),                                   // bcdHID: HID version 1.11
+//     USB_DESC_BYTE(0),                                       // bCountryCode
+//     USB_DESC_BYTE(1),                                       // bNumDescriptors
+//     USB_DESC_BYTE(0x22),                                    // bDescriptorType (report desc)
+//     USB_DESC_WORD(sizeof(lamp_array_hid_report_desc_data)), // wDescriptorLength
+
+//     /* Endpoint Descriptor (7 bytes) USB spec 9.6.6, page 269-271, Table 9-13 */
+//     USB_DESC_ENDPOINT(LAMP_ARRAY_ENDPOINT | 0x80, // bEndpointAddress
+//                       0x03,                       // bmAttributes (Interrupt)
+//                       LAMP_ARRAY_EPSIZE,          // wMaxPacketSize
+//                       1),                         // bInterval
+
+// #endif /* LAMP_ARRAY */
+
+// #ifdef CONTROL_ENABLE
+//     /* Interface Descriptor (9 bytes) USB spec 9.6.5, page 267-269, Table 9-12 */
+//     IAD_HID_IF_DESC_SET(6, 1, VENDOR_COMMUNICATION_INTERFACE_CLASS)
+//         USB_DESC_INTERFACE(CONTROL_INTERFACE, // bInterfaceNumber
+//                            0,                 // bAlternateSetting
+//                            1,                 // bNumEndpoints
+//                            0xff,              // bInterfaceClass: HID
+//                            0x00,              // bInterfaceSubClass
+//                            0x00,              // bInterfaceProtocol
+//                            0),                // iInterface
+
+//     /* HID descriptor (9 bytes) HID 1.11 spec, section 6.2.1 */
+//     //  USB_DESC_BYTE(9),            // bLength
+//     //  USB_DESC_BYTE(0x21),         // bDescriptorType (HID class)
+//     //  USB_DESC_BCD(0x0111),        // bcdHID: HID version 1.11
+//     //  USB_DESC_BYTE(0),            // bCountryCode
+//     //  USB_DESC_BYTE(1),            // bNumDescriptors
+//     //  USB_DESC_BYTE(0x22),         // bDescriptorType (report desc)
+//     //  USB_DESC_WORD(sizeof(control_hid_report_desc_data)), // wDescriptorLength
+
+//     /* Endpoint Descriptor (7 bytes) USB spec 9.6.6, page 269-271, Table 9-13 */
+//     USB_DESC_ENDPOINT(CONTROL_ENDPOINT | 0x80, // bEndpointAddress
+//                       0x03,                    // bmAttributes (Interrupt)
+//                       CONTROL_EPSIZE,          // wMaxPacketSize
+//                       1),                      // bInterval
+
+// #endif /* CONTROL */
+// };
+/***********************/
+static const uint8_t hid_configuration_descriptor_data_8000hz[] = { //_8000hz
+    // Configuration Descriptor (9 bytes) USB spec 9.6.3, page 264-266, Table 9-10
     USB_DESC_CONFIGURATION(CONFIG1_DESC_SIZE + USB_DESC_INTERFACE_ASSOCIATION_SIZE * 2, // wTotalLength
                            NUM_INTERFACES,                                              // bNumInterfaces
                            1,                                                           // bConfigurationValue
@@ -1754,7 +1997,7 @@ static const uint8_t hid_configuration_descriptor_data[] = {
 
     IAD_HID_IF_DESC_SET(0, 1, HID_COMMUNICATION_INTERFACE_CLASS)
 
-    /* Interface Descriptor (9 bytes) USB spec 9.6.5, page 267-269, Table 9-12 */
+    // Interface Descriptor (9 bytes) USB spec 9.6.5, page 267-269, Table 9-12
     USB_DESC_INTERFACE(KBD_INTERFACE, // bInterfaceNumber
                        0,             // bAlternateSetting
                        1,             // bNumEndpoints
@@ -1763,7 +2006,7 @@ static const uint8_t hid_configuration_descriptor_data[] = {
                        0x01,          // bInterfaceProtocol: Keyboard
                        0),            // iInterface
 
-    /* HID descriptor (9 bytes) HID 1.11 spec, section 6.2.1 */
+    // HID descriptor (9 bytes) HID 1.11 spec, section 6.2.1
     USB_DESC_BYTE(9),                                     // bLength
     USB_DESC_BYTE(0x21),                                  // bDescriptorType (HID class)
     USB_DESC_BCD(0x0111),                                 // bcdHID: HID version 1.11
@@ -1772,14 +2015,14 @@ static const uint8_t hid_configuration_descriptor_data[] = {
     USB_DESC_BYTE(0x22),                                  // bDescriptorType (report desc)
     USB_DESC_WORD(sizeof(keyboard_hid_report_desc_data)), // wDescriptorLength
 
-    /* Endpoint Descriptor (7 bytes) USB spec 9.6.6, page 269-271, Table 9-13 */
+    // Endpoint Descriptor (7 bytes) USB spec 9.6.6, page 269-271, Table 9-13
     USB_DESC_ENDPOINT(KBD_ENDPOINT | 0x80, // bEndpointAddress
                       0x03,                // bmAttributes (Interrupt)
                       KBD_EPSIZE,          // wMaxPacketSize
                       1),                  // bInterval
 
 #ifdef MOUSE_ENABLE
-    /* Interface Descriptor (9 bytes) USB spec 9.6.5, page 267-269, Table 9-12 */
+    // Interface Descriptor (9 bytes) USB spec 9.6.5, page 267-269, Table 9-12
     USB_DESC_INTERFACE(MOUSE_INTERFACE, // bInterfaceNumber
                        0,               // bAlternateSetting
                        1,               // bNumEndpoints
@@ -1977,54 +2220,808 @@ static const uint8_t hid_configuration_descriptor_data[] = {
 #endif /* CONTROL */
 };
 
+static const uint8_t hid_configuration_descriptor_data_4000hz[] = {
+    /* Configuration Descriptor (9 bytes) USB spec 9.6.3, page 264-266, Table 9-10 */
+    USB_DESC_CONFIGURATION(CONFIG1_DESC_SIZE + USB_DESC_INTERFACE_ASSOCIATION_SIZE * 2, // wTotalLength
+                           NUM_INTERFACES,                                              // bNumInterfaces
+                           1,                                                           // bConfigurationValue
+                           0,                                                           // iConfiguration
+                           0xA0,                                                        // bmAttributes (RESERVED|REMOTEWAKEUP)
+                           0xFA),                                                       // bMaxPower (500mA)
+
+    IAD_HID_IF_DESC_SET(0, 1, HID_COMMUNICATION_INTERFACE_CLASS)
+
+    /* Interface Descriptor (9 bytes) USB spec 9.6.5, page 267-269, Table 9-12 */
+    USB_DESC_INTERFACE(KBD_INTERFACE, // bInterfaceNumber
+                       0,             // bAlternateSetting
+                       1,             // bNumEndpoints
+                       0x03,          // bInterfaceClass: HID
+                       0x01,          // bInterfaceSubClass: Boot
+                       0x01,          // bInterfaceProtocol: Keyboard
+                       0),            // iInterface
+
+    /* HID descriptor (9 bytes) HID 1.11 spec, section 6.2.1 */
+    USB_DESC_BYTE(9),                                     // bLength
+    USB_DESC_BYTE(0x21),                                  // bDescriptorType (HID class)
+    USB_DESC_BCD(0x0111),                                 // bcdHID: HID version 1.11
+    USB_DESC_BYTE(0),                                     // bCountryCode
+    USB_DESC_BYTE(1),                                     // bNumDescriptors
+    USB_DESC_BYTE(0x22),                                  // bDescriptorType (report desc)
+    USB_DESC_WORD(sizeof(keyboard_hid_report_desc_data)), // wDescriptorLength
+
+    /* Endpoint Descriptor (7 bytes) USB spec 9.6.6, page 269-271, Table 9-13 */
+    USB_DESC_ENDPOINT(KBD_ENDPOINT | 0x80, // bEndpointAddress
+                      0x03,                // bmAttributes (Interrupt)
+                      KBD_EPSIZE,          // wMaxPacketSize
+                      2),                  // bInterval
+
+#ifdef MOUSE_ENABLE
+    /* Interface Descriptor (9 bytes) USB spec 9.6.5, page 267-269, Table 9-12 */
+    USB_DESC_INTERFACE(MOUSE_INTERFACE, // bInterfaceNumber
+                       0,               // bAlternateSetting
+                       1,               // bNumEndpoints
+                       0x03,            // bInterfaceClass (0x03 = HID)
+                       // ThinkPad T23 BIOS doesn't work with boot mouse.
+                       0x00, // bInterfaceSubClass (0x01 = Boot)
+                       0x00, // bInterfaceProtocol (0x02 = Mouse)
+                       /*
+                          0x01,      // bInterfaceSubClass (0x01 = Boot)
+                          0x02,      // bInterfaceProtocol (0x02 = Mouse)
+                        */
+                       0), // iInterface
+
+    /* HID descriptor (9 bytes) HID 1.11 spec, section 6.2.1 */
+    USB_DESC_BYTE(9),                                  // bLength
+    USB_DESC_BYTE(0x21),                               // bDescriptorType (HID class)
+    USB_DESC_BCD(0x0111),                              // bcdHID: HID version 1.11
+    USB_DESC_BYTE(0),                                  // bCountryCode
+    USB_DESC_BYTE(1),                                  // bNumDescriptors
+    USB_DESC_BYTE(0x22),                               // bDescriptorType (report desc)
+    USB_DESC_WORD(sizeof(mouse_hid_report_desc_data)), // wDescriptorLength
+
+    /* Endpoint Descriptor (7 bytes) USB spec 9.6.6, page 269-271, Table 9-13 */
+    USB_DESC_ENDPOINT(MOUSE_ENDPOINT | 0x80, // bEndpointAddress
+                      0x03,                  // bmAttributes (Interrupt)
+                      MOUSE_EPSIZE,          // wMaxPacketSize
+                      1),                    // bInterval
+#endif                                       /* MOUSE_ENABLE */
+
+#ifdef RAW_ENABLE   //!!
+    /* Interface Descriptor (9 bytes) USB spec 9.6.5, page 267-269, Table 9-12 */
+    USB_DESC_INTERFACE(RAW_INTERFACE, // bInterfaceNumber
+                       0,                 // bAlternateSetting
+                        2,                 // bNumEndpoints
+//                       1,                 // bNumEndpoints
+                       0x03,              // bInterfaceClass: HID
+                       0x00,              // bInterfaceSubClass: None
+                       0x00,              // bInterfaceProtocol: None
+                       0),                // iInterface
+
+    /* HID descriptor (9 bytes) HID 1.11 spec, section 6.2.1 */
+    USB_DESC_BYTE(9),                                    // bLength
+    USB_DESC_BYTE(0x21),                                 // bDescriptorType (HID class)
+    USB_DESC_BCD(0x0111),                                // bcdHID: HID version 1.11
+    USB_DESC_BYTE(0),                                    // bCountryCode
+    USB_DESC_BYTE(1),                                    // bNumDescriptors
+    USB_DESC_BYTE(0x22),                                 // bDescriptorType (report desc)
+    USB_DESC_WORD(sizeof(raw_hid_report_desc_data)),     // wDescriptorLength
+
+    /* Endpoint Descriptor (7 bytes) USB spec 9.6.6, page 269-271, Table 9-13 */
+     USB_DESC_ENDPOINT(RAW_IN_ENDPOINT | 0x80,   // bEndpointAddress
+                       0x03,                     // bmAttributes (Interrupt)
+                       RAW_EPSIZE,               // wMaxPacketSize
+                       //!!
+                       1),                       // bInterval
+
+    /* Endpoint Descriptor (7 bytes) USB spec 9.6.6, page 269-271, Table 9-13 */                      
+    USB_DESC_ENDPOINT(RAW_OUT_ENDPOINT,         // bEndpointAddress
+                      0x03,                     // bmAttributes (Interrupt)
+                      RAW_EPSIZE,               // wMaxPacketSize
+                      1),                       // bInterval
+
+#endif                                          /* RAW_ENABLE */
+
+#ifdef CONSOLE_ENABLE
+    /* Interface Descriptor (9 bytes) USB spec 9.6.5, page 267-269, Table 9-12 */
+    USB_DESC_INTERFACE(CONSOLE_INTERFACE, // bInterfaceNumber
+                       0,                 // bAlternateSetting
+                       1,                 // bNumEndpoints
+                       0x03,              // bInterfaceClass: HID
+                       0x00,              // bInterfaceSubClass: None
+                       0x00,              // bInterfaceProtocol: None
+                       0),                // iInterface
+
+    /* HID descriptor (9 bytes) HID 1.11 spec, section 6.2.1 */
+    USB_DESC_BYTE(9),                                    // bLength
+    USB_DESC_BYTE(0x21),                                 // bDescriptorType (HID class)
+    USB_DESC_BCD(0x0111),                                // bcdHID: HID version 1.11
+    USB_DESC_BYTE(0),                                    // bCountryCode
+    USB_DESC_BYTE(1),                                    // bNumDescriptors
+    USB_DESC_BYTE(0x22),                                 // bDescriptorType (report desc)
+    USB_DESC_WORD(sizeof(console_hid_report_desc_data)), // wDescriptorLength
+
+    /* Endpoint Descriptor (7 bytes) USB spec 9.6.6, page 269-271, Table 9-13 */
+    USB_DESC_ENDPOINT(CONSOLE_ENDPOINT | 0x80, // bEndpointAddress
+                      0x03,                    // bmAttributes (Interrupt)
+                      CONSOLE_EPSIZE,          // wMaxPacketSize
+                      1),                      // bInterval
+#endif                                         /* CONSOLE_ENABLE */
+
+#ifdef EXTRAKEY_ENABLE
+    /* Interface Descriptor (9 bytes) USB spec 9.6.5, page 267-269, Table 9-12 */
+    USB_DESC_INTERFACE(EXTRA_INTERFACE, // bInterfaceNumber
+                       0,               // bAlternateSetting
+                       1,               // bNumEndpoints
+                       0x03,            // bInterfaceClass: HID
+                       0x00,            // bInterfaceSubClass: None
+                       0x00,            // bInterfaceProtocol: None
+                       0),              // iInterface
+
+    /* HID descriptor (9 bytes) HID 1.11 spec, section 6.2.1 */
+    USB_DESC_BYTE(9),                                  // bLength
+    USB_DESC_BYTE(0x21),                               // bDescriptorType (HID class)
+    USB_DESC_BCD(0x0111),                              // bcdHID: HID version 1.11
+    USB_DESC_BYTE(0),                                  // bCountryCode
+    USB_DESC_BYTE(1),                                  // bNumDescriptors
+    USB_DESC_BYTE(0x22),                               // bDescriptorType (report desc)
+    USB_DESC_WORD(sizeof(extra_hid_report_desc_data)), // wDescriptorLength
+
+    /* Endpoint Descriptor (7 bytes) USB spec 9.6.6, page 269-271, Table 9-13 */
+    USB_DESC_ENDPOINT(EXTRA_ENDPOINT | 0x80, // bEndpointAddress
+                      0x03,                  // bmAttributes (Interrupt)
+                      EXTRA_EPSIZE,          // wMaxPacketSize
+                      2),                    // bInterval
+#endif                                       /* EXTRAKEY_ENABLE */
+
+#ifdef NKRO_ENABLE
+    /* Interface Descriptor (9 bytes) USB spec 9.6.5, page 267-269, Table 9-12 */
+    USB_DESC_INTERFACE(NKRO_INTERFACE, // bInterfaceNumber
+                       0,              // bAlternateSetting
+                       1,              // bNumEndpoints
+                       0x03,           // bInterfaceClass: HID
+                       0x00,           // bInterfaceSubClass: None
+                       0x00,           // bInterfaceProtocol: None
+                       0),             // iInterface
+
+    /* HID descriptor (9 bytes) HID 1.11 spec, section 6.2.1 */
+    USB_DESC_BYTE(9),                                 // bLength
+    USB_DESC_BYTE(0x21),                              // bDescriptorType (HID class)
+    USB_DESC_BCD(0x0111),                             // bcdHID: HID version 1.11
+    USB_DESC_BYTE(0),                                 // bCountryCode
+    USB_DESC_BYTE(1),                                 // bNumDescriptors
+    USB_DESC_BYTE(0x22),                              // bDescriptorType (report desc)
+    USB_DESC_WORD(sizeof(nkro_hid_report_desc_data)), // wDescriptorLength
+
+    /* Endpoint Descriptor (7 bytes) USB spec 9.6.6, page 269-271, Table 9-13 */
+    USB_DESC_ENDPOINT(NKRO_ENDPOINT | 0x80, // bEndpointAddress
+                      0x03,                 // bmAttributes (Interrupt)
+                      NKRO_EPSIZE,          // wMaxPacketSize
+                      2),                   // bInterval
+#endif                                      /* NKRO_ENABLE */
+#ifdef LAMP_ARRAY_ENABLE
+    /* Interface Descriptor (9 bytes) USB spec 9.6.5, page 267-269, Table 9-12 */
+    USB_DESC_INTERFACE(LAMP_ARRAY_INTERFACE, // bInterfaceNumber
+                       0,                    // bAlternateSetting
+                       1,                    // bNumEndpoints
+                       0x03,                 // bInterfaceClass: HID
+                       0x00,                 // bInterfaceSubClass
+                       0x00,                 // bInterfaceProtocol
+                       0),                   // iInterface
+
+    /* HID descriptor (9 bytes) HID 1.11 spec, section 6.2.1 */
+    USB_DESC_BYTE(9),                                       // bLength
+    USB_DESC_BYTE(0x21),                                    // bDescriptorType (HID class)
+    USB_DESC_BCD(0x0111),                                   // bcdHID: HID version 1.11
+    USB_DESC_BYTE(0),                                       // bCountryCode
+    USB_DESC_BYTE(1),                                       // bNumDescriptors
+    USB_DESC_BYTE(0x22),                                    // bDescriptorType (report desc)
+    USB_DESC_WORD(sizeof(lamp_array_hid_report_desc_data)), // wDescriptorLength
+
+    /* Endpoint Descriptor (7 bytes) USB spec 9.6.6, page 269-271, Table 9-13 */
+    USB_DESC_ENDPOINT(LAMP_ARRAY_ENDPOINT | 0x80, // bEndpointAddress
+                      0x03,                       // bmAttributes (Interrupt)
+                      LAMP_ARRAY_EPSIZE,          // wMaxPacketSize
+                      1),                         // bInterval
+
+#endif /* LAMP_ARRAY */
+
+#ifdef CONTROL_ENABLE
+    /* Interface Descriptor (9 bytes) USB spec 9.6.5, page 267-269, Table 9-12 */
+    IAD_HID_IF_DESC_SET(6, 1, VENDOR_COMMUNICATION_INTERFACE_CLASS)
+        USB_DESC_INTERFACE(CONTROL_INTERFACE, // bInterfaceNumber
+                           0,                 // bAlternateSetting
+                           1,                 // bNumEndpoints
+                           0xff,              // bInterfaceClass: HID
+                           0x00,              // bInterfaceSubClass
+                           0x00,              // bInterfaceProtocol
+                           0),                // iInterface
+
+    /* HID descriptor (9 bytes) HID 1.11 spec, section 6.2.1 */
+    //  USB_DESC_BYTE(9),            // bLength
+    //  USB_DESC_BYTE(0x21),         // bDescriptorType (HID class)
+    //  USB_DESC_BCD(0x0111),        // bcdHID: HID version 1.11
+    //  USB_DESC_BYTE(0),            // bCountryCode
+    //  USB_DESC_BYTE(1),            // bNumDescriptors
+    //  USB_DESC_BYTE(0x22),         // bDescriptorType (report desc)
+    //  USB_DESC_WORD(sizeof(control_hid_report_desc_data)), // wDescriptorLength
+
+    /* Endpoint Descriptor (7 bytes) USB spec 9.6.6, page 269-271, Table 9-13 */
+    USB_DESC_ENDPOINT(CONTROL_ENDPOINT | 0x80, // bEndpointAddress
+                      0x03,                    // bmAttributes (Interrupt)
+                      CONTROL_EPSIZE,          // wMaxPacketSize
+                      1),                      // bInterval
+
+#endif /* CONTROL */
+};
+
+static const uint8_t hid_configuration_descriptor_data_2000hz[] = {
+    /* Configuration Descriptor (9 bytes) USB spec 9.6.3, page 264-266, Table 9-10 */
+    USB_DESC_CONFIGURATION(CONFIG1_DESC_SIZE + USB_DESC_INTERFACE_ASSOCIATION_SIZE * 2, // wTotalLength
+                           NUM_INTERFACES,                                              // bNumInterfaces
+                           1,                                                           // bConfigurationValue
+                           0,                                                           // iConfiguration
+                           0xA0,                                                        // bmAttributes (RESERVED|REMOTEWAKEUP)
+                           0xFA),                                                       // bMaxPower (500mA)
+
+    IAD_HID_IF_DESC_SET(0, 1, HID_COMMUNICATION_INTERFACE_CLASS)
+
+    /* Interface Descriptor (9 bytes) USB spec 9.6.5, page 267-269, Table 9-12 */
+    USB_DESC_INTERFACE(KBD_INTERFACE, // bInterfaceNumber
+                       0,             // bAlternateSetting
+                       1,             // bNumEndpoints
+                       0x03,          // bInterfaceClass: HID
+                       0x01,          // bInterfaceSubClass: Boot
+                       0x01,          // bInterfaceProtocol: Keyboard
+                       0),            // iInterface
+
+    /* HID descriptor (9 bytes) HID 1.11 spec, section 6.2.1 */
+    USB_DESC_BYTE(9),                                     // bLength
+    USB_DESC_BYTE(0x21),                                  // bDescriptorType (HID class)
+    USB_DESC_BCD(0x0111),                                 // bcdHID: HID version 1.11
+    USB_DESC_BYTE(0),                                     // bCountryCode
+    USB_DESC_BYTE(1),                                     // bNumDescriptors
+    USB_DESC_BYTE(0x22),                                  // bDescriptorType (report desc)
+    USB_DESC_WORD(sizeof(keyboard_hid_report_desc_data)), // wDescriptorLength
+
+    /* Endpoint Descriptor (7 bytes) USB spec 9.6.6, page 269-271, Table 9-13 */
+    USB_DESC_ENDPOINT(KBD_ENDPOINT | 0x80, // bEndpointAddress
+                      0x03,                // bmAttributes (Interrupt)
+                      KBD_EPSIZE,          // wMaxPacketSize
+                      4),                  // bInterval
+
+#ifdef MOUSE_ENABLE
+    /* Interface Descriptor (9 bytes) USB spec 9.6.5, page 267-269, Table 9-12 */
+    USB_DESC_INTERFACE(MOUSE_INTERFACE, // bInterfaceNumber
+                       0,               // bAlternateSetting
+                       1,               // bNumEndpoints
+                       0x03,            // bInterfaceClass (0x03 = HID)
+                       // ThinkPad T23 BIOS doesn't work with boot mouse.
+                       0x00, // bInterfaceSubClass (0x01 = Boot)
+                       0x00, // bInterfaceProtocol (0x02 = Mouse)
+                       /*
+                          0x01,      // bInterfaceSubClass (0x01 = Boot)
+                          0x02,      // bInterfaceProtocol (0x02 = Mouse)
+                        */
+                       0), // iInterface
+
+    /* HID descriptor (9 bytes) HID 1.11 spec, section 6.2.1 */
+    USB_DESC_BYTE(9),                                  // bLength
+    USB_DESC_BYTE(0x21),                               // bDescriptorType (HID class)
+    USB_DESC_BCD(0x0111),                              // bcdHID: HID version 1.11
+    USB_DESC_BYTE(0),                                  // bCountryCode
+    USB_DESC_BYTE(1),                                  // bNumDescriptors
+    USB_DESC_BYTE(0x22),                               // bDescriptorType (report desc)
+    USB_DESC_WORD(sizeof(mouse_hid_report_desc_data)), // wDescriptorLength
+
+    /* Endpoint Descriptor (7 bytes) USB spec 9.6.6, page 269-271, Table 9-13 */
+    USB_DESC_ENDPOINT(MOUSE_ENDPOINT | 0x80, // bEndpointAddress
+                      0x03,                  // bmAttributes (Interrupt)
+                      MOUSE_EPSIZE,          // wMaxPacketSize
+                      1),                    // bInterval
+#endif                                       /* MOUSE_ENABLE */
+
+#ifdef RAW_ENABLE   //!!
+    /* Interface Descriptor (9 bytes) USB spec 9.6.5, page 267-269, Table 9-12 */
+    USB_DESC_INTERFACE(RAW_INTERFACE, // bInterfaceNumber
+                       0,                 // bAlternateSetting
+                        2,                 // bNumEndpoints
+//                       1,                 // bNumEndpoints
+                       0x03,              // bInterfaceClass: HID
+                       0x00,              // bInterfaceSubClass: None
+                       0x00,              // bInterfaceProtocol: None
+                       0),                // iInterface
+
+    /* HID descriptor (9 bytes) HID 1.11 spec, section 6.2.1 */
+    USB_DESC_BYTE(9),                                    // bLength
+    USB_DESC_BYTE(0x21),                                 // bDescriptorType (HID class)
+    USB_DESC_BCD(0x0111),                                // bcdHID: HID version 1.11
+    USB_DESC_BYTE(0),                                    // bCountryCode
+    USB_DESC_BYTE(1),                                    // bNumDescriptors
+    USB_DESC_BYTE(0x22),                                 // bDescriptorType (report desc)
+    USB_DESC_WORD(sizeof(raw_hid_report_desc_data)),     // wDescriptorLength
+
+    /* Endpoint Descriptor (7 bytes) USB spec 9.6.6, page 269-271, Table 9-13 */
+     USB_DESC_ENDPOINT(RAW_IN_ENDPOINT | 0x80,   // bEndpointAddress
+                       0x03,                     // bmAttributes (Interrupt)
+                       RAW_EPSIZE,               // wMaxPacketSize
+                       //!!
+                       1),                       // bInterval
+
+    /* Endpoint Descriptor (7 bytes) USB spec 9.6.6, page 269-271, Table 9-13 */                      
+    USB_DESC_ENDPOINT(RAW_OUT_ENDPOINT,         // bEndpointAddress
+                      0x03,                     // bmAttributes (Interrupt)
+                      RAW_EPSIZE,               // wMaxPacketSize
+                      1),                       // bInterval
+
+#endif                                          /* RAW_ENABLE */
+
+#ifdef CONSOLE_ENABLE
+    /* Interface Descriptor (9 bytes) USB spec 9.6.5, page 267-269, Table 9-12 */
+    USB_DESC_INTERFACE(CONSOLE_INTERFACE, // bInterfaceNumber
+                       0,                 // bAlternateSetting
+                       1,                 // bNumEndpoints
+                       0x03,              // bInterfaceClass: HID
+                       0x00,              // bInterfaceSubClass: None
+                       0x00,              // bInterfaceProtocol: None
+                       0),                // iInterface
+
+    /* HID descriptor (9 bytes) HID 1.11 spec, section 6.2.1 */
+    USB_DESC_BYTE(9),                                    // bLength
+    USB_DESC_BYTE(0x21),                                 // bDescriptorType (HID class)
+    USB_DESC_BCD(0x0111),                                // bcdHID: HID version 1.11
+    USB_DESC_BYTE(0),                                    // bCountryCode
+    USB_DESC_BYTE(1),                                    // bNumDescriptors
+    USB_DESC_BYTE(0x22),                                 // bDescriptorType (report desc)
+    USB_DESC_WORD(sizeof(console_hid_report_desc_data)), // wDescriptorLength
+
+    /* Endpoint Descriptor (7 bytes) USB spec 9.6.6, page 269-271, Table 9-13 */
+    USB_DESC_ENDPOINT(CONSOLE_ENDPOINT | 0x80, // bEndpointAddress
+                      0x03,                    // bmAttributes (Interrupt)
+                      CONSOLE_EPSIZE,          // wMaxPacketSize
+                      1),                      // bInterval
+#endif                                         /* CONSOLE_ENABLE */
+
+#ifdef EXTRAKEY_ENABLE
+    /* Interface Descriptor (9 bytes) USB spec 9.6.5, page 267-269, Table 9-12 */
+    USB_DESC_INTERFACE(EXTRA_INTERFACE, // bInterfaceNumber
+                       0,               // bAlternateSetting
+                       1,               // bNumEndpoints
+                       0x03,            // bInterfaceClass: HID
+                       0x00,            // bInterfaceSubClass: None
+                       0x00,            // bInterfaceProtocol: None
+                       0),              // iInterface
+
+    /* HID descriptor (9 bytes) HID 1.11 spec, section 6.2.1 */
+    USB_DESC_BYTE(9),                                  // bLength
+    USB_DESC_BYTE(0x21),                               // bDescriptorType (HID class)
+    USB_DESC_BCD(0x0111),                              // bcdHID: HID version 1.11
+    USB_DESC_BYTE(0),                                  // bCountryCode
+    USB_DESC_BYTE(1),                                  // bNumDescriptors
+    USB_DESC_BYTE(0x22),                               // bDescriptorType (report desc)
+    USB_DESC_WORD(sizeof(extra_hid_report_desc_data)), // wDescriptorLength
+
+    /* Endpoint Descriptor (7 bytes) USB spec 9.6.6, page 269-271, Table 9-13 */
+    USB_DESC_ENDPOINT(EXTRA_ENDPOINT | 0x80, // bEndpointAddress
+                      0x03,                  // bmAttributes (Interrupt)
+                      EXTRA_EPSIZE,          // wMaxPacketSize
+                      2),                    // bInterval
+#endif                                       /* EXTRAKEY_ENABLE */
+
+#ifdef NKRO_ENABLE
+    /* Interface Descriptor (9 bytes) USB spec 9.6.5, page 267-269, Table 9-12 */
+    USB_DESC_INTERFACE(NKRO_INTERFACE, // bInterfaceNumber
+                       0,              // bAlternateSetting
+                       1,              // bNumEndpoints
+                       0x03,           // bInterfaceClass: HID
+                       0x00,           // bInterfaceSubClass: None
+                       0x00,           // bInterfaceProtocol: None
+                       0),             // iInterface
+
+    /* HID descriptor (9 bytes) HID 1.11 spec, section 6.2.1 */
+    USB_DESC_BYTE(9),                                 // bLength
+    USB_DESC_BYTE(0x21),                              // bDescriptorType (HID class)
+    USB_DESC_BCD(0x0111),                             // bcdHID: HID version 1.11
+    USB_DESC_BYTE(0),                                 // bCountryCode
+    USB_DESC_BYTE(1),                                 // bNumDescriptors
+    USB_DESC_BYTE(0x22),                              // bDescriptorType (report desc)
+    USB_DESC_WORD(sizeof(nkro_hid_report_desc_data)), // wDescriptorLength
+
+    /* Endpoint Descriptor (7 bytes) USB spec 9.6.6, page 269-271, Table 9-13 */
+    USB_DESC_ENDPOINT(NKRO_ENDPOINT | 0x80, // bEndpointAddress
+                      0x03,                 // bmAttributes (Interrupt)
+                      NKRO_EPSIZE,          // wMaxPacketSize
+                      4),                   // bInterval
+#endif                                      /* NKRO_ENABLE */
+#ifdef LAMP_ARRAY_ENABLE
+    /* Interface Descriptor (9 bytes) USB spec 9.6.5, page 267-269, Table 9-12 */
+    USB_DESC_INTERFACE(LAMP_ARRAY_INTERFACE, // bInterfaceNumber
+                       0,                    // bAlternateSetting
+                       1,                    // bNumEndpoints
+                       0x03,                 // bInterfaceClass: HID
+                       0x00,                 // bInterfaceSubClass
+                       0x00,                 // bInterfaceProtocol
+                       0),                   // iInterface
+
+    /* HID descriptor (9 bytes) HID 1.11 spec, section 6.2.1 */
+    USB_DESC_BYTE(9),                                       // bLength
+    USB_DESC_BYTE(0x21),                                    // bDescriptorType (HID class)
+    USB_DESC_BCD(0x0111),                                   // bcdHID: HID version 1.11
+    USB_DESC_BYTE(0),                                       // bCountryCode
+    USB_DESC_BYTE(1),                                       // bNumDescriptors
+    USB_DESC_BYTE(0x22),                                    // bDescriptorType (report desc)
+    USB_DESC_WORD(sizeof(lamp_array_hid_report_desc_data)), // wDescriptorLength
+
+    /* Endpoint Descriptor (7 bytes) USB spec 9.6.6, page 269-271, Table 9-13 */
+    USB_DESC_ENDPOINT(LAMP_ARRAY_ENDPOINT | 0x80, // bEndpointAddress
+                      0x03,                       // bmAttributes (Interrupt)
+                      LAMP_ARRAY_EPSIZE,          // wMaxPacketSize
+                      1),                         // bInterval
+
+#endif /* LAMP_ARRAY */
+
+#ifdef CONTROL_ENABLE
+    /* Interface Descriptor (9 bytes) USB spec 9.6.5, page 267-269, Table 9-12 */
+    IAD_HID_IF_DESC_SET(6, 1, VENDOR_COMMUNICATION_INTERFACE_CLASS)
+        USB_DESC_INTERFACE(CONTROL_INTERFACE, // bInterfaceNumber
+                           0,                 // bAlternateSetting
+                           1,                 // bNumEndpoints
+                           0xff,              // bInterfaceClass: HID
+                           0x00,              // bInterfaceSubClass
+                           0x00,              // bInterfaceProtocol
+                           0),                // iInterface
+
+    /* HID descriptor (9 bytes) HID 1.11 spec, section 6.2.1 */
+    //  USB_DESC_BYTE(9),            // bLength
+    //  USB_DESC_BYTE(0x21),         // bDescriptorType (HID class)
+    //  USB_DESC_BCD(0x0111),        // bcdHID: HID version 1.11
+    //  USB_DESC_BYTE(0),            // bCountryCode
+    //  USB_DESC_BYTE(1),            // bNumDescriptors
+    //  USB_DESC_BYTE(0x22),         // bDescriptorType (report desc)
+    //  USB_DESC_WORD(sizeof(control_hid_report_desc_data)), // wDescriptorLength
+
+    /* Endpoint Descriptor (7 bytes) USB spec 9.6.6, page 269-271, Table 9-13 */
+    USB_DESC_ENDPOINT(CONTROL_ENDPOINT | 0x80, // bEndpointAddress
+                      0x03,                    // bmAttributes (Interrupt)
+                      CONTROL_EPSIZE,          // wMaxPacketSize
+                      1),                      // bInterval
+
+#endif /* CONTROL */
+};
+
+static const uint8_t hid_configuration_descriptor_data_1000hz[] = {
+    /* Configuration Descriptor (9 bytes) USB spec 9.6.3, page 264-266, Table 9-10 */
+    USB_DESC_CONFIGURATION(CONFIG1_DESC_SIZE + USB_DESC_INTERFACE_ASSOCIATION_SIZE * 2, // wTotalLength
+                           NUM_INTERFACES,                                              // bNumInterfaces
+                           1,                                                           // bConfigurationValue
+                           0,                                                           // iConfiguration
+                           0xA0,                                                        // bmAttributes (RESERVED|REMOTEWAKEUP)
+                           0xFA),                                                       // bMaxPower (500mA)
+
+    IAD_HID_IF_DESC_SET(0, 1, HID_COMMUNICATION_INTERFACE_CLASS)
+
+    /* Interface Descriptor (9 bytes) USB spec 9.6.5, page 267-269, Table 9-12 */
+    USB_DESC_INTERFACE(KBD_INTERFACE, // bInterfaceNumber
+                       0,             // bAlternateSetting
+                       1,             // bNumEndpoints
+                       0x03,          // bInterfaceClass: HID
+                       0x01,          // bInterfaceSubClass: Boot
+                       0x01,          // bInterfaceProtocol: Keyboard
+                       0),            // iInterface
+
+    /* HID descriptor (9 bytes) HID 1.11 spec, section 6.2.1 */
+    USB_DESC_BYTE(9),                                     // bLength
+    USB_DESC_BYTE(0x21),                                  // bDescriptorType (HID class)
+    USB_DESC_BCD(0x0111),                                 // bcdHID: HID version 1.11
+    USB_DESC_BYTE(0),                                     // bCountryCode
+    USB_DESC_BYTE(1),                                     // bNumDescriptors
+    USB_DESC_BYTE(0x22),                                  // bDescriptorType (report desc)
+    USB_DESC_WORD(sizeof(keyboard_hid_report_desc_data)), // wDescriptorLength
+
+    /* Endpoint Descriptor (7 bytes) USB spec 9.6.6, page 269-271, Table 9-13 */
+    USB_DESC_ENDPOINT(KBD_ENDPOINT | 0x80, // bEndpointAddress
+                      0x03,                // bmAttributes (Interrupt)
+                      KBD_EPSIZE,          // wMaxPacketSize
+                      8),                  // bInterval
+
+#ifdef MOUSE_ENABLE
+    /* Interface Descriptor (9 bytes) USB spec 9.6.5, page 267-269, Table 9-12 */
+    USB_DESC_INTERFACE(MOUSE_INTERFACE, // bInterfaceNumber
+                       0,               // bAlternateSetting
+                       1,               // bNumEndpoints
+                       0x03,            // bInterfaceClass (0x03 = HID)
+                       // ThinkPad T23 BIOS doesn't work with boot mouse.
+                       0x00, // bInterfaceSubClass (0x01 = Boot)
+                       0x00, // bInterfaceProtocol (0x02 = Mouse)
+                       /*
+                          0x01,      // bInterfaceSubClass (0x01 = Boot)
+                          0x02,      // bInterfaceProtocol (0x02 = Mouse)
+                        */
+                       0), // iInterface
+
+    /* HID descriptor (9 bytes) HID 1.11 spec, section 6.2.1 */
+    USB_DESC_BYTE(9),                                  // bLength
+    USB_DESC_BYTE(0x21),                               // bDescriptorType (HID class)
+    USB_DESC_BCD(0x0111),                              // bcdHID: HID version 1.11
+    USB_DESC_BYTE(0),                                  // bCountryCode
+    USB_DESC_BYTE(1),                                  // bNumDescriptors
+    USB_DESC_BYTE(0x22),                               // bDescriptorType (report desc)
+    USB_DESC_WORD(sizeof(mouse_hid_report_desc_data)), // wDescriptorLength
+
+    /* Endpoint Descriptor (7 bytes) USB spec 9.6.6, page 269-271, Table 9-13 */
+    USB_DESC_ENDPOINT(MOUSE_ENDPOINT | 0x80, // bEndpointAddress
+                      0x03,                  // bmAttributes (Interrupt)
+                      MOUSE_EPSIZE,          // wMaxPacketSize
+                      1),                    // bInterval
+#endif                                       /* MOUSE_ENABLE */
+
+#ifdef RAW_ENABLE   //!!
+    /* Interface Descriptor (9 bytes) USB spec 9.6.5, page 267-269, Table 9-12 */
+    USB_DESC_INTERFACE(RAW_INTERFACE, // bInterfaceNumber
+                       0,                 // bAlternateSetting
+                        2,                 // bNumEndpoints
+//                       1,                 // bNumEndpoints
+                       0x03,              // bInterfaceClass: HID
+                       0x00,              // bInterfaceSubClass: None
+                       0x00,              // bInterfaceProtocol: None
+                       0),                // iInterface
+
+    /* HID descriptor (9 bytes) HID 1.11 spec, section 6.2.1 */
+    USB_DESC_BYTE(9),                                    // bLength
+    USB_DESC_BYTE(0x21),                                 // bDescriptorType (HID class)
+    USB_DESC_BCD(0x0111),                                // bcdHID: HID version 1.11
+    USB_DESC_BYTE(0),                                    // bCountryCode
+    USB_DESC_BYTE(1),                                    // bNumDescriptors
+    USB_DESC_BYTE(0x22),                                 // bDescriptorType (report desc)
+    USB_DESC_WORD(sizeof(raw_hid_report_desc_data)),     // wDescriptorLength
+
+    /* Endpoint Descriptor (7 bytes) USB spec 9.6.6, page 269-271, Table 9-13 */
+     USB_DESC_ENDPOINT(RAW_IN_ENDPOINT | 0x80,   // bEndpointAddress
+                       0x03,                     // bmAttributes (Interrupt)
+                       RAW_EPSIZE,               // wMaxPacketSize
+                       //!!
+                       1),                       // bInterval
+
+    /* Endpoint Descriptor (7 bytes) USB spec 9.6.6, page 269-271, Table 9-13 */                      
+    USB_DESC_ENDPOINT(RAW_OUT_ENDPOINT,         // bEndpointAddress
+                      0x03,                     // bmAttributes (Interrupt)
+                      RAW_EPSIZE,               // wMaxPacketSize
+                      1),                       // bInterval
+
+#endif                                          /* RAW_ENABLE */
+
+#ifdef CONSOLE_ENABLE
+    /* Interface Descriptor (9 bytes) USB spec 9.6.5, page 267-269, Table 9-12 */
+    USB_DESC_INTERFACE(CONSOLE_INTERFACE, // bInterfaceNumber
+                       0,                 // bAlternateSetting
+                       1,                 // bNumEndpoints
+                       0x03,              // bInterfaceClass: HID
+                       0x00,              // bInterfaceSubClass: None
+                       0x00,              // bInterfaceProtocol: None
+                       0),                // iInterface
+
+    /* HID descriptor (9 bytes) HID 1.11 spec, section 6.2.1 */
+    USB_DESC_BYTE(9),                                    // bLength
+    USB_DESC_BYTE(0x21),                                 // bDescriptorType (HID class)
+    USB_DESC_BCD(0x0111),                                // bcdHID: HID version 1.11
+    USB_DESC_BYTE(0),                                    // bCountryCode
+    USB_DESC_BYTE(1),                                    // bNumDescriptors
+    USB_DESC_BYTE(0x22),                                 // bDescriptorType (report desc)
+    USB_DESC_WORD(sizeof(console_hid_report_desc_data)), // wDescriptorLength
+
+    /* Endpoint Descriptor (7 bytes) USB spec 9.6.6, page 269-271, Table 9-13 */
+    USB_DESC_ENDPOINT(CONSOLE_ENDPOINT | 0x80, // bEndpointAddress
+                      0x03,                    // bmAttributes (Interrupt)
+                      CONSOLE_EPSIZE,          // wMaxPacketSize
+                      1),                      // bInterval
+#endif                                         /* CONSOLE_ENABLE */
+
+#ifdef EXTRAKEY_ENABLE
+    /* Interface Descriptor (9 bytes) USB spec 9.6.5, page 267-269, Table 9-12 */
+    USB_DESC_INTERFACE(EXTRA_INTERFACE, // bInterfaceNumber
+                       0,               // bAlternateSetting
+                       1,               // bNumEndpoints
+                       0x03,            // bInterfaceClass: HID
+                       0x00,            // bInterfaceSubClass: None
+                       0x00,            // bInterfaceProtocol: None
+                       0),              // iInterface
+
+    /* HID descriptor (9 bytes) HID 1.11 spec, section 6.2.1 */
+    USB_DESC_BYTE(9),                                  // bLength
+    USB_DESC_BYTE(0x21),                               // bDescriptorType (HID class)
+    USB_DESC_BCD(0x0111),                              // bcdHID: HID version 1.11
+    USB_DESC_BYTE(0),                                  // bCountryCode
+    USB_DESC_BYTE(1),                                  // bNumDescriptors
+    USB_DESC_BYTE(0x22),                               // bDescriptorType (report desc)
+    USB_DESC_WORD(sizeof(extra_hid_report_desc_data)), // wDescriptorLength
+
+    /* Endpoint Descriptor (7 bytes) USB spec 9.6.6, page 269-271, Table 9-13 */
+    USB_DESC_ENDPOINT(EXTRA_ENDPOINT | 0x80, // bEndpointAddress
+                      0x03,                  // bmAttributes (Interrupt)
+                      EXTRA_EPSIZE,          // wMaxPacketSize
+                      2),                    // bInterval
+#endif                                       /* EXTRAKEY_ENABLE */
+
+#ifdef NKRO_ENABLE
+    /* Interface Descriptor (9 bytes) USB spec 9.6.5, page 267-269, Table 9-12 */
+    USB_DESC_INTERFACE(NKRO_INTERFACE, // bInterfaceNumber
+                       0,              // bAlternateSetting
+                       1,              // bNumEndpoints
+                       0x03,           // bInterfaceClass: HID
+                       0x00,           // bInterfaceSubClass: None
+                       0x00,           // bInterfaceProtocol: None
+                       0),             // iInterface
+
+    /* HID descriptor (9 bytes) HID 1.11 spec, section 6.2.1 */
+    USB_DESC_BYTE(9),                                 // bLength
+    USB_DESC_BYTE(0x21),                              // bDescriptorType (HID class)
+    USB_DESC_BCD(0x0111),                             // bcdHID: HID version 1.11
+    USB_DESC_BYTE(0),                                 // bCountryCode
+    USB_DESC_BYTE(1),                                 // bNumDescriptors
+    USB_DESC_BYTE(0x22),                              // bDescriptorType (report desc)
+    USB_DESC_WORD(sizeof(nkro_hid_report_desc_data)), // wDescriptorLength
+
+    /* Endpoint Descriptor (7 bytes) USB spec 9.6.6, page 269-271, Table 9-13 */
+    USB_DESC_ENDPOINT(NKRO_ENDPOINT | 0x80, // bEndpointAddress
+                      0x03,                 // bmAttributes (Interrupt)
+                      NKRO_EPSIZE,          // wMaxPacketSize
+                      8),                   // bInterval
+#endif                                      /* NKRO_ENABLE */
+#ifdef LAMP_ARRAY_ENABLE
+    /* Interface Descriptor (9 bytes) USB spec 9.6.5, page 267-269, Table 9-12 */
+    USB_DESC_INTERFACE(LAMP_ARRAY_INTERFACE, // bInterfaceNumber
+                       0,                    // bAlternateSetting
+                       1,                    // bNumEndpoints
+                       0x03,                 // bInterfaceClass: HID
+                       0x00,                 // bInterfaceSubClass
+                       0x00,                 // bInterfaceProtocol
+                       0),                   // iInterface
+
+    /* HID descriptor (9 bytes) HID 1.11 spec, section 6.2.1 */
+    USB_DESC_BYTE(9),                                       // bLength
+    USB_DESC_BYTE(0x21),                                    // bDescriptorType (HID class)
+    USB_DESC_BCD(0x0111),                                   // bcdHID: HID version 1.11
+    USB_DESC_BYTE(0),                                       // bCountryCode
+    USB_DESC_BYTE(1),                                       // bNumDescriptors
+    USB_DESC_BYTE(0x22),                                    // bDescriptorType (report desc)
+    USB_DESC_WORD(sizeof(lamp_array_hid_report_desc_data)), // wDescriptorLength
+
+    /* Endpoint Descriptor (7 bytes) USB spec 9.6.6, page 269-271, Table 9-13 */
+    USB_DESC_ENDPOINT(LAMP_ARRAY_ENDPOINT | 0x80, // bEndpointAddress
+                      0x03,                       // bmAttributes (Interrupt)
+                      LAMP_ARRAY_EPSIZE,          // wMaxPacketSize
+                      1),                         // bInterval
+
+#endif /* LAMP_ARRAY */
+
+#ifdef CONTROL_ENABLE
+    /* Interface Descriptor (9 bytes) USB spec 9.6.5, page 267-269, Table 9-12 */
+    IAD_HID_IF_DESC_SET(6, 1, VENDOR_COMMUNICATION_INTERFACE_CLASS)
+        USB_DESC_INTERFACE(CONTROL_INTERFACE, // bInterfaceNumber
+                           0,                 // bAlternateSetting
+                           1,                 // bNumEndpoints
+                           0xff,              // bInterfaceClass: HID
+                           0x00,              // bInterfaceSubClass
+                           0x00,              // bInterfaceProtocol
+                           0),                // iInterface
+
+    /* HID descriptor (9 bytes) HID 1.11 spec, section 6.2.1 */
+    //  USB_DESC_BYTE(9),            // bLength
+    //  USB_DESC_BYTE(0x21),         // bDescriptorType (HID class)
+    //  USB_DESC_BCD(0x0111),        // bcdHID: HID version 1.11
+    //  USB_DESC_BYTE(0),            // bCountryCode
+    //  USB_DESC_BYTE(1),            // bNumDescriptors
+    //  USB_DESC_BYTE(0x22),         // bDescriptorType (report desc)
+    //  USB_DESC_WORD(sizeof(control_hid_report_desc_data)), // wDescriptorLength
+
+    /* Endpoint Descriptor (7 bytes) USB spec 9.6.6, page 269-271, Table 9-13 */
+    USB_DESC_ENDPOINT(CONTROL_ENDPOINT | 0x80, // bEndpointAddress
+                      0x03,                    // bmAttributes (Interrupt)
+                      CONTROL_EPSIZE,          // wMaxPacketSize
+                      1),                      // bInterval
+
+#endif /* CONTROL */
+};
+
 /* Configuration Descriptor wrapper */
-static const USBDescriptor hid_configuration_descriptor = {
-    sizeof hid_configuration_descriptor_data,
-    hid_configuration_descriptor_data};
+// static const USBDescriptor hid_configuration_descriptor = {
+//     sizeof hid_configuration_descriptor_data,
+//     hid_configuration_descriptor_data};
+
+
+
+
+static const USBDescriptor hid_configuration_descriptor_8000hz = {
+    sizeof hid_configuration_descriptor_data_8000hz,
+    hid_configuration_descriptor_data_8000hz
+};
+
+static const USBDescriptor hid_configuration_descriptor_4000hz = {
+    sizeof hid_configuration_descriptor_data_4000hz,
+    hid_configuration_descriptor_data_4000hz
+};
+
+static const USBDescriptor hid_configuration_descriptor_2000hz = {
+    sizeof hid_configuration_descriptor_data_2000hz,
+    hid_configuration_descriptor_data_2000hz
+};
+
+static const USBDescriptor hid_configuration_descriptor_1000hz = {
+    sizeof hid_configuration_descriptor_data_1000hz,
+    hid_configuration_descriptor_data_1000hz
+};
+
+// active descriptor pointer
+static const USBDescriptor *active_hid_configuration_descriptor =
+    &hid_configuration_descriptor_8000hz;
 
 /* wrappers */
 #define HID_DESCRIPTOR_SIZE 9
-static const USBDescriptor keyboard_hid_descriptor = {
-    HID_DESCRIPTOR_SIZE,
-    &hid_configuration_descriptor_data[KBD_HID_DESC_OFFSET]};
-#ifdef MOUSE_ENABLE
-static const USBDescriptor mouse_hid_descriptor = {
-    HID_DESCRIPTOR_SIZE,
-    &hid_configuration_descriptor_data[MOUSE_HID_DESC_OFFSET]};
-#endif /* MOUSE_ENABLE */
-#ifdef RAW_ENABLE
-static const USBDescriptor raw_hid_descriptor = {
-    HID_DESCRIPTOR_SIZE,
-    &hid_configuration_descriptor_data[RAW_HID_DESC_OFFSET]};
-#endif /* RAW_ENABLE */
+// static const USBDescriptor keyboard_hid_descriptor = {
+//     HID_DESCRIPTOR_SIZE,
+//     &hid_configuration_descriptor_data[KBD_HID_DESC_OFFSET]};
+// #ifdef MOUSE_ENABLE
+// static const USBDescriptor mouse_hid_descriptor = {
+//     HID_DESCRIPTOR_SIZE,
+//     &hid_configuration_descriptor_data[MOUSE_HID_DESC_OFFSET]};
+// #endif /* MOUSE_ENABLE */
+// #ifdef RAW_ENABLE
+// static const USBDescriptor raw_hid_descriptor = {
+//     HID_DESCRIPTOR_SIZE,
+//     &hid_configuration_descriptor_data[RAW_HID_DESC_OFFSET]};
+// #endif /* RAW_ENABLE */
 
-#ifdef CONSOLE_ENABLE
-static const USBDescriptor console_hid_descriptor = {
-    HID_DESCRIPTOR_SIZE,
-    &hid_configuration_descriptor_data[CONSOLE_HID_DESC_OFFSET]};
-#endif /* CONSOLE_ENABLE */
-#ifdef EXTRAKEY_ENABLE
-static const USBDescriptor extra_hid_descriptor = {
-    HID_DESCRIPTOR_SIZE,
-    &hid_configuration_descriptor_data[EXTRA_HID_DESC_OFFSET]};
-#endif /* EXTRAKEY_ENABLE */
-#ifdef NKRO_ENABLE
-static const USBDescriptor nkro_hid_descriptor = {
-    HID_DESCRIPTOR_SIZE,
-    &hid_configuration_descriptor_data[NKRO_HID_DESC_OFFSET]};
-#endif /* NKRO_ENABLE */
+// #ifdef CONSOLE_ENABLE
+// static const USBDescriptor console_hid_descriptor = {
+//     HID_DESCRIPTOR_SIZE,
+//     &hid_configuration_descriptor_data[CONSOLE_HID_DESC_OFFSET]};
+// #endif /* CONSOLE_ENABLE */
+// #ifdef EXTRAKEY_ENABLE
+// static const USBDescriptor extra_hid_descriptor = {
+//     HID_DESCRIPTOR_SIZE,
+//     &hid_configuration_descriptor_data[EXTRA_HID_DESC_OFFSET]};
+// #endif /* EXTRAKEY_ENABLE */
+// #ifdef NKRO_ENABLE
+// static const USBDescriptor nkro_hid_descriptor = {
+//     HID_DESCRIPTOR_SIZE,
+//     &hid_configuration_descriptor_data[NKRO_HID_DESC_OFFSET]};
+// #endif /* NKRO_ENABLE */
 
-#ifdef LAMP_ARRAY_ENABLE
-static const USBDescriptor lamp_array_hid_descriptor = {
-    HID_DESCRIPTOR_SIZE,
-    &hid_configuration_descriptor_data[LAMP_ARRAY_HID_DESC_OFFSET]};
-#endif /* NKRO_ENABLE */
+// #ifdef LAMP_ARRAY_ENABLE
+// static const USBDescriptor lamp_array_hid_descriptor = {
+//     HID_DESCRIPTOR_SIZE,
+//     &hid_configuration_descriptor_data[LAMP_ARRAY_HID_DESC_OFFSET]};
+// #endif /* NKRO_ENABLE */
 
-#ifdef CONTROL_ENABLE
-static const USBDescriptor control_hid_descriptor = {
-    HID_DESCRIPTOR_SIZE,
-    &hid_configuration_descriptor_data[CONTROL_HID_DESC_OFFSET]};
-#endif /* NKRO_ENABLE */
+// #ifdef CONTROL_ENABLE
+// static const USBDescriptor control_hid_descriptor = {
+//     HID_DESCRIPTOR_SIZE,
+//     &hid_configuration_descriptor_data[CONTROL_HID_DESC_OFFSET]};
+// #endif /* NKRO_ENABLE */
+
+
+// static USBDescriptor active_hid_subdescriptor;
+
+// static const USBDescriptor *get_active_hid_descriptor_by_offset(uint16_t offset)
+// {
+//     active_hid_subdescriptor.ud_size = HID_DESCRIPTOR_SIZE;
+//     active_hid_subdescriptor.ud_string =
+//         &active_hid_configuration_descriptor->ud_string[offset];
+//     return &active_hid_subdescriptor;
+// }
+
+
+// switch (g_usb_poll_mode) { // this is another solution
+//     case USB_POLL_8000:
+//         return &hid_configuration_descriptor_8000hz;
+//     case USB_POLL_4000:
+//         return &hid_configuration_descriptor_4000hz;
+//     case USB_POLL_2000:
+//         return &hid_configuration_descriptor_2000hz;
+//     case USB_POLL_1000:
+//         return &hid_configuration_descriptor_1000hz;
+//     default:
+//         return &hid_configuration_descriptor_8000hz;
+// }
 
 /* U.S. English language identifier */
 static const uint8_t usb_string_langid[] = {
@@ -2099,7 +3096,20 @@ static const USBDescriptor *usb_get_descriptor_cb(USBDriver *usbp, uint8_t dtype
         //   return &usb_device_OSdescriptor;
 
     case USB_DESCRIPTOR_CONFIGURATION: /* Configuration Descriptor */
-        return &hid_configuration_descriptor;
+        // return &hid_configuration_descriptor;
+        // return active_hid_configuration_descriptor;
+        switch (g_usb_poll_mode) {
+            case USB_POLL_8000:
+                return &hid_configuration_descriptor_8000hz;
+            case USB_POLL_4000:
+                return &hid_configuration_descriptor_4000hz;
+            case USB_POLL_2000:
+                return &hid_configuration_descriptor_2000hz;
+            case USB_POLL_1000:
+                return &hid_configuration_descriptor_1000hz;
+            default:
+                return &hid_configuration_descriptor_8000hz;
+        }
 
     case USB_DESCRIPTOR_STRING: /* Strings */
         if (dindex < 4)
@@ -2118,36 +3128,140 @@ static const USBDescriptor *usb_get_descriptor_cb(USBDriver *usbp, uint8_t dtype
         switch (lang)
         { /* yea, poor label, it's actually wIndex from the setup packet */
         case KBD_INTERFACE:
-            return &keyboard_hid_descriptor;
+            // return &keyboard_hid_descriptor;
+            // return get_active_hid_descriptor_by_offset(KBD_HID_DESC_OFFSET);
+            switch (g_usb_poll_mode) {
+                case USB_POLL_8000:
+                    return &hid_configuration_descriptor_8000hz;
+                case USB_POLL_4000:
+                    return &hid_configuration_descriptor_4000hz;
+                case USB_POLL_2000:
+                    return &hid_configuration_descriptor_2000hz;
+                case USB_POLL_1000:
+                    return &hid_configuration_descriptor_1000hz;
+                default:
+                    return &hid_configuration_descriptor_8000hz;
+            }
 
 #ifdef MOUSE_ENABLE
         case MOUSE_INTERFACE:
-            return &mouse_hid_descriptor;
+            // return &mouse_hid_descriptor;
+            // return get_active_hid_descriptor_by_offset(MOUSE_HID_DESC_OFFSET);
+            switch (g_usb_poll_mode) {
+                case USB_POLL_8000:
+                    return &hid_configuration_descriptor_8000hz;
+                case USB_POLL_4000:
+                    return &hid_configuration_descriptor_4000hz;
+                case USB_POLL_2000:
+                    return &hid_configuration_descriptor_2000hz;
+                case USB_POLL_1000:
+                    return &hid_configuration_descriptor_1000hz;
+                default:
+                    return &hid_configuration_descriptor_8000hz;
+            }
 #endif /* MOUSE_ENABLE */
 
 #ifdef RAW_ENABLE
         case RAW_INTERFACE:
-            return &raw_hid_descriptor;
+            // return &raw_hid_descriptor;
+            // return get_active_hid_descriptor_by_offset(RAW_HID_DESC_OFFSET);
+            switch (g_usb_poll_mode) {
+                case USB_POLL_8000:
+                    return &hid_configuration_descriptor_8000hz;
+                case USB_POLL_4000:
+                    return &hid_configuration_descriptor_4000hz;
+                case USB_POLL_2000:
+                    return &hid_configuration_descriptor_2000hz;
+                case USB_POLL_1000:
+                    return &hid_configuration_descriptor_1000hz;
+                default:
+                    return &hid_configuration_descriptor_8000hz;
+            }
 #endif /* RAW_ENABLE */
 #ifdef CONSOLE_ENABLE
         case CONSOLE_INTERFACE:
-            return &console_hid_descriptor;
+            // return &console_hid_descriptor;
+            // return get_active_hid_descriptor_by_offset(CONSOLE_HID_DESC_OFFSET);
+            switch (g_usb_poll_mode) {
+                case USB_POLL_8000:
+                    return &hid_configuration_descriptor_8000hz;
+                case USB_POLL_4000:
+                    return &hid_configuration_descriptor_4000hz;
+                case USB_POLL_2000:
+                    return &hid_configuration_descriptor_2000hz;
+                case USB_POLL_1000:
+                    return &hid_configuration_descriptor_1000hz;
+                default:
+                    return &hid_configuration_descriptor_8000hz;
+            }
 #endif /* CONSOLE_ENABLE */
 #ifdef EXTRAKEY_ENABLE
         case EXTRA_INTERFACE:
-            return &extra_hid_descriptor;
+            // return &extra_hid_descriptor;
+            // return get_active_hid_descriptor_by_offset(EXTRA_HID_DESC_OFFSET);
+            switch (g_usb_poll_mode) {
+                case USB_POLL_8000:
+                    return &hid_configuration_descriptor_8000hz;
+                case USB_POLL_4000:
+                    return &hid_configuration_descriptor_4000hz;
+                case USB_POLL_2000:
+                    return &hid_configuration_descriptor_2000hz;
+                case USB_POLL_1000:
+                    return &hid_configuration_descriptor_1000hz;
+                default:
+                    return &hid_configuration_descriptor_8000hz;
+            }
 #endif /* EXTRAKEY_ENABLE */
 #ifdef NKRO_ENABLE
         case NKRO_INTERFACE:
-            return &nkro_hid_descriptor;
+            // return &nkro_hid_descriptor;
+            // return get_active_hid_descriptor_by_offset(NKRO_HID_DESC_OFFSET);
+            switch (g_usb_poll_mode) {
+                case USB_POLL_8000:
+                    return &hid_configuration_descriptor_8000hz;
+                case USB_POLL_4000:
+                    return &hid_configuration_descriptor_4000hz;
+                case USB_POLL_2000:
+                    return &hid_configuration_descriptor_2000hz;
+                case USB_POLL_1000:
+                    return &hid_configuration_descriptor_1000hz;
+                default:
+                    return &hid_configuration_descriptor_8000hz;
+            }
 #endif /* NKRO_ENABLE */
 #ifdef LAMP_ARRAY_ENABLE
         case LAMP_ARRAY_INTERFACE:
-            return &lamp_array_hid_descriptor;
+            // return &lamp_array_hid_descriptor;
+            // return get_active_hid_descriptor_by_offset(LAMP_ARRAY_HID_DESC_OFFSET);
+            switch (g_usb_poll_mode) {
+                case USB_POLL_8000:
+                    return &hid_configuration_descriptor_8000hz;
+                case USB_POLL_4000:
+                    return &hid_configuration_descriptor_4000hz;
+                case USB_POLL_2000:
+                    return &hid_configuration_descriptor_2000hz;
+                case USB_POLL_1000:
+                    return &hid_configuration_descriptor_1000hz;
+                default:
+                    return &hid_configuration_descriptor_8000hz;
+            }
 #endif /* LAMP_ARRAY_ENABLE */
 #ifdef CONTROL_ENABLE
         case CONTROL_INTERFACE:
-            return &control_hid_descriptor;
+            // return &control_hid_descriptor;
+            // return get_active_hid_descriptor_by_offset(CONTROL_HID_DESC_OFFSET);
+            switch (g_usb_poll_mode) {
+                case USB_POLL_8000:
+                    return &hid_configuration_descriptor_8000hz;
+                case USB_POLL_4000:
+                    return &hid_configuration_descriptor_4000hz;
+                case USB_POLL_2000:
+                    return &hid_configuration_descriptor_2000hz;
+                case USB_POLL_1000:
+                    return &hid_configuration_descriptor_1000hz;
+                default:
+                    return &hid_configuration_descriptor_8000hz;
+            }
 #endif /* CONTROL_ENABLE */
         }
 
@@ -3747,4 +4861,152 @@ __attribute__((weak)) void restart_usb_driver(USBDriver *usbp)
 
     usbStart(usbp, &usbcfg);
     usbConnectBus(usbp);
+}
+
+// set function HZ
+static bool usb_set_poll_mode_by_hz(uint16_t hz)
+{
+    switch (hz) {
+        case 8000:
+            g_usb_poll_mode = USB_POLL_8000;
+            return true;
+        case 4000:
+            g_usb_poll_mode = USB_POLL_4000;
+            return true;
+        case 2000:
+            g_usb_poll_mode = USB_POLL_2000;
+            return true;
+        case 1000:
+            g_usb_poll_mode = USB_POLL_1000;
+            return true;
+        default:
+            return false;
+    }
+}
+
+// get polling rate
+uint8_t get_usb_poll_rate(void)
+{
+    return g_usb_poll_mode;
+}
+uint16_t get_usb_poll_rate_hz(void)
+{
+    switch (g_usb_poll_mode){
+        case USB_POLL_8000:  return 8000;
+        case USB_POLL_4000:  return 4000;
+        case USB_POLL_2000:  return 2000;
+        case USB_POLL_1000:  return 1000;
+        default: return 8000;
+    }
+}
+
+void change_usb_driver(USBDriver *usbp, usb_poll_mode_t mode)
+{
+    g_usb_poll_mode = mode;
+    restart_usb_driver(usbp);
+}
+
+void usb_force_reenumeration(void) {
+    uprintf("usb_force_reenumeration\n");
+
+    //wait_ms(50);
+    //reset_keyboard();
+
+    uprintf("Force USB Re-enumeration (No System Reset)...\n");
+
+    // 1. Disconnect the USB bus (this pulls D+ low and makes the PC detect device removal)
+    usbDisconnectBus(&USBD2);
+
+    // 2. Wait 500ms to ensure the host OS has enough time to process the disconnect
+    wait_ms(500);
+
+    // 3. Reconnect the USB bus (this triggers the host to re-read descriptors)
+    usbConnectBus(&USBD2);
+
+    uprintf("USB Re-connected with new settings.\n");
+}
+
+// void usb_update_polling_rate(uint16_t polling_rate) {
+//     uint8_t interval_ms = polling_hz_to_interval_ms(polling_rate);
+
+//     uprintf("[USB] usb_update_polling_rate request=%u Hz (interval=%u ms), current=%u Hz\n",
+//             polling_rate, interval_ms, s_usb_polling_hz_current);
+
+//     // If no change, do nothing
+//     if (s_usb_polling_hz_current == polling_rate) {
+//         uprintf("[USB] Polling unchanged -> skip re-enumeration\n");
+//         return;
+//     }
+
+//     // Apply new interval (descriptor selection variable)
+//     usb_set_shared_polling_ms(interval_ms);
+
+//     uprintf("[USB] Polling change: %u Hz -> %u Hz (interval=%u ms)\n",
+//             s_usb_polling_hz_current, polling_rate, interval_ms);
+
+//     // Update current value BEFORE reset/reenum
+//     s_usb_polling_hz_current = polling_rate;
+
+//     uprintf("[USB] Force re-enumeration\n");
+//     usb_force_reenumeration();
+// }
+
+// set polling rate
+void usb_update_polling_rate(uint16_t polling_rate)
+{
+    uint16_t current = usb_get_polling_hz();
+
+    uprintf("[USB] request=%u Hz, current=%u Hz\r\n", polling_rate, current);
+
+    if (current == polling_rate) {
+        uprintf("[USB] unchanged, skip\r\n");
+        return;
+    }
+
+    if (!usb_set_poll_mode_by_hz(polling_rate)) {
+        uprintf("[USB] invalid polling rate: %u\r\n", polling_rate);
+        return;
+    }
+
+    uprintf("[USB] switching to %u Hz\r\n", polling_rate);
+    restart_usb_driver(&USBD2);
+}
+
+void usb_set_polling_rate(uint8_t idx)
+{
+    if (idx > 3) {
+        // uprintf("[USB] invalid polling idx=%u\r\n", idx);
+        return false;
+    }
+
+    if (g_usb_poll_mode == idx) {
+        // uprintf("[USB] polling unchanged (%u Hz)\r\n",
+        //         usb_poll_idx_to_hz(idx));
+        return true;
+    }
+
+    // uint16_t old_hz = usb_poll_idx_to_hz(s_usb_poll_idx);
+    // uint16_t new_hz = usb_poll_idx_to_hz(idx);
+
+    // uprintf("[USB] polling change: %u Hz -> %u Hz\r\n",
+    //         old_hz, new_hz);
+
+    // s_usb_poll_idx = idx;
+
+    switch (idx) {
+        case 0:
+            g_usb_poll_mode = USB_POLL_8000;
+            break;
+        case 1:
+            g_usb_poll_mode = USB_POLL_4000;
+            break;
+        case 2:
+            g_usb_poll_mode = USB_POLL_2000;
+            break;
+        case 3:
+            g_usb_poll_mode = USB_POLL_1000;
+            break;
+    }
+
+    restart_usb_driver(&USBD2);
 }

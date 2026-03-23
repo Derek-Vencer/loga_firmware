@@ -10,7 +10,104 @@
 
 #include "usb_main.h" // lyon fix reboot dynamic lighting 
 #include "matrix.h" // all the define lyon
+// wheel
+#include <math.h>
+#include <stdint.h>
+uint8_t wheel_base_hue[LED_MATRIX_ROWS][LED_MATRIX_COLS];
+static bool wheel_inited = false;
 
+// reactive
+uint8_t reactive_level[MATRIX_ROWS][MATRIX_COLS] = {0};
+
+//starlight
+typedef struct {
+    uint8_t active;
+    uint8_t phase;      // 0~255
+    uint8_t speed;      // 每次增加多少
+    led_config_t color;
+} starlight_led_t;
+
+typedef struct {
+    bool enable;
+    uint8_t density;    // 每幀新增星星數量
+    uint8_t base_dim;   // 背景微亮，可設 0
+} EffectStarlight_t;
+
+static EffectStarlight_t starlight;
+static starlight_led_t starlight_leds[LedNumbers];
+static uint32_t starlight_seed = 0x12345678;
+
+static uint32_t starlight_rand(void)
+{
+    starlight_seed = starlight_seed * 1664525UL + 1013904223UL;
+    return starlight_seed;
+}
+
+static uint8_t starlight_rand8(void)
+{
+    return (uint8_t)(starlight_rand() >> 24);
+}
+
+static led_config_t starlight_pick_color(void)
+{
+    led_config_t c;
+    uint8_t r = starlight_rand8() % 6;
+
+    switch (r) {
+        default:
+        case 0: // 暖白
+            c.red = 255; c.green = 220; c.blue = 180;
+            break;
+        case 1: // 中性白
+            c.red = 255; c.green = 245; c.blue = 230;
+            break;
+        case 2: // 冷白
+            c.red = 220; c.green = 235; c.blue = 255;
+            break;
+        case 3: // 淡藍白
+            c.red = 190; c.green = 215; c.blue = 255;
+            break;
+        case 4: // 微暖星光
+            c.red = 255; c.green = 235; c.blue = 210;
+            break;
+        case 5: // 偏冷星光
+            c.red = 210; c.green = 225; c.blue = 255;
+            break;
+    }
+
+    return c;
+}
+
+static uint8_t starlight_triangle_wave(uint8_t phase)
+{
+    if (phase < 128) {
+        return phase << 1;
+    } else {
+        return (255 - phase) << 1;
+    }
+}
+
+static led_config_t starlight_scale_color(led_config_t in, uint8_t bright)
+{
+    led_config_t out;
+    out.red   = ((uint16_t)in.red   * bright) / 255;
+    out.green = ((uint16_t)in.green * bright) / 255;
+    out.blue  = ((uint16_t)in.blue  * bright) / 255;
+    return out;
+}
+
+static void starlight_reset_all(void)
+{
+    for (uint16_t i = 0; i < LedNumbers; i++) {
+        starlight_leds[i].active = 0;
+        starlight_leds[i].phase = 0;
+        starlight_leds[i].speed = 0;
+        starlight_leds[i].color.red = 0;
+        starlight_leds[i].color.green = 0;
+        starlight_leds[i].color.blue = 0;
+    }
+}
+//endof starlight
 uint8_t ledUpdateInterval = 35;
 static EffectrandonColor_t randColor;
 static EffectProfile_t eProfile;
@@ -42,6 +139,111 @@ extern bool gameModeEnable;
 // extern volatile bool g_usb_configured_flag;   // ★ extern 宣告（不要 = false）lyon
 // #endif
 
+// wheel
+#ifndef M_PI
+#define M_PI 3.14159265358979323846f
+#endif
+
+static void wheel_init_table(void)
+{
+    static const uint8_t wheel_row_lengths[LED_MATRIX_ROWS] = {26, 16, 17, 17, 16, 15, 12};
+
+    const float pitch_x = 16.0f;
+    const float pitch_y = 16.0f;
+
+    float row_offset[LED_MATRIX_ROWS];
+    float center_x;
+    float center_y;
+
+    uint8_t row, column;
+
+    for (row = 0; row < LED_MATRIX_ROWS; row++) {
+        row_offset[row] = ((26.0f - wheel_row_lengths[row]) * pitch_x) * 0.5f;
+    }
+
+    center_x = ((26.0f - 1.0f) * pitch_x) * 0.5f;
+    center_y = ((LED_MATRIX_ROWS - 1.0f) * pitch_y) * 0.5f;
+
+    /* 先全部清掉，避免短列未使用位置有垃圾值 */
+    for (row = 0; row < LED_MATRIX_ROWS; row++) {
+        for (column = 0; column < LED_MATRIX_COLS; column++) {
+            wheel_base_hue[row][column] = 0;
+        }
+    }
+
+    for (row = 0; row < LED_MATRIX_ROWS; row++) {
+        for (column = 0; column < wheel_row_lengths[row]; column++) {
+            float x = row_offset[row] + (column * pitch_x);
+            float y = row * pitch_y;
+
+            float dx = x - center_x;
+            float dy = y - center_y;
+
+            float angle = atan2f(dy, dx);
+            float norm = (angle + (float)M_PI) / (2.0f * (float)M_PI);
+
+            wheel_base_hue[row][column] = (uint8_t)(norm * 255.0f);
+        }
+    }
+
+    wheel_inited = true;
+}
+typedef struct {
+    uint8_t red;
+    uint8_t green;
+    uint8_t blue;
+} wheel_rgb_t;
+
+/* 0~255 hue -> RGB */
+static led_config_t wheel_hue_to_rgb(uint8_t hue)
+{
+    led_config_t c;
+    uint8_t region = hue / 43;                 // 256 / 6 ~= 43
+    uint8_t remainder = (hue - (region * 43)) * 6;
+
+    uint8_t p = 0;
+    uint8_t q = 255 - remainder;
+    uint8_t t = remainder;
+
+    switch (region) {
+        default:
+        case 0:
+            c.red = 255; c.green = t;   c.blue = p;
+            break;
+        case 1:
+            c.red = q;   c.green = 255; c.blue = p;
+            break;
+        case 2:
+            c.red = p;   c.green = 255; c.blue = t;
+            break;
+        case 3:
+            c.red = p;   c.green = q;   c.blue = 255;
+            break;
+        case 4:
+            c.red = t;   c.green = p;   c.blue = 255;
+            break;
+        case 5:
+            c.red = 255; c.green = p;   c.blue = q;
+            break;
+    }
+    return c;
+}
+
+/* 亮度縮放，brightness 建議 1~10 */
+static led_config_t wheel_apply_brightness(led_config_t in, uint8_t brightness)
+{
+    led_config_t out;
+    if (brightness > 10) {
+        brightness = 10;
+    }
+
+    out.red   = ((uint16_t)in.red   * brightness) / 10;
+    out.green = ((uint16_t)in.green * brightness) / 10;
+    out.blue  = ((uint16_t)in.blue  * brightness) / 10;
+    return out;
+}
+// end wheel
+
 static THD_WORKING_AREA(waLED_EffectThread, 256);
 static THD_FUNCTION(LED_EffectThread, arg)
 {
@@ -72,8 +274,14 @@ static THD_FUNCTION(LED_EffectThread, arg)
     	case EffectTypeChangeProfile:
     	enable = EffectTypeChangeProfileProcess();
     	break;
-        // case EffectTypeWheel:
-        // enable = EffectWheelProcess();
+        case EffectTypeWheel:
+        enable = EffectTypeWheelProcess();
+        break;
+        case EffectTypeReactive:
+        enable = EffectTypeReactiveProcess();
+        break;
+        // case EffectTypeStarlight:
+        // enable = EffectTypeStarlightProcess();
         // break;
     	case EffectTypeOff:
         break;
@@ -228,6 +436,73 @@ bool LED_Effect(uint8_t effect, bool enable, uint32_t interval, uint8_t colorMod
         	break;
         case EffectTypeColorBrith:
             break;
+        case EffectTypeWheel:
+            if (enable) {
+                if (speed > 5 || (brightness < 1 || brightness > 10)) {
+                    return false;
+                }
+
+                effectStatus.speed = speed * ledUpdateInterval;
+
+                /* 先直接跑第一幀，不要只等 timer */
+                chBSemSignal(&ledEffetSem);
+
+                /* 再啟動後續 timer */
+                chVTSet(&randColor_vt, TIME_MS2I(effectStatus.speed), (vtfunc_t)led_cb, NULL);
+            }
+            break;
+
+        case EffectTypeReactive:
+            if (enable) {
+                effectStatus.speed = speed * ledUpdateInterval;
+
+                /* 先直接跑第一幀 */
+                chBSemSignal(&ledEffetSem);
+
+                /* 再啟動 timer */
+                chVTSet(&randColor_vt, TIME_MS2I(effectStatus.speed), (vtfunc_t)led_cb, NULL);
+            }
+            break;
+        // case EffectTypeStarlight:
+        //     if (enable)
+        //     {
+        //         if (speed > 5 || (brightness < 1 || brightness > 10)) {
+        //             return false;
+        //         }
+
+        //         starlight.enable = true;
+
+        //         /* 密一點 */
+        //         starlight.density = 8 + speed;   // speed 越高，每幀越多顆新星
+        //         starlight.base_dim = 0;
+
+        //         starlight_reset_all();
+
+        //         effectStatus.speed = 35;   // 固定更新節奏，避免太慢或太快
+        //         chVTSet(&randColor_vt, TIME_MS2I(effectStatus.speed), (vtfunc_t)led_cb, NULL);
+        //     }
+        //     else
+        //     {
+        //         starlight.enable = false;
+        //     }
+        //     break;
+        // case EffectTypeWheel:
+        //     // effectStatus.speed = speed * ledUpdateInterval;
+        //     // mosArt.TimerBase = 0;
+        //     // chVTSet(&randColor_vt, TIME_MS2I(effectStatus.speed), (vtfunc_t)led_cb, NULL);
+        //     if (enable){
+        //         if (speed > 5 || (brightness < 1 || brightness > 10)){
+        //             return false;
+        //         }
+
+        //         effectStatus.speed = speed * ledUpdateInterval;
+        //         chVTSet(&randColor_vt, TIME_MS2I(effectStatus.speed), (vtfunc_t)led_cb, NULL);
+        //     }
+        //     break;
+        // case EffectTypeReactive:
+        //     effectStatus.speed = speed * ledUpdateInterval;
+        //     chVTSet(&randColor_vt, TIME_MS2I(effectStatus.speed), (vtfunc_t)led_cb, NULL);
+        //     break;
         case EffectTypeOff:
             if (randColor.enable)
             {
@@ -533,36 +808,149 @@ bool EffectTypeRainbowFlowProcess(void)
     return false;
 }
 
-bool EffectWheelProcess(void)
+bool EffectTypeWheelProcess(void)
 {
-    uint8_t row, col;
-    uint32_t tb = rainbowBase;   // 你專案已經有 extern rainbowBase :contentReference[oaicite:3]{index=3}
-    led_config_t c;
+        static const uint8_t wheel_row_lengths[LED_MATRIX_ROWS] = {26, 16, 17, 17, 16, 15, 12};
+    static uint8_t wheel_offset = 0;
 
-    // 依 speed/方向推進 timebase
-    // speed 越大，色相轉得越快
-    if (effectStatus.direction) {
-        tb += mosArt.TimerBase * (rainbowBase + 4);
-    } else {
-        tb -= mosArt.TimerBase * (rainbowBase + 4);
+    uint8_t row, column;
+
+    // if (!wheel_inited) {
+    //     wheel_init_table();
+    // }
+
+    if (effectStatus.interval != 0 &&
+        (get_system_time_ticks() - effectStatus.timeStamp > effectStatus.interval)) {
+        chVTReset(&randColor_vt);
+        ledAllOff(false);
+        effectStatus.effect = EffectIdle;
+
+        if (effectStatus.runMode == demoMode) {
+            chBSemSignal(&ledRunmodeSem);
+        }
+        return false;
     }
 
-    for (col = 0; col < LED_MATRIX_COLS; col++) {
-        for (row = 0; row < LED_MATRIX_ROWS; row++) {
+    for (row = 0; row < LED_MATRIX_ROWS; row++) {
+        for (column = 0; column < wheel_row_lengths[row]; column++) {
+            uint8_t hue = wheel_base_hue[row][column] + wheel_offset;
 
-            // 位置 offset：讓每顆 LED hue 不一樣，才像 Wheel
-            uint32_t local_tb = tb + (col * 50) + (row * 20);
+            // led_config_t color = wheel_hue_to_rgb(hue);
+            // color = wheel_apply_brightness(color, effectStatus.brightness);
+            led_config_t color = wheel_hue_to_rgb(hue);
+            setRemapLED(row, column, color);
 
-            // 用你現有的彩虹計算（會填入 c）
-            Calculate_Colorful_Color(0, local_tb, &c);  // :contentReference[oaicite:4]{index=4}
-
-            // 寫到對應鍵位（逐顆）
-            setRemapLED(row, col, c);                   // :contentReference[oaicite:5]{index=5}
+            setRemapLED(row, column, color);
         }
     }
 
-    mosArt.TimerBase += (effectStatus.speed / ledUpdateInterval); // 或固定 +10 也行
-    chBSemSignal(&ledUpdateSem);                                  // 刷新 LED :contentReference[oaicite:6]{index=6}
+    /* 先固定慢速，避免太快 */
+    wheel_offset += effectStatus.speed / 10; //
+
+    chBSemSignal(&ledUpdateSem);
+    return true;
+    // /* 依你目前鍵盤實際 row LED 數量 */
+    // static const uint8_t wheel_row_lengths[LED_MATRIX_ROWS] = {26, 16, 17, 17, 16, 15, 12};
+
+    // /*
+    //  * 這裡用「置中後的 row offset」模擬鍵盤幾何位置
+    //  * 假設每顆 key 的水平間距為 16，短列往中間靠
+    //  */
+    // const float pitch_x = 16.0f;
+    // const float pitch_y = 16.0f;
+
+    // float row_offset[LED_MATRIX_ROWS];
+    // float center_x;
+    // float center_y;
+
+    // static uint8_t wheel_offset = 0;   // 旋轉偏移，持續累加 = 逆時針
+    // uint8_t row, column;
+
+    // if (effectStatus.interval != 0 &&
+    //     (get_system_time_ticks() - effectStatus.timeStamp > effectStatus.interval)) {
+    //     chVTReset(&randColor_vt);
+    //     ledAllOff(false);
+    //     effectStatus.effect = EffectIdle;
+
+    //     if (effectStatus.runMode == demoMode) {
+    //         chBSemSignal(&ledRunmodeSem);
+    //     }
+    //     return false;
+    // }
+
+    // /* 讓每一列依最長列置中 */
+    // for (row = 0; row < LED_MATRIX_ROWS; row++) {
+    //     row_offset[row] = ((26.0f - wheel_row_lengths[row]) * pitch_x) * 0.5f;
+    // }
+
+    // /* 幾何中心：以最長列寬度與總列高為基準 */
+    // center_x = ((26.0f - 1.0f) * pitch_x) * 0.5f;
+    // center_y = ((LED_MATRIX_ROWS - 1.0f) * pitch_y) * 0.5f;
+
+    // for (row = 0; row < LED_MATRIX_ROWS; row++) {
+    //     for (column = 0; column < wheel_row_lengths[row]; column++) {
+    //         float x = row_offset[row] + (column * pitch_x);
+    //         float y = row * pitch_y;
+
+    //         float dx = x - center_x;
+    //         float dy = y - center_y;
+
+    //         /* atan2 -> -pi ~ pi */
+    //         float angle = atan2f(dy, dx);
+
+    //         /* 轉成 0~255 hue */
+    //         float norm = (angle + (float)M_PI) / (2.0f * (float)M_PI);
+    //         uint8_t base_hue = (uint8_t)(norm * 255.0f);
+
+    //         /*
+    //          * 逆時針旋轉：
+    //          * 如果你實機看起來變順時針，把 +wheel_offset 改成 -wheel_offset
+    //          */
+    //         uint8_t hue = base_hue + wheel_offset;
+
+    //         led_config_t color = wheel_hue_to_rgb(hue);
+    //         color = wheel_apply_brightness(color, effectStatus.brightness);
+
+    //         setRemapLED(row, column, color);
+    //     }
+    // }
+
+    // /* speed 越大，轉越快 */
+    // wheel_offset = (effectStatus.speed);// / 20); //
+
+    // chBSemSignal(&ledUpdateSem);
+    // return true;
+}
+
+bool EffectTypeReactiveProcess(void)
+{
+    uint8_t row, col;
+    led_config_t px;
+
+    for (row = 0; row < MATRIX_ROWS; row++) {
+        for (col = 0; col < MATRIX_COLS; col++) {
+            uint8_t level = reactive_level[row][col];
+
+            if (level) {
+                px.red   = ((uint16_t)c.red   * level) / 255;
+                px.green = ((uint16_t)c.green * level) / 255;
+                px.blue  = ((uint16_t)c.blue  * level) / 255;
+
+                setKeymapLED(row, col, px);
+
+                if (level > 20) {
+                    reactive_level[row][col] -= 20;
+                } else {
+                    reactive_level[row][col] = 0;
+                    setKeymapLED(row, col, LED_NULL);   // 關鍵
+                }
+            } else {
+                setKeymapLED(row, col, LED_NULL);       // 保險，確保真的清掉
+            }
+        }
+    }
+
+    chBSemSignal(&ledUpdateSem);
     return true;
 }
 
@@ -808,12 +1196,13 @@ void buildNormalModes(void){
     LED_ModesBuilder(addPresetEffect , false,EffectTypeRainbowFlow, true, 5000, 0, 0,  LED_NULL, normalBrightness, normalSpeed, false);
 
 	LED_ModesBuilder(addPresetEffect , false,EffectTypeMosArt, true, 5000, single, mosArtWave,  c, normalBrightness, normalSpeed, 0);
-	LED_ModesBuilder(addPresetEffect , false,EffectTypeMosArt, true, 5000, single, mosArtStatic,  rainbowColor[orange], normalBrightness, normalSpeed, 0);
-	LED_ModesBuilder(addPresetEffect , false,EffectTypeMosArt, true, 5000, single, mosArtStatic,  rainbowColor[indigo], normalBrightness, normalSpeed, 0);
+	LED_ModesBuilder(addPresetEffect , false,EffectTypeReactive,true,5000, single, mosArtStatic, rainbowColor[white], normalBrightness, normalSpeed, 0); //5
+    LED_ModesBuilder(addPresetEffect , false, EffectTypeWheel, true, 5000, single, mosArtStatic, rainbowColor[orange], normalBrightness, normalSpeed, 0);
 	LED_ModesBuilder(addPresetEffect , false,EffectTypeMosArt, true, 5000, single, mosArtStatic,  rainbowColor[violet], normalBrightness, normalSpeed, 0);
+    LED_ModesBuilder(addPresetEffect , false, EffectTypeWheel, true, 5000, single, mosArtStatic, rainbowColor[orange], normalBrightness, normalSpeed, 0); //8
 	LED_ModesBuilder(addPresetEffect , false,EffectTypeRainbowFlow, true, 5000, 0, 0,  LED_NULL, normalBrightness, normalSpeed, false);
 	LED_ModesBuilder(addPresetEffect , false,EffectTypeRainbowFlow, true, 5000, 0, 0,  LED_NULL, normalBrightness, normalSpeed, true);
-	LED_ModesBuilder(addPresetEffect , false, EffectTypeKeytest, true, 5000, 0, 0,  LED_NULL, normalBrightness, normalSpeed, true);
+	// LED_ModesBuilder(addPresetEffect , false, EffectTypeKeytest, true, 5000, 0, 0,  LED_NULL, normalBrightness, normalSpeed, true);
 	LED_ModesBuilder(addPresetEffect , false,EffectTypeChangeProfile, true, 5000, 0, 0,  LED_NULL, normalBrightness, normalSpeed, true);
 
 
@@ -1001,6 +1390,8 @@ void LED_init(void){//
 
 	buildDemoModes();
 	buildNormalModes();
+    wheel_init_table();   //
+    wheel_inited = true;  //
 	chThdCreateStatic(waLED_EffectThread, sizeof(waLED_EffectThread), NORMALPRIO - 3, LED_EffectThread, NULL); //original -3 test +７
     currentLED_RunMode.mode = eeprom_read_byte(KB_COLOR_MODE_ADDR);//8;//
     

@@ -187,6 +187,9 @@ void console_in_cb(USBDriver *usbp, usbep_t ep);
 #ifdef reboot
 extern volatile bool g_usb_configured_flag;   // ★ 全域旗標（非 static）lyon
 #endif
+// set rate
+void usb_update_polling_rate(uint16_t polling_rate);
+void usb_set_polling_rate(uint8_t idx);
 
 void sendchar_pf(void *p, char c);
 

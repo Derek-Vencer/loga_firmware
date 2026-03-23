@@ -7,7 +7,7 @@
 #define VENDOR_ID       0x195d
 #define PRODUCT_ID      0x2100//0x2092
 #define DEVICE_VER      0x000E//14//0x000E
-#define DEVICE_VER_FIX  0x10 // 16
+#define DEVICE_VER_FIX  0x11 // 17
 /* in python2: list(u"whatever".encode('utf-16-le')) */
 /*   at most 32 characters or the ugly hack in usb_main.c borks */
 #define MANUFACTURER "iOne Innovation"
@@ -54,6 +54,7 @@
 #define EECONFIG_KB_SAT   (uint8_t *)(EECONFIG_kbColor + 1)
 #define EECONFIG_KB_VAL   (uint8_t *)(EECONFIG_kbColor + 2)
 #define EECONFIG_KB_MAGIC (uint8_t *)(EECONFIG_kbColor + 3)
+#define EECONFIG_POLLING_RATE         0x0070
 #define IS_SOCD_ON_ADD                0x0071
 #define TACHYON_MODE_ADD              0x0072
 #define RAPID_KEY_ENABLE_ADDR         0x0073

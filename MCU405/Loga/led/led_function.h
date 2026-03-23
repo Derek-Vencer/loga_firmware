@@ -145,6 +145,8 @@ enum effectTypes{
 	EffectTypeKeytest,
 	EffectTypeChangeProfile,
 	EffectTypeWheel,
+	EffectTypeReactive,
+	EffectTypeStarlight,
 	EffectTypeOff,
 };
 

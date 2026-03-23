@@ -31,6 +31,7 @@ extern socd_policy_t g_policy;
 # include "keymap_common.h" // lyon customize keycode
 #define draftShift	0 //
 #include "feature.h"
+#include "../../keyboard_core/protocol/chibios/usb_main.h"
 #define TRAVEL_STEPS 350
 
 //
@@ -42,6 +43,9 @@ extern EffectMosArt_t mosArt; //lyon for changing color keycode
 hsv_t hsv;
 bool isKEYLOCK = false; // for toggle lock key
 bool isCtrl = true;
+static bool eeclr_pressed = false; //EECLR
+static bool eeclr_fired = false;
+static uint32_t eeclr_timer = 0;
 // enum custom_keycodes{ //define in keymap_common.h
 // 	KC_M1 = SAFE_RANGE,
 // };
@@ -918,11 +922,11 @@ void hook_late_init()
 
 	uint8_t FACTORY_INIT_MAGIC = 0xF1;
     uint8_t flag = eeprom_read_byte((uint8_t *)EEPROM_FACTORY_INIT_FLAG_ADDR);
+	usb_set_polling_rate(eeprom_read_byte(EECONFIG_POLLING_RATE));
 
     // uprintf("=============factory init flag = %u\n", flag);
 
     if (flag != FACTORY_INIT_MAGIC) {
-		//
 		eeprom_write_word(EEPROM_FACTORY_INIT_FLAG_ADDR, 0xF1);
 		eeprom_write_word(EECONFIG_KEYMAP_TRIGGER_LEVEL, 0x00C8);
 	    eeprom_write_word(EECONFIG_KEYMAP_RELEASE_LEVEL, 0x0000);
@@ -930,7 +934,7 @@ void hook_late_init()
 	    // eeprom_write_word(EECONFIG_KEYMAP_RELEASE_LEVEL, keyMatrixReleaseLevel);
 		rapidKeyEnable = eeprom_read_byte(RAPID_KEY_ENABLE_ADDR);
 		eeprom_update_byte(KB_COLOR_MODE_ADDR, 8);
-		
+		eeprom_write_word(EECONFIG_POLLING_RATE, 0x00);
 		
 	}
 	load_all_rappy_snappy();
@@ -3069,6 +3073,55 @@ if (!reset_checked) {
 		}
 	}*/
 
+	// EECLR
+	void eeclr_task(void)
+	{
+		if (!eeclr_pressed || eeclr_fired) {
+			return;
+		}
+
+		if (timer_elapsed32(eeclr_timer) >= 3000) {
+			eeclr_fired = true;
+			eeclr_pressed = false;
+
+			uprintf("[EECLR] hold 3s -> factory reset\r\n");
+			// keyboard_factory_reset_all();
+			knobState = 0;
+			eeprom_update_byte(KB_ENCODER_MODE_ADDR, knobState);
+			eeconfig_socd_clear();
+			eeconfig_rappy_snappy_clear();
+			eeconfig_modtap_clear();
+			currentLED_RunMode.mode = 8;
+			currentLED_RunMode.type = offMode;
+			setRunMode(currentLED_RunMode);
+			eeprom_update_byte(KB_COLOR_MODE_ADDR, currentLED_RunMode.mode);
+			eeprom_write_word(EECONFIG_POLLING_RATE, 0x00);
+			uprintf (".");
+			eeconfig_rapidTrigger_init();
+			keyMatrixTriggerLevel = DEFAULT_TRIGGER_LEVEL;
+			keyMatrixReleaseLevel = DEFAULT_RELEASE_LEVEL;
+			eeprom_write_word(EECONFIG_KEYMAP_TRIGGER_LEVEL, keyMatrixTriggerLevel);
+			uprintf (".");
+			eeprom_write_word(EECONFIG_KEYMAP_RELEASE_LEVEL, keyMatrixReleaseLevel);
+			uprintf (".");
+			write_trigger_to_eeprom();
+			uprintf (".");
+			write_Release_to_eeprom();
+			uprintf (".");
+			eeconfig_rapidTrigger_init();
+			uprintf (".");
+			write_keymap_to_eeprom();
+			uprintf (".");
+			dynamic_macro_reset_eeprom();
+			uprintf (".");
+			uprintf (".");
+			eeprom_write_word(EEPROM_FACTORY_INIT_FLAG_ADDR, 0xFA);
+			uprintf("\r\nEnd\r\n");
+			chThdSleepMilliseconds(500);
+			NVIC_SystemReset();
+		}
+	}
+	eeclr_task();
 
 }
 
@@ -4207,14 +4260,17 @@ bool hook_matrix_change(keyrecord_t record)
 {
 	uint16_t keycode = keymap_key_to_keycode(biton32(layer_state),record.event.key);
 	static uint16_t counts = 0;
-	uprintf("KEY row=%d col=%d kc=%04X pressed=%d\r\n",
-					keyLocation.rowA, keyLocation.colA, keycode, record.event.pressed);
+	// uprintf("KEY row=%d col=%d kc=%04X pressed=%d\r\n",
+	// 				record.event.key.row, record.event.key.col, keycode, record.event.pressed);
 //	uprintf ("Layer:%d keycode:%04x\r\n", biton32(layer_state), keycode);
 
 //    action_t action = layer_switch_get_action(record.event.key);
 //    uint8_t code = action.key.code;
 //    uprintf ("action keycode:%X modes:%X kid_id:%X\r\n",code,action.key.mods,action.kind.id);
 
+    if (record.event.pressed && (currentLED_RunMode.mode == 5 || currentLED_RunMode.mode == 7)) {
+        reactive_level[record.event.key.row][record.event.key.col] = REACTIVE_MAX;
+    }
 	#ifdef socd
 	if(isSOCD){
 		int8_t slot = socd_find_slot_by_keycode(keycode);
@@ -4430,6 +4486,7 @@ bool hook_matrix_change(keyrecord_t record)
 				case KC_LM1:
 					uprintf("LM1\r\n");
 					if(isCtrl){
+						currentLED_RunMode.type = normalMode;
 						currentLED_RunMode.mode = 0x00;
 						setRunMode(currentLED_RunMode);
 						eeprom_update_byte(KB_COLOR_MODE_ADDR, 0);
@@ -4438,6 +4495,7 @@ bool hook_matrix_change(keyrecord_t record)
 				case KC_LM2:
 					uprintf("LM2\r\n");
 					if(isCtrl){
+						currentLED_RunMode.type = normalMode;
 						currentLED_RunMode.mode = 0x01;
 						setRunMode(currentLED_RunMode);
 						eeprom_update_byte(KB_COLOR_MODE_ADDR, 1);
@@ -4446,6 +4504,7 @@ bool hook_matrix_change(keyrecord_t record)
 				case KC_LM3:
 					uprintf("LM3\r\n");
 					if(isCtrl){
+						currentLED_RunMode.type = normalMode;
 						currentLED_RunMode.mode = 0x02;
 						setRunMode(currentLED_RunMode);
 						eeprom_update_byte(KB_COLOR_MODE_ADDR, 2);
@@ -4454,6 +4513,7 @@ bool hook_matrix_change(keyrecord_t record)
 				case KC_LM4:
 					uprintf("LM4\r\n");
 					if(isCtrl){
+						currentLED_RunMode.type = normalMode;
 						currentLED_RunMode.mode = 0x03;
 						setRunMode(currentLED_RunMode);
 						eeprom_update_byte(KB_COLOR_MODE_ADDR, 3);
@@ -4462,25 +4522,55 @@ bool hook_matrix_change(keyrecord_t record)
 				case KC_LM5:
 					uprintf("L5\r\n");
 					if(isCtrl){
+						currentLED_RunMode.type = normalMode;
 						currentLED_RunMode.mode = 0x04;
 						setRunMode(currentLED_RunMode);
 						eeprom_update_byte(KB_COLOR_MODE_ADDR, 4);
 					}
 				break;
 				case KC_LM6:
+					uprintf("L6\r\n");
+					if(isCtrl){
+						currentLED_RunMode.type = normalMode;
+						currentLED_RunMode.mode = 0x05;
+						setRunMode(currentLED_RunMode);
+						eeprom_update_byte(KB_COLOR_MODE_ADDR, 5);
+					}
 				break;
 				case KC_LM7:
+					uprintf("L7\r\n");
+					if(isCtrl){
+						currentLED_RunMode.type = normalMode;
+						currentLED_RunMode.mode = 0x06;
+						setRunMode(currentLED_RunMode);
+						eeprom_update_byte(KB_COLOR_MODE_ADDR, 6);
+					}
 				break;
 				case KC_LM8:
+					uprintf("L8\r\n");
+					if(isCtrl){
+						currentLED_RunMode.type = normalMode;
+						currentLED_RunMode.mode = 0x07;
+						setRunMode(currentLED_RunMode);
+						eeprom_update_byte(KB_COLOR_MODE_ADDR, 7);
+					}
 				break;
 				case KC_LM9:
+					uprintf("L9\r\n");
+					if(isCtrl){
+						currentLED_RunMode.type = normalMode;
+						currentLED_RunMode.mode = 0x08;
+						setRunMode(currentLED_RunMode);
+						eeprom_update_byte(KB_COLOR_MODE_ADDR, 8);
+					}
 				break;
 				case KC_M1:
 				// at keycode i 
-					uprintf("load_all_rappy_snappy\r\n");
-					void load_all_rappy_snappy(void);
-					uprintf("modtap_load_form_eeprom\r\n");
-					void modtap_load_form_eeprom(void);
+					// uprintf("load_all_rappy_snappy\r\n");
+					// void load_all_rappy_snappy(void);
+					// uprintf("modtap_load_form_eeprom\r\n");
+					// void modtap_load_form_eeprom(void);
+					// uprintf("usb mode is %d\r\n", );
 				break;
 				case KC_M2:
 					uprintf("matrix (%d)_(%d)_(%d),(%d)_(%d)_(%d)\r\n",
@@ -4496,6 +4586,19 @@ bool hook_matrix_change(keyrecord_t record)
 					} else {
 						isSOCD = true;
 					}
+				break;
+				case KC_EECLR:
+					if (record.event.pressed) {
+						eeclr_pressed = true;
+						eeclr_fired = false;
+						eeclr_timer = timer_read32();
+						uprintf("[EECLR] pressed\r\n");
+					} else {
+						eeclr_pressed = false;
+						eeclr_fired = false;
+						uprintf("[EECLR] released\r\n");
+					}
+					return false; // 不往下送出一般按鍵
 				break;
 				case KC_WIN_LOCK:
 				//eeprom keylock
@@ -4710,7 +4813,7 @@ bool hook_matrix_change(keyrecord_t record)
 					// setRunMode(currentLED_RunMode);
 //					chThdSleepMilliseconds(50);
 					// lampArrayDisable = true;
-					gamePadIndicate();
+					// gamePadIndicate(); // disable
 #ifdef minTriggerCheck
 					rapidKeyEnable = true;
 #endif

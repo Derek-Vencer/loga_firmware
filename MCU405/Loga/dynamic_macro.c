@@ -8,7 +8,7 @@
 
 
 
-dynamic_macro_t dynamic_macros[DYNAMIC_MACRO_COUNT];
+dynamic_macro_t dynamic_macros[DYNAMIC_MACRO_COUNT];//
 uint32_t macro_timeStamp = 0;
 uint8_t macro_layer = 0;
 

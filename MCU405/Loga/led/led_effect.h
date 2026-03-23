@@ -10,6 +10,9 @@ bool effectMosArtProcess(void);
 bool EffectTypeRainbowFlowProcess(void);
 bool EffectTypeKeytestProcess(void);
 bool EffectTypeChangeProfileProcess (void);
+bool EffectTypeWheelProcess (void);
+bool EffectTypeReactiveProcess (void);
+bool EffectTypeStarlightProcess(void);
 void Calculate_Colorful_Color(uint8_t speed, uint32_t timebase, led_config_t* LED);
 void calculate_breath_volume(uint8_t speed, uint16_t timebase, uint8_t* bright);
 void Calculate_Flashing_Volume(uint8_t speed, uint16_t timebase, uint8_t* bright);
@@ -25,4 +28,7 @@ hsv_t rgb_to_hsv(led_config_t rgb);
 led_config_t hsv_to_rgb(hsv_t hsv);
 
 extern led_config_t LED_NULL;
+
+#define REACTIVE_MAX 255
+extern uint8_t reactive_level[MATRIX_ROWS][MATRIX_COLS];
 #endif /* LED_EFFECT_H_ */
