@@ -18,8 +18,68 @@ static bool wheel_inited = false;
 
 // reactive
 uint8_t reactive_level[MATRIX_ROWS][MATRIX_COLS] = {0};
-
+//ripple thread
+extern binary_semaphore_t ledUpdateSem;
 //starlight
+extern led_config_t LED_Datas[LedNumbers];
+
+// fix led location
+typedef struct {
+    int16_t x;
+    int16_t y;
+    bool valid;
+} led_pos_t;
+
+static led_pos_t led_pos[LedNumbers];
+static bool led_pos_inited = false;
+static int16_t led_center_x = 0;
+static int16_t led_center_y = 0;
+
+static void led_pos_init_from_remap(void)
+{
+    const int16_t pitch_x = 16;
+    const int16_t pitch_y = 16;
+
+    int16_t min_x = 32767, min_y = 32767;
+    int16_t max_x = -32768, max_y = -32768;
+
+    uint16_t i;
+    uint8_t row, col;
+
+    for (i = 0; i < LedNumbers; i++) {
+        led_pos[i].x = 0;
+        led_pos[i].y = 0;
+        led_pos[i].valid = false;
+    }
+
+    for (row = 0; row < LED_MATRIX_ROWS; row++) {
+        for (col = 0; col < LED_MATRIX_COLS; col++) {
+            int8_t idx = ledRemap[row][col];
+            if (idx >= 0 && idx < LedNumbers) {
+                led_pos[idx].x = col * pitch_x;
+                led_pos[idx].y = row * pitch_y;
+                led_pos[idx].valid = true;
+
+                if (led_pos[idx].x < min_x) min_x = led_pos[idx].x;
+                if (led_pos[idx].x > max_x) max_x = led_pos[idx].x;
+                if (led_pos[idx].y < min_y) min_y = led_pos[idx].y;
+                if (led_pos[idx].y > max_y) max_y = led_pos[idx].y;
+            }
+        }
+    }
+
+    led_center_x = (min_x + max_x) / 2;
+    led_center_y = (min_y + max_y) / 2;
+    led_pos_inited = true;
+}
+
+typedef struct {
+    bool enable;
+    uint8_t offset;
+} effect_wheel_t;
+
+static effect_wheel_t wheel_fx;
+// end
 typedef struct {
     uint8_t active;
     uint8_t phase;      // 0~255
@@ -123,21 +183,313 @@ static void starlight_reset_all(void)
         starlight_leds[i].color.blue = 0;
     }
 }
-//endof starlight
+// starlight_end
+// ripple
+#define RIPPLE_MAX_EVENTS 8
+#define RIPPLE_RADIUS_STEP 12
+#define RIPPLE_WIDTH 18
+#define RIPPLE_FADE_STEP 10
+
+// typedef struct { //centre
+//     bool active;
+//     uint8_t row;
+//     uint8_t col;
+//     uint16_t radius;
+//     uint8_t life;
+//     led_config_t color;
+// } ripple_event_t;
+typedef struct {
+    bool active;
+    uint8_t origin_led;
+    uint16_t radius;
+    uint8_t life;
+    led_config_t color;
+} ripple_event_t;
+
+static ripple_event_t ripple_events[RIPPLE_MAX_EVENTS];
+
+typedef struct {
+    int16_t x;
+    int16_t y;
+} ripple_pos_t;
+
+// static const uint8_t ripple_row_lengths[LED_MATRIX_ROWS] = {26, 16, 17, 17, 16, 15, 12};
+// static ripple_pos_t ripple_pos[LED_MATRIX_ROWS][LED_MATRIX_COLS];
+// static bool ripple_pos_inited = false;
+
+// static void ripple_init_positions(void)
+// {
+//     const int16_t pitch_x = 16;
+//     const int16_t pitch_y = 16;
+//     uint8_t row, col;
+
+//     for (row = 0; row < LED_MATRIX_ROWS; row++) {
+//         int16_t row_offset = ((26 - ripple_row_lengths[row]) * pitch_x) / 2;
+
+//         for (col = 0; col < LED_MATRIX_COLS; col++) {
+//             ripple_pos[row][col].x = 0;
+//             ripple_pos[row][col].y = 0;
+//         }
+
+//         for (col = 0; col < ripple_row_lengths[row]; col++) {
+//             ripple_pos[row][col].x = row_offset + col * pitch_x;
+//             ripple_pos[row][col].y = row * pitch_y;
+//         }
+//     }
+
+//     ripple_pos_inited = true;
+// }
+// call when press
+void ripple_add_event(uint8_t row, uint8_t col, led_config_t color)
+{
+    uint8_t i;
+    int8_t origin_led;
+
+    if (row >= MATRIX_ROWS || col >= MATRIX_COLS) {
+        return;
+    }
+
+    origin_led = ledKeyMatrix[row][col];
+    if (origin_led < 0 || origin_led >= LedNumbers) {
+        return;
+    }
+
+    for (i = 0; i < RIPPLE_MAX_EVENTS; i++) {
+        if (!ripple_events[i].active) {
+            ripple_events[i].active = true;
+            ripple_events[i].origin_led = (uint8_t)origin_led;
+            ripple_events[i].radius = 0;
+            ripple_events[i].life = 255;
+            ripple_events[i].color = color;
+            return;
+        }
+    }
+
+    ripple_events[0].active = true;
+    ripple_events[0].origin_led = (uint8_t)origin_led;
+    ripple_events[0].radius = 0;
+    ripple_events[0].life = 255;
+    ripple_events[0].color = color;
+}
+// void ripple_add_event(uint8_t row, uint8_t col, led_config_t color)
+// {
+//     uint8_t i;
+
+//     for (i = 0; i < RIPPLE_MAX_EVENTS; i++) {
+//         if (!ripple_events[i].active) {
+//             ripple_events[i].active = true;
+//             ripple_events[i].row = row;
+//             ripple_events[i].col = col;
+//             ripple_events[i].radius = 0;
+//             ripple_events[i].life = 255;
+//             ripple_events[i].color = color;
+//             return;
+//         }
+//     }
+
+//     /* 滿了就覆蓋最舊的 0 號 */
+//     ripple_events[0].active = true;
+//     ripple_events[0].row = row;
+//     ripple_events[0].col = col;
+//     ripple_events[0].radius = 0;
+//     ripple_events[0].life = 255;
+//     ripple_events[0].color = color;
+// }
+// ripple process
+extern led_config_t LED_Datas[LedNumbers];
+
+static uint8_t ripple_abs_u8(int16_t v)
+{
+    return (v < 0) ? (uint8_t)(-v) : (uint8_t)v;
+}
+
+static uint16_t ripple_dist_approx(int16_t dx, int16_t dy)
+{
+    /* 不用 sqrt，避免太重 */
+    uint16_t ax = (dx < 0) ? -dx : dx;
+    uint16_t ay = (dy < 0) ? -dy : dy;
+    return ax + ay;   /* Manhattan distance，夠用了 */
+}
+
+static led_config_t ripple_scale_color(led_config_t in, uint8_t bright)
+{
+    led_config_t out;
+    out.red   = ((uint16_t)in.red   * bright) / 255;
+    out.green = ((uint16_t)in.green * bright) / 255;
+    out.blue  = ((uint16_t)in.blue  * bright) / 255;
+    return out;
+}
+
+static void ripple_clear_events(void)
+{
+    uint8_t i;
+    for (i = 0; i < RIPPLE_MAX_EVENTS; i++) {
+        ripple_events[i].active = false;
+        ripple_events[i].radius = 0;
+        ripple_events[i].life = 0;
+    }
+}
+
+bool EffectTypeRippleProcess(void)
+{
+    uint16_t i;
+    uint8_t e;
+
+    if (!led_pos_inited) {
+        led_pos_init_from_remap();
+    }
+
+    for (i = 0; i < LedNumbers; i++) {
+        LED_Datas[i].red = 0;
+        LED_Datas[i].green = 0;
+        LED_Datas[i].blue = 0;
+    }
+
+    for (e = 0; e < RIPPLE_MAX_EVENTS; e++) {
+        if (!ripple_events[e].active) {
+            continue;
+        }
+
+        uint8_t origin = ripple_events[e].origin_led;
+        int16_t cx = led_pos[origin].x;
+        int16_t cy = led_pos[origin].y;
+
+        for (i = 0; i < LedNumbers; i++) {
+            uint16_t dist;
+            uint16_t dr;
+            uint8_t bright;
+            led_config_t c;
+
+            if (!led_pos[i].valid) {
+                continue;
+            }
+
+            dist = ripple_dist_approx(
+                led_pos[i].x - cx,
+                led_pos[i].y - cy
+            );
+
+            dr = (dist > ripple_events[e].radius) ?
+                 (dist - ripple_events[e].radius) :
+                 (ripple_events[e].radius - dist);
+
+            if (dr > RIPPLE_WIDTH) {
+                continue;
+            }
+
+            bright = (uint8_t)(((uint32_t)(RIPPLE_WIDTH - dr) * ripple_events[e].life) / RIPPLE_WIDTH);
+            c = ripple_scale_color(ripple_events[e].color, bright);
+
+            {
+                uint16_t r = LED_Datas[i].red + c.red;
+                uint16_t g = LED_Datas[i].green + c.green;
+                uint16_t b = LED_Datas[i].blue + c.blue;
+
+                LED_Datas[i].red   = (r > 255) ? 255 : r;
+                LED_Datas[i].green = (g > 255) ? 255 : g;
+                LED_Datas[i].blue  = (b > 255) ? 255 : b;
+            }
+        }
+
+        ripple_events[e].radius += RIPPLE_RADIUS_STEP;
+
+        if (ripple_events[e].life > RIPPLE_FADE_STEP) {
+            ripple_events[e].life -= RIPPLE_FADE_STEP;
+        } else {
+            ripple_events[e].active = false;
+        }
+    }
+
+    chBSemSignal(&ledUpdateSem);
+    return true;
+}
+// bool EffectTypeRippleProcess(void) //centre
+// {
+//     uint8_t row, col, i;
+
+//     if (!ripple_pos_inited) {
+//         ripple_init_positions();
+//     }
+
+//     for (i = 0; i < LedNumbers; i++) {
+//         LED_Datas[i].red = 0;
+//         LED_Datas[i].green = 0;
+//         LED_Datas[i].blue = 0;
+//     }
+
+//     for (i = 0; i < RIPPLE_MAX_EVENTS; i++) {
+//         if (!ripple_events[i].active) {
+//             continue;
+//         }
+
+//         int16_t cx = ripple_pos[ripple_events[i].row][ripple_events[i].col].x;
+//         int16_t cy = ripple_pos[ripple_events[i].row][ripple_events[i].col].y;
+
+//         for (row = 0; row < LED_MATRIX_ROWS; row++) {
+//             for (col = 0; col < ripple_row_lengths[row]; col++) {
+//                 uint16_t dist;
+//                 uint16_t dr;
+//                 uint8_t bright;
+//                 led_config_t c;
+//                 int8_t led_idx;
+
+//                 dist = ripple_dist_approx(
+//                     ripple_pos[row][col].x - cx,
+//                     ripple_pos[row][col].y - cy
+//                 );
+
+//                 dr = (dist > ripple_events[i].radius) ?
+//                      (dist - ripple_events[i].radius) :
+//                      (ripple_events[i].radius - dist);
+
+//                 if (dr > RIPPLE_WIDTH) {
+//                     continue;
+//                 }
+
+//                 bright = (uint8_t)(((uint32_t)(RIPPLE_WIDTH - dr) * ripple_events[i].life) / RIPPLE_WIDTH);
+//                 c = ripple_scale_color(ripple_events[i].color, bright);
+
+//                 led_idx = ledRemap[row][col];
+//                 if (led_idx >= 0 && led_idx < LedNumbers) {
+//                     uint16_t r = LED_Datas[led_idx].red + c.red;
+//                     uint16_t g = LED_Datas[led_idx].green + c.green;
+//                     uint16_t b = LED_Datas[led_idx].blue + c.blue;
+
+//                     LED_Datas[led_idx].red   = (r > 255) ? 255 : r;
+//                     LED_Datas[led_idx].green = (g > 255) ? 255 : g;
+//                     LED_Datas[led_idx].blue  = (b > 255) ? 255 : b;
+//                 }
+//             }
+//         }
+
+//         ripple_events[i].radius += RIPPLE_RADIUS_STEP;
+
+//         if (ripple_events[i].life > RIPPLE_FADE_STEP) {
+//             ripple_events[i].life -= RIPPLE_FADE_STEP;
+//         } else {
+//             ripple_events[i].active = false;
+//         }
+//     }
+
+//     chBSemSignal(&ledUpdateSem);
+//     return true;
+// }
+// ripple_end
 uint8_t ledUpdateInterval = 35;
 static EffectrandonColor_t randColor;
 static EffectProfile_t eProfile;
 static led_runMode_t profilePreviusMode;
 // static EffectMosArt_t mosArt;
-EffectMosArt_t mosArt; // lyon
+EffectMosArt_t mosArt;
 static EffectRanbowFlow_t ranbowFlow;
+static effect_wheel_t wheel_fx;
 led_runMode_t currentLED_RunMode,lastLED_RunMode;
 EffectStatus_t effectStatus;
 uint8_t LED_DemoModeIndex = 0,LED_DemoCurrentMode = 0;
 uint8_t LED_PresetModeIndex = 0,LED_PresetCurrentMode;
 EffectStruct_t	LED_DemoMode[LED_DemoModes], LED_PresetMode[LED_PresetModes];
 led_config_t LED_NULL;
-static led_config_t c;
+led_config_t c;
 
 int8_t normalEffect;
 uint8_t normalBrightness = 3, normalSpeed = 2;
@@ -160,45 +512,79 @@ extern bool gameModeEnable;
 #define M_PI 3.14159265358979323846f
 #endif
 
+// static void wheel_init_table(void)
+// {
+//     static const uint8_t wheel_row_lengths[LED_MATRIX_ROWS] = {26, 16, 17, 17, 16, 15, 12};
+
+//     const float pitch_x = 16.0f;
+//     const float pitch_y = 16.0f;
+
+//     float row_offset[LED_MATRIX_ROWS];
+//     float center_x;
+//     float center_y;
+
+//     uint8_t row, column;
+
+//     for (row = 0; row < LED_MATRIX_ROWS; row++) {
+//         row_offset[row] = ((26.0f - wheel_row_lengths[row]) * pitch_x) * 0.5f;
+//     }
+
+//     center_x = ((26.0f - 1.0f) * pitch_x) * 0.5f;
+//     center_y = ((LED_MATRIX_ROWS - 1.0f) * pitch_y) * 0.5f;
+
+//     /* 先全部清掉，避免短列未使用位置有垃圾值 */
+//     for (row = 0; row < LED_MATRIX_ROWS; row++) {
+//         for (column = 0; column < LED_MATRIX_COLS; column++) {
+//             wheel_base_hue[row][column] = 0;
+//         }
+//     }
+
+//     for (row = 0; row < LED_MATRIX_ROWS; row++) {
+//         for (column = 0; column < wheel_row_lengths[row]; column++) {
+//             float x = row_offset[row] + (column * pitch_x);
+//             float y = row * pitch_y;
+
+//             float dx = x - center_x;
+//             float dy = y - center_y;
+
+//             float angle = atan2f(dy, dx);
+//             float norm = (angle + (float)M_PI) / (2.0f * (float)M_PI);
+
+//             wheel_base_hue[row][column] = (uint8_t)(norm * 255.0f);
+//         }
+//     }
+
+//     wheel_inited = true;
+// }
 static void wheel_init_table(void)
 {
-    static const uint8_t wheel_row_lengths[LED_MATRIX_ROWS] = {26, 16, 17, 17, 16, 15, 12};
+    uint16_t i;
 
-    const float pitch_x = 16.0f;
-    const float pitch_y = 16.0f;
-
-    float row_offset[LED_MATRIX_ROWS];
-    float center_x;
-    float center_y;
-
-    uint8_t row, column;
-
-    for (row = 0; row < LED_MATRIX_ROWS; row++) {
-        row_offset[row] = ((26.0f - wheel_row_lengths[row]) * pitch_x) * 0.5f;
+    if (!led_pos_inited) {
+        led_pos_init_from_remap();
     }
 
-    center_x = ((26.0f - 1.0f) * pitch_x) * 0.5f;
-    center_y = ((LED_MATRIX_ROWS - 1.0f) * pitch_y) * 0.5f;
-
-    /* 先全部清掉，避免短列未使用位置有垃圾值 */
-    for (row = 0; row < LED_MATRIX_ROWS; row++) {
-        for (column = 0; column < LED_MATRIX_COLS; column++) {
-            wheel_base_hue[row][column] = 0;
-        }
+    for (i = 0; i < LED_MATRIX_ROWS * LED_MATRIX_COLS; i++) {
+        ((uint8_t*)wheel_base_hue)[i] = 0;
     }
 
-    for (row = 0; row < LED_MATRIX_ROWS; row++) {
-        for (column = 0; column < wheel_row_lengths[row]; column++) {
-            float x = row_offset[row] + (column * pitch_x);
-            float y = row * pitch_y;
-
-            float dx = x - center_x;
-            float dy = y - center_y;
+    for (i = 0; i < LedNumbers; i++) {
+        if (led_pos[i].valid) {
+            float dx = (float)(led_pos[i].x - led_center_x);
+            float dy = (float)(led_pos[i].y - led_center_y);
 
             float angle = atan2f(dy, dx);
             float norm = (angle + (float)M_PI) / (2.0f * (float)M_PI);
+            uint8_t hue = (uint8_t)(norm * 255.0f);
 
-            wheel_base_hue[row][column] = (uint8_t)(norm * 255.0f);
+            /* 反查回 ledRemap 對應位置，存進 wheel_base_hue[row][col] */
+            for (uint8_t row = 0; row < LED_MATRIX_ROWS; row++) {
+                for (uint8_t col = 0; col < LED_MATRIX_COLS; col++) {
+                    if (ledRemap[row][col] == i) {
+                        wheel_base_hue[row][col] = hue;
+                    }
+                }
+            }
         }
     }
 
@@ -296,9 +682,12 @@ static THD_FUNCTION(LED_EffectThread, arg)
         case EffectTypeReactive:
         enable = EffectTypeReactiveProcess();
         break;
-        // case EffectTypeStarlight:
-        // enable = EffectTypeStarlightProcess();
-        // break;
+        case EffectTypeStarlight:
+        enable = EffectTypeStarlightProcess();
+        break;
+        case EffectTypeRipple:
+        enable = EffectTypeRippleProcess();
+        break;
     	case EffectTypeOff:
         break;
     	case EffectIdle:
@@ -351,6 +740,22 @@ void LED_SpeedChange(int8_t brightness, uint8_t speed){
 		        	break;
 		        case EffectTypeOff:
 		        	break;
+                case EffectTypeWheel:
+                    currentLED_RunMode.brightness = brightness;
+                    currentLED_RunMode.speed = speed;
+                    break;
+                case EffectTypeReactive:
+                    currentLED_RunMode.brightness = brightness;
+                    currentLED_RunMode.speed = speed;
+                    break;
+                case EffectTypeStarlight:
+                    currentLED_RunMode.brightness = brightness;
+                    currentLED_RunMode.speed = speed;
+                    break;
+                case EffectTypeRipple:
+                    currentLED_RunMode.brightness = brightness;
+                    currentLED_RunMode.speed = speed;
+                    break;
 			}
             effectStatus.speed = speed * (ledUpdateInterval);
 			break;
@@ -457,13 +862,13 @@ bool LED_Effect(uint8_t effect, bool enable, uint32_t interval, uint8_t colorMod
                 if (speed > 5 || (brightness < 1 || brightness > 10)) {
                     return false;
                 }
+                wheel_fx.enable = true;
+                wheel_fx.offset = 0;
 
                 effectStatus.speed = speed * ledUpdateInterval;
 
-                /* 先直接跑第一幀，不要只等 timer */
                 chBSemSignal(&ledEffetSem);
 
-                /* 再啟動後續 timer */
                 chVTSet(&randColor_vt, TIME_MS2I(effectStatus.speed), (vtfunc_t)led_cb, NULL);
             }
             break;
@@ -472,10 +877,8 @@ bool LED_Effect(uint8_t effect, bool enable, uint32_t interval, uint8_t colorMod
             if (enable) {
                 effectStatus.speed = speed * ledUpdateInterval;
 
-                /* 先直接跑第一幀 */
                 chBSemSignal(&ledEffetSem);
 
-                /* 再啟動 timer */
                 chVTSet(&randColor_vt, TIME_MS2I(effectStatus.speed), (vtfunc_t)led_cb, NULL);
             }
             break;
@@ -826,18 +1229,23 @@ bool EffectTypeRainbowFlowProcess(void)
 
 bool EffectTypeWheelProcess(void)
 {
-        static const uint8_t wheel_row_lengths[LED_MATRIX_ROWS] = {26, 16, 17, 17, 16, 15, 12};
-    static uint8_t wheel_offset = 0;
+    uint8_t row, col;
 
-    uint8_t row, column;
+    if (!wheel_fx.enable) {
+        chVTReset(&randColor_vt);
+        ledAllOff(false);
+        effectStatus.effect = EffectIdle;
+        return false;
+    }
 
-    // if (!wheel_inited) {
-    //     wheel_init_table();
-    // }
+    if (!led_pos_inited) {
+        led_pos_init_from_remap();
+    }
 
     if (effectStatus.interval != 0 &&
         (get_system_time_ticks() - effectStatus.timeStamp > effectStatus.interval)) {
         chVTReset(&randColor_vt);
+        wheel_fx.enable = false;
         ledAllOff(false);
         effectStatus.effect = EffectIdle;
 
@@ -848,20 +1256,22 @@ bool EffectTypeWheelProcess(void)
     }
 
     for (row = 0; row < LED_MATRIX_ROWS; row++) {
-        for (column = 0; column < wheel_row_lengths[row]; column++) {
-            uint8_t hue = wheel_base_hue[row][column] + wheel_offset;
+        for (col = 0; col < LED_MATRIX_COLS; col++) {
+            int8_t idx = ledRemap[row][col];
 
-            // led_config_t color = wheel_hue_to_rgb(hue);
-            // color = wheel_apply_brightness(color, effectStatus.brightness);
-            led_config_t color = wheel_hue_to_rgb(hue);
-            setRemapLED(row, column, color);
+            if (idx < 0 || idx >= LedNumbers) {
+                continue;
+            }
 
-            setRemapLED(row, column, color);
+            {
+                uint8_t hue = wheel_base_hue[row][col] + wheel_fx.offset;
+                led_config_t color = wheel_hue_to_rgb(hue);
+                LED_Datas[idx] = color;
+            }
         }
     }
 
-    /* 先固定慢速，避免太快 */
-    wheel_offset += effectStatus.speed / 10; //
+    wheel_fx.offset += effectStatus.speed / 10;
 
     chBSemSignal(&ledUpdateSem);
     return true;
@@ -1218,7 +1628,7 @@ void buildNormalModes(void){
 	LED_ModesBuilder(addPresetEffect , false,EffectTypeMosArt, true, 5000, single, mosArtWave,  c, normalBrightness, normalSpeed, 0);
 	LED_ModesBuilder(addPresetEffect , false,EffectTypeReactive,true,5000, single, mosArtStatic, rainbowColor[white], normalBrightness, normalSpeed, 0); //5
     LED_ModesBuilder(addPresetEffect , false, EffectTypeStarlight, true, 5000, single, mosArtStatic, rainbowColor[orange], normalBrightness, normalSpeed, 0); //6
-	LED_ModesBuilder(addPresetEffect , false, EffectTypeRipple, true, 5000, single, mosArtStatic,  rainbowColor[violet], normalBrightness, normalSpeed, 0);
+	LED_ModesBuilder(addPresetEffect , false, EffectTypeRipple, true, 5000, single, mosArtStatic,  c, normalBrightness, normalSpeed, 0);
     LED_ModesBuilder(addPresetEffect , false, EffectTypeWheel, true, 5000, single, mosArtStatic, rainbowColor[orange], normalBrightness, normalSpeed, 0); //8
 	LED_ModesBuilder(addPresetEffect , false,EffectTypeRainbowFlow, true, 5000, 0, 0,  LED_NULL, normalBrightness, normalSpeed, false);
 	LED_ModesBuilder(addPresetEffect , false,EffectTypeRainbowFlow, true, 5000, 0, 0,  LED_NULL, normalBrightness, normalSpeed, true);
@@ -1410,6 +1820,7 @@ void LED_init(void){//
 
 	buildDemoModes();
 	buildNormalModes();
+    led_pos_init_from_remap(); //
     wheel_init_table();   //
     wheel_inited = true;  //
 	chThdCreateStatic(waLED_EffectThread, sizeof(waLED_EffectThread), NORMALPRIO - 3, LED_EffectThread, NULL); //original -3 test +７

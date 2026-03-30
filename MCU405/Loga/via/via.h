@@ -191,9 +191,9 @@ enum ione_api_command {
 	ione_api_cmd_get_lighting_effect	= 0x0184,
 	ione_api_cmd_set_lighting_color		= 0x0105,
 	ione_api_cmd_get_lighting_color		= 0x0185,
-	ione_api_cmd_set_konb_state         = 0x0106, // lyon add
+	ione_api_cmd_set_konb_state         = 0x0106,
 	ione_api_cmd_konb_state				= 0x0186,
-	ione_api_cmd_set_lock_state         = 0x0107, // lyon add
+	ione_api_cmd_set_lock_state         = 0x0107,
 	ione_api_cmd_get_lock_state			= 0x0187,
 	ione_api_cmd_set_rapid_trigger_state = 0x0108,
 	ione_api_cmd_get_rapid_trigger_state = 0x0188,
@@ -217,7 +217,7 @@ enum ione_api_command {
 	ione_api_cmd_set_factory_reset		= 0x0201,
 	ione_api_cmd_get_rapid_trigger_value_mm   = 0x028B,
 	ione_api_cmd_set_rapid_trigger_value_mm   = 0x020B,
-	ione_api_cmd_get_eeprom_max_trigger_value = 0x0282, // lyon add
+	ione_api_cmd_get_eeprom_max_trigger_value = 0x0282,
 	ione_api_cmd_set_macro_record       = 0x0202,
 	ione_api_cmd_set_stop_macro_record  = 0x0203,
 	ione_api_cmd_set_macro_playback     = 0x0204,
@@ -230,6 +230,8 @@ enum ione_api_command {
 	ione_api_cmd_get_dead_zone_settings = 0x0288,
 	ione_api_cmd_system_reset           = 0x0209,
 	ione_api_cmd_factory_reset_and_system_reset = 0x020A,
+	ione_api_cmd_set_lighting_value     = 0x020C,
+	ione_api_cmd_get_lighting_value     = 0x028C,
 	ione_api_cmd_set_test_mode			= 0x0700,
 
 

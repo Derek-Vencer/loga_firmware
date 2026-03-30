@@ -13,6 +13,8 @@ bool EffectTypeChangeProfileProcess (void);
 bool EffectTypeWheelProcess (void);
 bool EffectTypeReactiveProcess (void);
 bool EffectTypeStarlightProcess(void);
+bool EffectTypeRippleProcess(void);
+void ripple_add_event(uint8_t row, uint8_t col, led_config_t color);
 void Calculate_Colorful_Color(uint8_t speed, uint32_t timebase, led_config_t* LED);
 void calculate_breath_volume(uint8_t speed, uint16_t timebase, uint8_t* bright);
 void Calculate_Flashing_Volume(uint8_t speed, uint16_t timebase, uint8_t* bright);

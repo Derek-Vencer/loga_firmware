@@ -74,7 +74,6 @@ void send_A_to_Z(void) {
 
 
 #define ADC_v5
-// #define ADC_v6
 //#define ADC_Oversample
 
 // #define rappySnappy // lyon move to matrix.h
@@ -139,22 +138,6 @@ typedef struct {
 static socd_runtime_t socd_rt[SOCD_SLOT_COUNT];
 
 #endif // socd
-#ifdef rappySnappy //
-
-
-// Snappy 鍵位設定（可自行改）rappy snappy
-// /*static*/ keypos_t snappy_key1 = {1, 3};  // 對應 KC_A // (COL, ROW)? WHY IS THIS HAPPEN?
-// /*static*/ keypos_t snappy_key2 = {2, 3};  // 對應 KC_B
-// static const uint16_t keycode1 = KC_1;
-// static const uint16_t keycode2 = KC_2;
-
-// layer_keypos_t snappy_key1 = {0, 3, 1};  // {0,10,10};//{0, 3, 1};  // 對應 KC_C // (COL, ROW)? WHY IS THIS HAPPEN?
-// layer_keypos_t snappy_key2 = {0, 3, 2};  // {0,10,10};//{0, 3, 2};  // 對應 KC_V
-// bool rappySnappyisOn = false;
-
-// static int16_t adc_value[MATRIX_ROWS][MATRIX_COLS]; // put this in rappy_snappy.h
-#endif // rappySnappy
-
 #ifdef rappyTrigger
 //rappy trigger lyon
 int16_t adcPre_value[MATRIX_ROWS][MATRIX_COLS];
@@ -170,52 +153,9 @@ rappy_fixed_ratio_t rappy_q = {
 };
 
 bool process_rappy_fixed_ratio(rappy_fixed_ratio_t *rappy);
-/**********
-typedef struct {
-    bool enabled;              // 是否啟用此鍵的 Rappy 功能
-    bool active;              // 當前按鍵狀態（是否已觸發）
-    uint8_t row;               // 該鍵位於哪一行
-    uint8_t col;               // 該鍵位於哪一列
-    uint16_t keycode;          // 要註冊的 keycode
-
-    float last_ratio;          // 上一次行程百分比
-    uint8_t rise_count;        // 連續上升次數
-    uint8_t fall_count;        // 連續下降次數
-
-    uint8_t rise_threshold;    // 達到幾次連升才註冊
-    uint8_t fall_threshold;    // 達到幾次連降才釋放
-} rappy_ratio_trigger_t;
-
-rappy_ratio_trigger_t rappy_q = {
-    .enabled = true,
-    .active = false,
-    .row = 2,
-    .col = 1,
-    .keycode = KC_1,
-    .last_ratio = 0.0f,
-    .rise_count = 0,
-    .fall_count = 0,
-    .rise_threshold = 3,
-    .fall_threshold = 3
-};
-bool process_rappy_ratio_trend(rappy_ratio_trigger_t *rappy);
-***********/
 
 
 #endif // rappyTrigger
-
-#ifdef rappySnappy
-// // 狀態記錄（避免重複輸出）
-// static bool snappy1_active = false;
-// static bool snappy2_active = false;
-
-// // 判斷是否略過 Snappy 鍵（掃描時用）
-// bool is_skipped_key(uint8_t row, uint8_t col) {
-//     return (row == snappy_key1.row && col == snappy_key1.col) ||
-//            (row == snappy_key2.row && col == snappy_key2.col);// ||
-// 		   //(row == 2 && col == 1); // this is for rappy trigger KC_Q test
-// }
-#endif // rappySnappy
 
 #ifdef eepromClear
 #define RESET_ROW 0
@@ -389,7 +329,7 @@ void modtap_load_form_eeprom(void)
 		eeconfig_read_modtap(i, m);
 
 		// typedef struct {
-		// 	uint8_t L, R, C;           // 建議之後可改成 layer,row,col 比較清楚
+		// 	uint8_t L, R, C;
 		// 	uint8_t hold, click;
 		// 	bool    used;
 		// } mt_entry_t;
@@ -424,85 +364,15 @@ void eeconfig_modtap_clear(void){
 extern const uint16_t keymaps[][MATRIX_ROWS][MATRIX_COLS]; //lyon for rappy snappy
 
 
-#ifdef test8_thread
-static binary_semaphore_t reportSem;
-static THD_WORKING_AREA(waReportThread, 512);
-// === Shared across threads ===
-volatile bool rapidKeyActive = false;   // 取代跨函式想用的 rapidKeyStatus
-uint32_t     lastMatrixUpdateTime = 0;  // 給 ReportThread 用
-#endif // test8_thread
 //uint16_t analogX,analogY,analogRx,analogRy,analogZ,analogRz;
 
 //const int8_t hatSwitchMap[] = {0,-1,1,8,9,1,5,4,6,-1,2,-1,-1,-1,-1,-1};
 const int8_t hatSwitchMap[] = {0,1,5,0,7,8,6,0,3,2,4,0,0,0,0,0,0};
 
 //#define nonOP
-#ifdef saocd_new
-#define SOCD_MAX_PAIR 16
-
-typedef enum {
-    SOCD_MODE_NEUTRAL = 0,
-    SOCD_MODE_LAST_WINS = 1,
-    SOCD_MODE_FIRST_WINS = 2,
-    SOCD_MODE_A_WINS = 3,
-    SOCD_MODE_B_WINS = 4,
-} socd_mode_t;
-
-typedef struct {
-    bool enable;
-
-    uint8_t layer;   // 0xFF = all layers
-
-    uint8_t a_row;
-    uint8_t a_col;
-
-    uint8_t b_row;
-    uint8_t b_col;
-
-    socd_mode_t mode;
-
-    bool last_a;
-    bool last_b;
-
-	// 🔥 本輪 pressed 狀態（最關鍵）
-    bool a_now;
-    bool b_now;
-} socd_pair_t;
-
-static socd_pair_t socd_pairs[SOCD_MAX_PAIR];
-
-///////////////////////
-void socd_init(void) {
-    memset(socd_pairs, 0, sizeof(socd_pairs));
-}
-
-void socd_set_pair(uint8_t index,
-                   uint8_t layer,
-                   uint8_t a_row, uint8_t a_col,
-                   uint8_t b_row, uint8_t b_col,
-                   socd_mode_t mode)
-{
-    socd_pair_t *p = &socd_pairs[index];
-
-    p->enable = true;
-    p->layer = layer;
-
-    p->a_row = a_row;
-    p->a_col = a_col;
-    p->b_row = b_row;
-    p->b_col = b_col;
-
-    p->mode = mode;
-
-    p->last_a = false;
-    p->last_b = false;
-
-    uprintf("[SOCD] SET pair %u: A(%u,%u) B(%u,%u) mode=%u\r\n",
-        index, a_row, a_col, b_row, b_col, mode);
-}
-#endif // socd_new
 #ifdef toggleKey
 /* matrix state(1:on, 0:off) */
+#define toggle_key_pair_count	10
 matrix_row_t matrix[MATRIX_ROWS];
 static matrix_row_t matrix_temp[MATRIX_ROWS];
 
@@ -510,6 +380,9 @@ typedef struct {
     bool    enabled;   // 這個位置有沒有設定成 toggle key
     bool    state;     // 當前 ON(1) / OFF(0) 狀態
     uint8_t keycode;   // 要被「保持按住」的 keycode（1 byte）
+	uint8_t layer;
+	uint8_t row;
+	uint8_t col;
 } toggle_key_slot_t;
 
 // [layer][row][col]
@@ -528,19 +401,131 @@ void toggle_key_set(uint8_t layer, uint8_t row, uint8_t col, uint8_t keycode) {
     toggle_key_slot_t *tk = &toggle_keys[layer][row][col];
 
     if (keycode == 0) {
-        // keycode=0 當作「清除這個 toggle key」
         tk->enabled = false;
         tk->state   = false;
         tk->keycode = 0;
+        tk->layer   = layer;
+        tk->row     = row;
+        tk->col     = col;
+
+        for (int i = 0; i < toggle_key_pair_count; i++) {
+            toggle_key_slot_t tmp = {0};
+            eeconfig_read_toggle_entry(i, &tmp);
+
+            if (tmp.enabled == 0x01 &&
+                tmp.layer == tk->layer &&
+                tmp.row == tk->row &&
+                tmp.col == tk->col) {
+                eeconfig_clear_toggle_entry(i);
+                uprintf("clear toggle eeprom idx=%d\r\n", i);
+				tap_code(KC_Z);
+                break;
+            }
+        }
     } else {
         tk->enabled = true;
-        tk->state   = false;     // 新設定預設 OFF
+        tk->state   = false;
         tk->keycode = keycode;
+        tk->layer   = layer;
+        tk->row     = row;
+        tk->col     = col;
+
+		uint8_t data_start;
+        bool isRepeat = false;
+
+        for (int i = 0; i < toggle_key_pair_count; i++) {
+            toggle_key_slot_t tmp = {0};
+            eeconfig_read_toggle_entry(i, &tmp);
+
+            if (tmp.enabled == 0x01 &&
+                tmp.layer == tk->layer &&
+                tmp.row == tk->row &&
+                tmp.col == tk->col) {
+                isRepeat = true;
+                uprintf("isRepeat true idx=%d\r\n", i);
+
+                // 如果你希望重設同位置時更新 keycode，這裡應直接覆寫
+                eeconfig_write_toggle_entry(i, tk);
+                uprintf("update toggle eeprom idx=%d\r\n", i);
+                break;
+            }
+        }
+
+        if (!isRepeat) {
+            for (int i = 0; i < toggle_key_pair_count; i++) {
+                toggle_key_slot_t tmp = {0};
+                eeconfig_read_toggle_entry(i, &tmp);
+
+                if (tmp.enabled != 0x01) {
+                    eeconfig_write_toggle_entry(i, tk);
+                    uprintf("write toggle eeprom idx=%d\r\n", i);
+                    break;
+                }
+            }
+        }
     }
 
-    // 實體按鍵的狀態也清掉，避免殘留觸發一次
     toggle_last_pressed[layer][row][col] = false;
 }
+// void toggle_key_set(uint8_t layer, uint8_t row, uint8_t col, uint8_t keycode) {
+//     if (layer >= KEYMAPS_COUNT || row >= MATRIX_ROWS || col >= MATRIX_COLS) {
+//         return;
+//     }
+
+//     toggle_key_slot_t *tk = &toggle_keys[layer][row][col];
+
+//     if (keycode == 0) {
+//         // keycode=0 當作「清除這個 toggle key」
+//         tk->enabled = false;
+//         tk->state   = false;
+//         tk->keycode = 0;
+// 		tk->layer   = layer;
+// 		tk->row     = row;
+// 		tk->col     = col;
+
+// 		for(int i = 0; i < toggle_key_pair_count; i++){
+// 			toggle_key_slot_t tmp;
+// 			eeconfig_read_toggle_entry(i, &tmp);
+// 			if(tmp.enabled == 0x01 && tmp.layer == tk->layer && tmp.row == tk->row && tmp.col == tk->col){
+// 				// eeconfig_write_toggle_entry(i, &tk);
+// 				eeconfig_clear_toggle_entry(i);
+// 				uprintf("clear toggle eeprom\r\n");
+// 			}
+// 		}
+//     } else {
+//         tk->enabled = true;
+//         tk->state   = false;     // 新設定預設 OFF
+//         tk->keycode = keycode;
+// 		tk->layer   = layer;
+// 		tk->row     = row;
+// 		tk->col     = col;
+
+// 		bool isRepeat = false;
+// 		for(int i = 0; i < toggle_key_pair_count; i++){
+// 			toggle_key_slot_t tmp;
+// 			eeconfig_read_toggle_entry(i, &tmp);
+// 			if(tmp.layer == tk->layer && tmp.row == tk->row && tmp.col == tk->col){
+// 				isRepeat == true;
+// 				uprintf("isRepeat true\r\n");
+// 			}
+// 		}
+// 		if(!isRepeat){
+// 			for(int i = 0; i < toggle_key_pair_count; i++){
+// 				toggle_key_slot_t tmp;
+// 				eeconfig_read_toggle_entry(i, &tmp);
+// 				if(tmp.enabled != 0x01){
+// 					eeconfig_write_toggle_entry(i, &tk);
+// 					uprintf("write toggle eeprom\r\n");
+// 				}
+// 			}
+// 		}
+		
+//     }
+// 	// eeconfig_write_toggle_entry(0,tk);
+
+//     // 實體按鍵的狀態也清掉，避免殘留觸發一次
+//     toggle_last_pressed[layer][row][col] = false;
+// }
 
 uint8_t toggle_key_get(uint8_t layer, uint8_t row, uint8_t col) {
     if (layer >= KEYMAPS_COUNT || row >= MATRIX_ROWS || col >= MATRIX_COLS) {
@@ -548,6 +533,134 @@ uint8_t toggle_key_get(uint8_t layer, uint8_t row, uint8_t col) {
     }
     return toggle_keys[layer][row][col].keycode;
 }
+
+void eeconfig_write_toggle_entry(uint8_t index, const toggle_key_slot_t *entry)
+{
+    if (index >= toggle_key_pair_count) return;
+
+    uint16_t addr = EECONFIG_TOGGLE_KEY_ADDR + index * sizeof(toggle_key_slot_t);
+    eeprom_update_block((const void *)entry, (void *)addr, sizeof(toggle_key_slot_t));
+}
+
+void eeconfig_read_toggle_entry(uint8_t index, toggle_key_slot_t *entry)
+{
+    if (index >= toggle_key_pair_count) return;
+
+    uint16_t addr = EECONFIG_TOGGLE_KEY_ADDR + index * sizeof(toggle_key_slot_t);
+    eeprom_read_block((void *)entry, (const void *)addr, sizeof(toggle_key_slot_t));
+}
+
+void eeconfig_clear_toggle_entry(uint8_t index)
+{
+    toggle_key_slot_t empty = {0};
+    eeconfig_write_toggle_entry(index, &empty);
+}
+
+void eeconfig_clear_all_toggle_entry(){
+	for(int i = 0; i < toggle_key_pair_count; i++){
+		eeconfig_clear_toggle_entry(i);
+		uprintf("clear all toggle eeprom\r\n");
+	}
+}
+
+void toggle_key_dump_eeprom(void)
+{
+    uprintf("\r\n===== TOGGLE EEPROM DUMP START =====\r\n");
+
+    for (uint8_t i = 0; i < 10; i++) {   // 你現在用 5，也可以先印多一點
+        toggle_key_slot_t tmp = {0};
+
+        eeconfig_read_toggle_entry(i, &tmp);
+
+        uprintf("[IDX %u] en=%u L=%u R=%u C=%u KC=0x%04X\r\n",
+                i,
+                tmp.enabled,
+                tmp.layer,
+                tmp.row,
+                tmp.col,
+                tmp.keycode);
+    }
+
+    uprintf("===== TOGGLE EEPROM DUMP END =====\r\n\r\n");
+}
+
+// int8_t toggle_key_find_empty_slot(void)
+// {
+//     toggle_key_slot_t temp;
+
+//     for (uint8_t i = 0; i < MAX_TOGGLE_KEYS; i++) {
+//         eeconfig_read_toggle_entry(i, &temp);
+//         if (temp.valid == 0) {
+//             return i;
+//         }
+//     }
+//     return -1;
+// }
+
+// bool toggle_key_add(uint8_t layer, uint8_t row, uint8_t col,
+//                     uint8_t binding_count, uint16_t *kc,
+//                     uint8_t key_press, uint8_t key_release)
+// {
+//     int8_t slot = toggle_key_find_empty_slot();
+//     if (slot < 0) return false;
+
+//     toggle_key_entry_t entry = {0};
+//     entry.valid = 1;
+//     entry.layer = layer;
+//     entry.row = row;
+//     entry.col = col;
+//     entry.binding_count = binding_count;
+//     entry.key_press = key_press;
+//     entry.key_release = key_release;
+
+//     for (uint8_t i = 0; i < 4; i++) {
+//         entry.keycode[i] = (i < binding_count) ? kc[i] : 0;
+//     }
+
+//     eeconfig_write_toggle_entry(slot, &entry);
+//     return true;
+// }
+
+// int8_t toggle_key_find_by_pos(uint8_t layer, uint8_t row, uint8_t col)
+// {
+//     toggle_key_entry_t temp;
+
+//     for (uint8_t i = 0; i < MAX_TOGGLE_KEYS; i++) {
+//         eeconfig_read_toggle_entry(i, &temp);
+//         if (temp.valid &&
+//             temp.layer == layer &&
+//             temp.row == row &&
+//             temp.col == col) {
+//             return i;
+//         }
+//     }
+//     return -1;
+// }
+
+// int8_t toggle_key_find_by_pos(uint8_t layer, uint8_t row, uint8_t col)
+// {
+//     toggle_key_entry_t temp;
+
+//     for (uint8_t i = 0; i < MAX_TOGGLE_KEYS; i++) {
+//         eeconfig_read_toggle_entry(i, &temp);
+//         if (temp.valid &&
+//             temp.layer == layer &&
+//             temp.row == row &&
+//             temp.col == col) {
+//             return i;
+//         }
+//     }
+//     return -1;
+// }
+
+// bool toggle_key_remove(uint8_t layer, uint8_t row, uint8_t col)
+// {
+//     int8_t slot = toggle_key_find_by_pos(layer, row, col);
+//     if (slot < 0) return false;
+
+//     eeconfig_clear_toggle_entry(slot);
+//     return true;
+// }
 
 #endif // toggleKey
 
@@ -691,25 +804,6 @@ static inline void on_key_changed(uint8_t row, uint8_t col, bool pressed) {
         socd_post_event(slot, keycode, pressed);
         return;   // ★ SOCD 接管，跳過原本流程
     }
-
-    // if (socd_claims_pos(row, col)) {
-    //     socd_post_event(row, col, pressed);
-    //     return;
-    // }
-	// uint8_t layer = get_highest_layer(layer_state);
-
-	// int8_t slot = socd_find_slot(layer, row, col);
-	// if (slot >= 0) {
-	// 	socd_post_event(slot, row, col, pressed);
-	// 	// continue;
-	// 	return;
-	// }
-	// return;
-
-    // if (socd_claims_pos(row, col)) {
-    //     socd_post_event(row, col, pressed);
-    //     return;
-    // }
 }
 // *********/
 // 放在 matrix.c 檔案頂端「函式外」或其他合適區域
@@ -730,59 +824,12 @@ static inline bool calc_pressed_now(uint8_t row, uint8_t col, int32_t adcCalc) {
         return prev;
     }
 }
-/************** 
-bool now = calc_pressed_now(row, col, adcCalc);
-bool prev = (matrix_temp[row] >> col) & 1;
-
-if (now != prev) {
-    matrix_temp[row] ^= (1 << col);
-
-    uint8_t current_layer = get_highest_layer(layer_state);
-    on_key_changed(current_layer, row, col, now);
-}
-
-static inline void on_key_changed(uint8_t layer, uint8_t row, uint8_t col, bool pressed)
-{
-    for (uint8_t i = 0; i < g_feature_count; i++) {
-
-        switch (g_features[i].type) {
-
-            case FEATURE_SOCD:
-                socd_process(
-                    (socd_cfg_t*)g_features[i].config,
-                    layer, row, col, pressed
-                );
-                break;
-
-            // 之後我們在 Step3 再加：
-            // case FEATURE_MODTAP:
-            // case FEATURE_RAPIDTRIGGER:
-            // case FEATURE_RAPPYSNAPPY:
-        }
-    }
-}
-************/
 #endif // socd
-#ifdef saocd_new
-static inline bool calc_pressed_now(uint8_t row, uint8_t col, int32_t adcCalc) {
+// #define FORCE_HARDCODE_RT_PROFILE // dynamic keystroke
 
-    // 先取「上一輪的狀態」當作中間帶的預設
-    bool prev = ( (matrix_temp[row] >> col) & 0x01 ) != 0;
-
-    if (globleTrigger) {
-        if (adcCalc > (keyMatrixTriggerLevel + draftValue)) return true;   // 觸發
-        if (adcCalc <= keyMatrixReleaseLevel)               return false;  // 釋放
-        return prev;  // 落在中間帶，維持上次狀態
-    } else {
-        // extern int32_t eeconfig_read_Trigger(uint8_t r, uint8_t c);
-        // extern int32_t eeconfig_read_Release(uint8_t r, uint8_t c);
-        if (adcCalc > (eeconfig_read_Trigger(row, col) + draftValue)) return true;
-        if (adcCalc <= eeconfig_read_Release(row, col))               return false;
-        return prev;
-    }
-}
-#endif //socd_new
-#define FORCE_HARDCODE_RT_PROFILE // lyon dynamic keystroke
+bool isMac = false;
+static hsv_t current_hsv;
+extern led_config_t c;
 
 void hook_early_init(void)
 {
@@ -795,10 +842,7 @@ void hook_early_init(void)
 
     i2c_init();
     uart_init();
-	#ifdef socd
-	// socd_init(); // lyon test for socd thread
-	#endif // socd
-	osalThreadSleepMilliseconds(1000); // lyon led delay add in here work
+	osalThreadSleepMilliseconds(1000); // led delay add in here work
     uprintf("\033[2J\033[HiOne M18 Start .....\r\n");
     uprintf("KeyMap Size:%d %X END:%d %X\r\n",KEYMAP_SIZE,KEYMAP_SIZE,EECONFIG_END,EECONFIG_END);
 
@@ -920,14 +964,14 @@ void hook_late_init()
 
 
 
-	uint8_t FACTORY_INIT_MAGIC = 0xF1;
+	uint8_t FACTORY_INIT_MAGIC = 0xF2;
     uint8_t flag = eeprom_read_byte((uint8_t *)EEPROM_FACTORY_INIT_FLAG_ADDR);
 	usb_set_polling_rate(eeprom_read_byte(EECONFIG_POLLING_RATE));
 
     // uprintf("=============factory init flag = %u\n", flag);
 
     if (flag != FACTORY_INIT_MAGIC) {
-		eeprom_write_word(EEPROM_FACTORY_INIT_FLAG_ADDR, 0xF1);
+		eeprom_write_word(EEPROM_FACTORY_INIT_FLAG_ADDR, 0xF2);
 		eeprom_write_word(EECONFIG_KEYMAP_TRIGGER_LEVEL, 0x00C8);
 	    eeprom_write_word(EECONFIG_KEYMAP_RELEASE_LEVEL, 0x0000);
 		// eeprom_write_word(EECONFIG_KEYMAP_TRIGGER_LEVEL, keyMatrixTriggerLevel);
@@ -935,6 +979,8 @@ void hook_late_init()
 		rapidKeyEnable = eeprom_read_byte(RAPID_KEY_ENABLE_ADDR);
 		eeprom_update_byte(KB_COLOR_MODE_ADDR, 8);
 		eeprom_write_word(EECONFIG_POLLING_RATE, 0x00);
+		eeprom_write_word(EECONFIG_MAC_MODE, 0x00);
+		eeconfig_clear_all_toggle_entry();
 		
 	}
 	load_all_rappy_snappy();
@@ -944,6 +990,28 @@ void hook_late_init()
 	} else {
 		isSOCD = false;
 	}
+	isMac = eeprom_read_word(EECONFIG_MAC_MODE);
+
+	void toggle_key_load_from_eeprom(void)//toggle_key_pair_count
+	{
+		for (uint8_t i = 0; i < toggle_key_pair_count; i++) {
+			toggle_key_slot_t tmp;
+			eeconfig_read_toggle_entry(i, &tmp);
+
+			// toggle_key_slot_t toggle_keys[MAX_TOGGLE_KEYS];
+			if(tmp.enabled == 0x01 && tmp.layer <= LAYERS_PER_PROFILE && tmp.row <= MATRIX_ROWS && tmp.col <= MATRIX_COLS){
+				toggle_key_slot_t *tka = &toggle_keys[tmp.layer][tmp.row][tmp.col];
+				tka->enabled = true;
+				tka->state   = false;     // 新設定預設 OFF
+				tka->keycode = tmp.keycode;
+				tka->layer   = tmp.layer;
+				tka->row     = tmp.row;
+				tka->col     = tmp.col;
+				uprintf("load toggle eeprom\r\n");
+			}
+		}
+	}
+	toggle_key_load_from_eeprom();
 }
 
 
@@ -1006,12 +1074,6 @@ static void adcerrorcallback(ADCDriver* adcp, adcerror_t err);
  * ADC streaming callback.
  */
 
-#ifdef ADC_v6
-static void adccallback_v6(ADCDriver* adcp);
-#endif
-#ifdef ADC_v7
-static void adccallback_v7(ADCDriver* adcp);
-#endif
 
 #ifdef ADC_v5
 static const ADCConversionGroup adcgrpcfg2 = {
@@ -1243,9 +1305,6 @@ void irq_storm_gpt9_cb(GPTDriver* gptp)
 					adcsampleIndex = 0;
 					muxSelect(adcsampleIndex);
 					chBSemSignalI(&adcCompleteSem);
-					#ifdef test8_thread
-					chBSemSignalI(&reportSem);
-					#endif
 #ifndef ADC_Oversample
 					gptStartOneShot(&GPTD9, 5);
 #else
@@ -1274,267 +1333,6 @@ void irq_storm_gpt9_cb(GPTDriver* gptp)
 	}
 }
 #endif
-//=====V6R START
-#ifdef ADC_v6E
-// 可調參數 (以 GPT9 .frequency = 80000U → tick = 12.5 µs 為基準)
-#define ADC_SETTLE_TICKS  3   // MUX 切換後等待 ~37.5 µs
-#define ADC_SAMPLE_TICKS  4   // 轉換完成到下一步等 ~50 µs
-
-static const ADCConversionGroup adcgrpcfg2 = {
-    FALSE,                // circular
-    6,                    // 一次轉換 6 個通道
-    adccallback_v6,       // ★ 一定要用 v6 callback
-    adcerrorcallback,     // 錯誤回呼
-
-    0, // CR1
-	// for one row?
-  
-
-
-
-
-		  ADC_CTRL2_OCSWTRG | 7 << 17 | ADC_CTRL2_OCTEN,
-//  	1<<30U,
-	ADC_SPT1_CSPT13(ADC_SAMPLE_CYCLE) |
-	ADC_SPT1_CSPT12(ADC_SAMPLE_CYCLE) | ADC_SPT1_CSPT11(ADC_SAMPLE_CYCLE) |
-	ADC_SPT1_CSPT10(ADC_SAMPLE_CYCLE),
-	ADC_SPT2_CSPT2(ADC_SAMPLE_CYCLE) | ADC_SPT2_CSPT1(ADC_SAMPLE_CYCLE) |
-	ADC_SPT2_CSPT0(ADC_SAMPLE_CYCLE) ,                    /* SMPR2 */
-	ADC_VM_HIGH,              /* HTR */
-	ADC_VM_LOW,               /* LTR */
-	0,                        /* SQR1 */
-	ADC_OSQ2_OSN7_N(ADC_CHANNEL_IN2) ,
-	ADC_OSQ3_OSN6_N(ADC_CHANNEL_IN1) | ADC_OSQ3_OSN5_N(ADC_CHANNEL_IN0) |
-	ADC_OSQ3_OSN4_N(ADC_CHANNEL_IN13) | ADC_OSQ3_OSN3_N(ADC_CHANNEL_IN12) |
-	ADC_OSQ3_OSN2_N(ADC_CHANNEL_IN11) | ADC_OSQ3_OSN1_N(ADC_CHANNEL_IN10)
-};
-
-
-// v6 的 adccallback：只處理 ADC 完成事件，排下一步
-static void adccallback_v6(ADCDriver* adcp)
-{
-	// chBSemSignalI(&adcCompleteSem);
-	// #ifdef test8_thread
-	// chBSemSignalI(&reportSem); 
-	// #endif
-	++adcsampleIndex;
-	adcStauts = adcConvertStart;
-	gptStartOneShot(&GPTD9, ADC_SETTLE_TICKS );
-}
-
-// v6 的主狀態機
-void irq_storm_gpt9_cb(GPTDriver* gptp)
-{
-    (void)gptp;
-    switch (adcStauts) {
-    case adcSensorPowerOn:
-        sensorPowerCtrl(true);
-		adcStauts = adcConvertStart;
-        adcsampleIndex = 0; //original 0
-        // muxSelect(adcsampleIndex);
-        
-
-        gptStartOneShot(&GPTD9, ADC_SETTLE_TICKS);
-        break;
-
-    case adcConvertStart:
-        if (!ledUpdatingLock) {
-            if (adcsampleIndex < 16) {
-				muxSelect(adcsampleIndex);
-				adcStauts = adcConvertWait;
-				gptStartOneShot(&GPTD9, ADC_SETTLE_TICKS + 8);
-                // AdcPortChange(false);
-				// adcStartConversion(&ADCD1, &adcgrpcfg2,
-                //                    &samples2[adcsampleIndex][0], 1); // for test
-
-            } else {
-                // 一輪完成：喚醒 matrixAnalogScan()
-                sensorPowerCtrl(false);
-                adcsampleIndex = 0;
-                muxSelect(adcsampleIndex);
-                chBSemSignalI(&adcCompleteSem);
-				#ifdef test8_thread
-				chBSemSignalI(&reportSem); 
-				#endif
-				adcStauts = adcSensorPowerOn;
-                gptStartOneShot(&GPTD9, ADC_SETTLE_TICKS);
-            }
-        } else {
-            sensorPowerCtrl(false);
-            adcStauts = adcSensorPowerOn;
-            gptStartOneShot(&GPTD9, ADC_SETTLE_TICKS);
-        }
-        break;
-
-    case adcConvertWait:
-		AdcPortChange(false);
-		adcStartConversion(&ADCD1, &adcgrpcfg2,
-							&samples2[adcsampleIndex][0], 1); // for test
-        // sensorPowerCtrl(true);
-        // if (++adcsampleIndex < 16) {
-        //     muxSelect(adcsampleIndex);
-        //     adcStauts = adcConvertStart;
-        //     gptStartOneShot(&GPTD9, ADC_SETTLE_TICKS);
-        // } else {
-        //     // 保險：一輪完成
-
-        //     sensorPowerCtrl(false);
-        //     adcsampleIndex = 0;
-        //     muxSelect(adcsampleIndex);
-        //     chBSemSignalI(&adcCompleteSem);
-		// 	#ifdef test8_thread
-		// 	chBSemSignalI(&reportSem); 
-		// 	#endif
-        //     adcStauts = adcSensorPowerOn;
-        //     gptStartOneShot(&GPTD9,
-        //                     ADC_SETTLE_TICKS + ADC_SAMPLE_TICKS);
-        // }
-        break;
-    }
-}
-// {
-//     (void)gptp;
-
-//     switch (adcStauts) {
-//     case adcSensorPowerOn:
-// 		adcStauts = adcConvertStart;
-// 		adcsampleIndex = 0;
-// 		gptStartOneShot(&GPTD9, ADC_SETTLE_TICKS);
-// 		break;
-//     case adcConvertStart:
-// 	if (!ledUpdatingLock) {
-// 		if (adcsampleIndex < 16) {
-// 			AdcPortChange(true);
-// 			sensorPowerCtrl(false);
-// 			// osalSysPolledDelayX(US2RTC(AT32_SYSCLK, 5)); // add delay
-// 			muxSelect(adcsampleIndex);
-// 			// gptStartOneShot(&GPTD9, ADC_SETTLE_TICKS); // -2 will reach to 8k， (+４ is 5k but stable)
-// 			sensorPowerCtrl(true);
-// 			adcStauts = adcConvertWait;
-// 			gptStartOneShot(&GPTD9, ADC_SETTLE_TICKS+ 8);
-// 			// adcStartConversion(&ADCD1, &adcgrpcfg2,
-// 			// 				   &samples2[adcsampleIndex][0], 1); // for test
-// 		} else {
-// 			sensorPowerCtrl(false);
-// 			// chBSemSignalI(&adcCompleteSem);
-// 			// #ifdef test8_thread
-// 			// chBSemSignalI(&reportSem); 
-// 			// #endif
-// 			adcsampleIndex = 0;
-// 			// adcStauts = adcConvertStart;
-// 			gptStartOneShot(&GPTD9, ADC_SETTLE_TICKS);
-// 		}
-// 	} else {
-// 		sensorPowerCtrl(false);
-// 		adcStauts = adcSensorPowerOn;
-// 		gptStartOneShot(&GPTD9, ADC_SETTLE_TICKS);
-// 	}
-// 	case adcConvertWait:
-// 		AdcPortChange(false);
-// 		adcStartConversion(&ADCD1, &adcgrpcfg2,
-// 						   &samples2[adcsampleIndex][0], 1); // for test
-// 	}
-// }
-#endif
-// ===== /ADC_v6E =================================
-
-#ifdef ADC_v6
-// 可調參數 (以 GPT9 .frequency = 80000U → tick = 12.5 µs 為基準)
-#define ADC_SETTLE_TICKS  3   // MUX 切換後等待 ~37.5 µs
-#define ADC_SAMPLE_TICKS  4   // 轉換完成到下一步等 ~50 µs
-// 掃描 6 路 ADC (PF4, PF5, PA4, PA5, PA6, PA7)
-// 注意：ADC_NUM_CHANNELS 要定義成 6
-static const ADCConversionGroup adcgrpcfg2 = {
-    FALSE,                // circular
-    6,                    // 一次轉換 6 個通道
-    adccallback_v6,       // ★ 一定要用 v6 callback
-    adcerrorcallback,     // 錯誤回呼
-
-    0, // CR1
-	  ADC_CTRL2_OCSWTRG | 7 << 17 | ADC_CTRL2_OCTEN,
-//  	1<<30U,
-	ADC_SPT1_CSPT13(ADC_SAMPLE_CYCLE) |
-	ADC_SPT1_CSPT12(ADC_SAMPLE_CYCLE) | ADC_SPT1_CSPT11(ADC_SAMPLE_CYCLE) |
-	ADC_SPT1_CSPT10(ADC_SAMPLE_CYCLE),
-	ADC_SPT2_CSPT2(ADC_SAMPLE_CYCLE) | ADC_SPT2_CSPT1(ADC_SAMPLE_CYCLE) |
-	ADC_SPT2_CSPT0(ADC_SAMPLE_CYCLE) ,                    /* SMPR2 */
-	ADC_VM_HIGH,              /* HTR */
-	ADC_VM_LOW,               /* LTR */
-	0,                        /* SQR1 */
-	ADC_OSQ2_OSN7_N(ADC_CHANNEL_IN2) ,
-	ADC_OSQ3_OSN6_N(ADC_CHANNEL_IN1) | ADC_OSQ3_OSN5_N(ADC_CHANNEL_IN0) |
-	ADC_OSQ3_OSN4_N(ADC_CHANNEL_IN13) | ADC_OSQ3_OSN3_N(ADC_CHANNEL_IN12) |
-	ADC_OSQ3_OSN2_N(ADC_CHANNEL_IN11) | ADC_OSQ3_OSN1_N(ADC_CHANNEL_IN10)
-};
-
-
-#endif
-
-#ifdef ADC_v6
-static void adccallback_v6(ADCDriver* adcp)
-{
-	chBSemSignalI(&adcCompleteSem);
-	#ifdef test8_thread
-	chBSemSignalI(&reportSem);
-	#endif
-	AdcPortChange(true);
-	sensorPowerCtrl(false);
-	muxSelect(++adcsampleIndex);
-
-	gptStartOneShot(&GPTD9, ADC_SETTLE_TICKS + ADC_SAMPLE_TICKS + 5 + 1 + 1); // lyon 更改這個數值至3看看adc數值是否正常//original is 7 // 9問題改8測試8可以，為什麼13可以，改10吧(為了8k)會有問題
-	// maybe change to higher value give it more time to process ex: 01-9, 02-8,02會有點狀況改成刪除狀態?no
-	// 7 / 60000 秒 ＝ 約 116.7 µs
-	// 8 / 140000sec = 57usec, 7/140000=50
-
-	sensorPowerCtrl(true);
-}
-
-void irq_storm_gpt9_cb(GPTDriver* gptp)
-{
-	switch (adcStauts) {
-		case adcSensorPowerOn:
-			sensorPowerCtrl(true);
-			adcsampleIndex = 0;
-			muxSelect(adcsampleIndex);
-			adcStauts = adcConvertStart;
-			gptStartOneShot(&GPTD9, ADC_SETTLE_TICKS);
-
-		break;
-		case adcConvertStart:
-			if (!ledUpdatingLock){
-				if (adcsampleIndex<16){	
-					AdcPortChange(false);
-					adcStartConversion(&ADCD1, &adcgrpcfg2, &samples2[adcsampleIndex][0], 1);
-				return;
-				} else {
-					sensorPowerCtrl(false);
-					adcsampleIndex = 0;
-					muxSelect(adcsampleIndex);
-					chBSemSignalI(&adcCompleteSem);
-					#ifdef test8_thread
-					chBSemSignalI(&reportSem);
-					#endif
-					gptStartOneShot(&GPTD9, ADC_SETTLE_TICKS + ADC_SAMPLE_TICKS);
-					adcStauts = adcSensorPowerOn;
-
-				}
-			} else {
-				sensorPowerCtrl(false);
-				gptStartOneShot(&GPTD9, ADC_SETTLE_TICKS);  
-				adcStauts = adcConvertWait;
-			}
-
-		break;
-		
-		case adcConvertWait:
-			sensorPowerCtrl(true);
-			gptStartOneShot(&GPTD9, ADC_SETTLE_TICKS);
-			adcStauts = adcConvertStart;
-			break;
-	}
-}
-#endif
-// ===== /ADC_v6 =====
 void adcOffsetGet(bool findMax)
 {
     if (!findMax)
@@ -1900,9 +1698,6 @@ static void adccallback(ADCDriver* adcp)
 {
 	/////////////palClearPad(GPIOC, 12);
 	chBSemSignalI(&adcCompleteSem);
-	#ifdef test8_thread
-	chBSemSignalI(&reportSem);
-	#endif
 	AdcPortChange(true);
 	sensorPowerCtrl(false);
 	muxSelect(++adcsampleIndex);
@@ -2296,7 +2091,7 @@ if (!reset_checked) {
 	int adc_val = samples2[loc.rowA][loc.colA] - initPostionLevel[loc.rowA][loc.colA];
 
     if (adc_val > keyMatrixTriggerLevel) {
-        perform_factory_reset();  // 執行你原本的清除邏輯
+        perform_factory_reset();
     }
 }
 #endif // eepromClear
@@ -2469,58 +2264,14 @@ if (!reset_checked) {
 				// 	keyLocation.rowA, keyLocation.colA, get_highest_layer(layer_state), keycode, pressed);
 
 			#ifdef rappySnappy
-			// ✅ 若此鍵是 Snappy 指定的，跳過掃描觸發處理 //lyon
-			// if (is_skipped_key(keyLocation.rowA, keyLocation.colA) && rappySnappyisOn == true) {continue;}
-
 			// adcCalc 已經算好
-			// adc_value[keyLocation.rowA][keyLocation.colA] = (int16_t)adcCalc;
 			adcPre_value[keyLocation.rowA][keyLocation.colA] = (int16_t)adcPre;
 
-			/**********
-			#define TEST_ROW  2
-			#define TEST_COL  1
-
-			if (keyLocation.rowA == TEST_ROW && keyLocation.colA == TEST_COL) {
-				static int16_t last = -1;
-				if (adcCalc != last) {
-					uprintf("[ADC] r%d c%d adcCalc=%d cache=%d\r\n",
-							TEST_ROW, TEST_COL,
-							adcCalc,
-							adc_value[TEST_ROW][TEST_COL]);
-					last = adcCalc;
-				}
-			***********/
 
 
 			if (rappy_snappy_is_key(keyLocation.rowA, keyLocation.colA)) {
 				continue;
 			}
-
-			// void rappy_process_key(uint8_t row, uint8_t col, int16_t depth)
-			// {
-			// 	for (uint8_t i = 0; i < RAPPY_COUNT; i++)
-			// 	{
-			// 		rappy_key_t *rk = &g_rappy[i];
-
-			// 		if (!rk->enable)
-			// 			continue;
-
-			// 		if (rk->row == row && rk->col == col)
-			// 		{
-			// 			if (depth < 0)
-			// 				depth = 0;
-
-			// 			rappy_process_one(rk, depth);
-			// 			return;
-			// 		}
-			// 	}
-			// }
-
-			// if (rappy_is_bound(keyLocation.rowA, keyLocation.colA))
-			// {
-			// 	uprintf("isBound!!!\n");
-			// 	rappy_process_key(keyLocation.rowA, keyLocation.colA, (int16_t)adcCalc);
-			// }
 			#endif // rappySnappy
 
 			#ifdef rappyTrigger
@@ -2528,14 +2279,6 @@ if (!reset_checked) {
 			#endif // rappyTrigger
 
 			#ifdef socd
-			/********* old one 
-			bool pressed_now = calc_pressed_now(keyLocation.rowA, keyLocation.colA, adcCalc);
-
-			if (socd_claims_pos(keyLocation.rowA, keyLocation.colA) && g_policy != 4) {
-				socd_post_event(keyLocation.rowA, keyLocation.colA, pressed_now);
-				continue;   // ★ 跳過原本邏輯
-			}
-			************/
 
 			bool pressed_now = calc_pressed_now(keyLocation.rowA, keyLocation.colA, adcCalc);
 
@@ -2543,19 +2286,6 @@ if (!reset_checked) {
 			if(isSOCD){
 				void on_key_changed(uint8_t row, uint8_t col, bool pressed);
 			}
-			
-
-			// uint8_t layer = 0;//get_highest_layer(layer_state);
-			// int8_t slot = socd_find_slot(layer, keyLocation.rowA, keyLocation.colA);
-			// if (slot >= 0) {
-			// 	socd_post_event((uint8_t)slot, keyLocation.rowA, keyLocation.colA, pressed_now);
-			// 	continue; // SOCD 接管，跳過原本 register/unregister
-			// }
-
-			/* ② 如果這顆鍵是 SOCD 管的，就不要自己送 keycode */
-			// if (socd_claims_pos(keyLocation.rowA, keyLocation.colA)) {
-			// 	continue;//return;
-			// }
 
 			#endif // socd
 			#ifdef modTap
@@ -2565,28 +2295,6 @@ if (!reset_checked) {
 			// bool prev = mt_prev[R][C];
 			bool prev = mt_prev[keyLocation.rowA][keyLocation.colA];
 
-			// A) P：按下邊緣 → toggle A 的 Mod-Tap；不論按/放，都要更新 prev 並 continue
-			// if (R == P_ROW && C == P_COL) {
-			// 	if (pressed_now && !prev) {                   // 只在「按下瞬間」切換
-			// 		if (mt_active(0, A_ROW, A_COL)) {
-			// 			mt_schedule_set(0, A_ROW, A_COL, 0, 0);                  // 關
-			// 			// uprintf("[MT] toggle -> OFF\n");
-			// 		} else {
-			// 			mt_schedule_set(0, A_ROW, A_COL, 0xE0, 0x04);            // 開：長壓 LCtrl、點按 A
-			// 			// uprintf("[MT] toggle -> ON\n");
-			// 		}
-			// 	}
-			// 	mt_prev[R][C] = pressed_now;                 // ★ 不論 press/release 都更新
-			// 	continue;                                    // ★ 吃掉 P 的事件，避免落回原路徑
-			// }
-
-			// B) A 或任何已被設定為 Mod-Tap 的鍵：用邊緣觸發 mt_on_down/up
-			// if (mt_active(L, R, C)) {
-			// 	if (pressed_now && !prev) mt_on_down(L, R, C);   // 上一輪未按、這輪按下 → down
-			// 	if (!pressed_now && prev) mt_on_up  (L, R, C);   // 上一輪按下、這輪放開 → up
-			// 	mt_prev[R][C] = pressed_now;                     // ★ 自行維護 prev
-			// 	continue;                                        // ★ 跳過原本 matrix_temp 的設/清位
-			// }
 			if (mt_active(L, keyLocation.rowA, keyLocation.colA)) {
 				if (pressed_now && !prev) mt_on_down(L, keyLocation.rowA, keyLocation.colA);   // 上一輪未按、這輪按下 → down
 				if (!pressed_now && prev) mt_on_up  (L, keyLocation.rowA, keyLocation.colA);   // 上一輪按下、這輪放開 → up
@@ -2594,75 +2302,6 @@ if (!reset_checked) {
 				continue;                                        // ★ 跳過原本 matrix_temp 的設/清位
 			}
 			#endif // modTap
-
-			#ifdef saocd_new
-			bool socd_process(uint8_t layer,
-							uint8_t row,
-							uint8_t col,
-							bool *pressed_io)
-			{
-				for (uint8_t i = 0; i < SOCD_MAX_PAIR; i++) {
-
-					socd_pair_t *p = &socd_pairs[i];
-					if (!p->enable) continue;
-					if (p->layer != 0xFF && p->layer != layer) continue;
-
-					bool is_a = (p->a_row == row && p->a_col == col);
-					bool is_b = (p->b_row == row && p->b_col == col);
-					if (!is_a && !is_b) continue;
-
-					// 🔥 使用「本輪」的 A/B 狀態
-					bool A_state = p->a_now;
-					bool B_state = p->b_now;
-
-					// update last pressed
-					if (is_a) p->last_a = *pressed_io;
-					if (is_b) p->last_b = *pressed_io;
-
-					switch (p->mode)
-					{
-						case SOCD_MODE_NEUTRAL:
-							if (A_state && B_state) {
-								*pressed_io = false;
-								return true;
-							}
-							return false;
-
-						case SOCD_MODE_A_WINS:
-							if (A_state && B_state) {
-								if (is_b) *pressed_io = false;
-								return true;
-							}
-							return false;
-
-						case SOCD_MODE_B_WINS:
-							if (A_state && B_state) {
-								if (is_a) *pressed_io = false;
-								return true;
-							}
-							return false;
-
-						case SOCD_MODE_LAST_WINS:
-							if (A_state && B_state) {
-								if (p->last_a && !p->last_b && is_b) *pressed_io = false;
-								if (p->last_b && !p->last_a && is_a) *pressed_io = false;
-								return true;
-							}
-							return false;
-
-						case SOCD_MODE_FIRST_WINS:
-							if (A_state && B_state) {
-								if (p->last_a && !p->last_b && is_a) *pressed_io = false;
-								if (p->last_b && !p->last_a && is_b) *pressed_io = false;
-								return true;
-							}
-							return false;
-					}
-				}
-
-				return false;
-			}
-			#endif // socd_new
 			#ifdef toggleKey
 			// 取得目前 active layer（假設你有 action_layer.h / layer_state）
 			uint8_t act_layer = biton32(layer_state);
@@ -2730,33 +2369,6 @@ if (!reset_checked) {
 			}
 
 			#endif // toggleKey
-			#ifdef saocd_new
-			// uint8_t act_layer = biton32(layer_state);
-			bool pressed = calc_pressed_now(keyLocation.rowA,
-											keyLocation.colA,
-											adcCalc);
-
-			// socd_process(act_layer, keyLocation.rowA, keyLocation.colA, &pressed);
-
-			// // 再把 pressed 寫進 matrix_temp
-			// if (pressed)
-			// 	matrix_temp[keyLocation.rowA] |= (1u << keyLocation.colA);
-			// else
-			// 	matrix_temp[keyLocation.rowA] &= ~(1u << keyLocation.colA);
-
-
-			// 偵測是否為 SOCD 的 A/B key
-			for (uint8_t i = 0; i < SOCD_MAX_PAIR; i++) {
-				if (!socd_pairs[i].enable) continue;
-
-				if (keyLocation.rowA == socd_pairs[i].a_row && keyLocation.colA == socd_pairs[i].a_col)
-					socd_pairs[i].a_now = pressed;
-
-				if (keyLocation.rowA == socd_pairs[i].b_row && keyLocation.colA == socd_pairs[i].b_col)
-					socd_pairs[i].b_now = pressed;
-			}
-
-			#endif //socd_new
 
 
 			// if (rapidKeyStatus == false) // lyon 
@@ -2948,40 +2560,7 @@ if (!reset_checked) {
 
 
 	#ifdef rappySnappy
-	// process_snappy_pair(0, 3, 1, 0, 3, 2); // lyon rappy snappy function
-	// process_snappy_pair(0, snappy_key1.row, snappy_key1.col, 0, snappy_key2.row, snappy_key2.col);
-
 	rappy_snappy_process_all();
-
-	// void rappy_process_all(void) {
-	// 	for (int i=0;i<RAPPY_COUNT;i++){
-	// 		rappy_key_t *rk = &g_rappy[i];
-	// 		if (!rk->enable) continue;
-	// 		int16_t depth = keyMatrixDelta[rk->row][rk->col];
-	// 		rappy_process_one(rk, depth);
-	// 	}
-	// }
-	// void rappy_process_all(uint8_t row, uint8_t col, int16_t depth)
-	// {
-	// 	for (uint8_t i = 0; i < RAPPY_COUNT; i++)
-	// 	{
-	// 		rappy_key_t *rk = &g_rappy[i];
-
-	// 		if (!rk->enable)
-	// 			continue;
-
-	// 		if (rk->row == row && rk->col == col)
-	// 		{
-	// 			if (depth < 0)
-	// 				depth = 0;
-
-	// 			rappy_process_one(rk, depth);
-	// 			return;
-	// 		}
-	// 	}
-	// }
-	// rappy_process_all(); 
-
 	#endif // rappySnappy
 
 	#ifdef rappyTrigger
@@ -2992,23 +2571,12 @@ if (!reset_checked) {
 	}
 	#endif // rappyTrigger
 
-	#ifdef socd
-	// socd_direction(&firstSnap); // before error
-	// static inline void after_matrix_scan(void){
-	// 	socd_tick();
-	// }
-	#endif //socd
-
 	#ifdef modTap
 	mt_tick(0);         // 處理長按超時 → 送/收修飾鍵
 	mt_apply_pending(); //
 	#endif // modTap
 
 
-#ifdef test8_thread
-	rapidKeyActive = rapidKeyStatus;
-#endif
-#ifndef test8_thread
 // uprintf("rapidKeyStatus is %d\r\n", rapidKeyStatus);
 	if (rapidKeyStatus == false){
 		// crcReset(&CRCD1);
@@ -3041,7 +2609,6 @@ if (!reset_checked) {
 	if (gameAnalogStickStatus.raw !=0){
 		chBSemSignal(&gamepadAnalogSem);
 	}
-#endif // test8_thread
 	// if(currentLED_RunMode.type == dynamticLightingMode && !lampArrayDisable){
 	// 	if (rapidKeyStatus == false){
 	// 		// crcReset(&CRCD1);
@@ -3490,9 +3057,6 @@ static THD_FUNCTION(ADC_ProcessThread, arg)
 
     //Init ADC control GPIO
     chBSemObjectInit(&adcCompleteSem, true);
-	#ifdef test8_thread
-	chBSemObjectInit(&reportSem, true);
-	#endif
     //osalMutexObjectInit(&keymatrixProcessMut);
     palSetGroupMode(GPIOC, PAL_PORT_BIT(0) | PAL_PORT_BIT(1) | PAL_PORT_BIT(2) | PAL_PORT_BIT(3), 0, PAL_MODE_INPUT_ANALOG);
     palSetGroupMode(GPIOA, PAL_PORT_BIT(0) | PAL_PORT_BIT(1) | PAL_PORT_BIT(2), 0, PAL_MODE_INPUT_ANALOG);
@@ -3556,42 +3120,15 @@ static THD_FUNCTION(ADC_ProcessThread, arg)
 	// adcsampleIndex = 1;
 	gptStartOneShot(&GPTD9, 100);			//check gpt min 9
 	via_init();
-	LED_init();
+	// LED_init(); //
 	led_ctrl(true);
+    // current_hsv = rgb_to_hsv(c);
 //    currentLED_RunMode.type = offMode;
 #ifdef socd
 	socd_thread_init();  // lyon socd.c file
 	socd_load_all_from_eeprom();
-	// 測試：pair 0 綁 row=4,col=1 和 row=4,col=2
-    // socd_config_pair(
-    //     4,
-    //     true,       // enable
-    //     4, 3,       // A
-    //     4, 4,       // B
-    //     SOCD_PRIORITY_PRIMARY
-    // );
-
-    // uprintf("SOCD test pair loaded\r\n");
 #endif
 
-#ifdef saocd_new
-
-    socd_init();   // ✅ 初始化所有 SOCD pair
-
-    // ✅ 在 pre_init 設定 Pair0：
-    //   Layer 0
-    //   A = R2C1
-    //   B = R3C1
-    //   Mode = Neutral
-    socd_set_pair(
-        0,               // index = Pair0
-        0,               // layer = 0
-        2, 1,            // A = row=2, col=1
-        3, 1,            // B = row=3, col=1
-        SOCD_MODE_NEUTRAL
-    );
-
-#endif //socd_new
 
 
 //	setRunMode(currentLED_RunMode);
@@ -3608,22 +3145,8 @@ static THD_FUNCTION(ADC_ProcessThread, arg)
 	rapidTriggerProcess(true,0);
     gamePad_init();
 
-
-	// 在 LED 相關 thread 啟動之後 // lyon add
-	// if(!lampArrayDisable){
-	// 	// uprintf(">>>>>>>>>>8\r\n");
-	// 	chThdSleepMilliseconds(300);
-    // 	buildNormalModes();
-	// 	// currentLED_RunMode.type = normalMode;
-	// 	currentLED_RunMode.mode = eeprom_read_byte(KB_COLOR_MODE_ADDR);//8;//0;// RED
-	// 	currentLED_RunMode.brightness = 5;
-	// 	currentLED_RunMode.speed = 1;
-	// 	setRunMode(currentLED_RunMode);
-	// }
-	
-
 	#ifdef FORCE_HARDCODE_RT_PROFILE
-	rapidTriggerKey[0].key.enable = 0;
+	rapidTriggerKey[0].key.enable = 1;
 	rapidTriggerKey[0].key.row    = 3;
 	rapidTriggerKey[0].key.col    = 1;
 	rapidTriggerKey[0].key.counts = 5;
@@ -3667,44 +3190,6 @@ static THD_FUNCTION(ADC_ProcessThread, arg)
 
     }
 }
-#ifdef test8_thread
-// static THD_WORKING_AREA(waReportThread, 512);
-static THD_FUNCTION(ReportThread, arg) {
-    (void)arg;
-    chRegSetThreadName("ReportThread");
-
-    while (1) {
-		uprintf("a\r\n");
-		palSetPad(GPIOC, 12);
-		if(currentLED_RunMode.type != dynamticLightingMode){
-			// chThdSleep(TIME_US2I(200)); //
-			chBSemWait(&reportSem);   // 等 ISR 通知
-			palClearPad(GPIOC, 12);
-			// uprintf("a1\r\n");
-			memcpy(matrix, matrix_temp, sizeof(matrix));
-			keyboard_taskTMR();
-			if (rapidKeyActive == false){
-				// chThdSleep(TIME_US2I(300));
-				memcpy(matrix, matrix_temp, sizeof(matrix));
-				keyboard_taskTMR();
-
-			} else if (timer_elapsed32(lastMatrixUpdateTime) > 500){
-				memcpy(matrix, matrix_temp, sizeof(matrix)); // lyon try 
-				keyboard_taskTMR();
-				lastMatrixUpdateTime = timer_read32();
-			}
-			if (gameAnalogStickStatus.raw !=0){
-				chBSemSignal(&gamepadAnalogSem);
-			}
-			
-		} else {
-
-		}
-		// palClearPad(GPIOC, 12);  //
-    }
-}
-
-#endif // test8_thread
 bool rapidTriggerKeyBuilder(uint8_t key){
 
 analogKey_Config_t keyLocation;
@@ -3841,15 +3326,6 @@ void matrix_init(void)//
 	#endif
 
 
-
-//    if (rapidTriggerKeyBuilder(7, 1, 10, 10, keycodes) !=0){
-//    	uprintf ("build Fail #9\r\n");
-//    }
-
-
-    //if (1){
-    //eepromInitCheck = false;
-	//write_keymap_to_eeprom();
     if (!eepromInitCheck){
     	uprintf("Factory Reset start\r\n");
     	write_keymap_to_eeprom();
@@ -3866,11 +3342,8 @@ void matrix_init(void)//
 //    	NVIC_SystemReset();
     }
     chThdCreateStatic(waADC_ProcessThread, sizeof(waADC_ProcessThread), NORMALPRIO - 4, ADC_ProcessThread, NULL);
-    // LED_init();
+    LED_init();
 	knobState = eeprom_read_byte(KB_ENCODER_MODE_ADDR);
-	#ifdef test8_thread
-	chThdCreateStatic(waReportThread, sizeof(waReportThread), NORMALPRIO - 3, ReportThread, NULL);
-	#endif
 
 	// currentLED_RunMode.mode = 8; // original 8 lyon
     // currentLED_RunMode.brightness = 3;//1;	//max 8 original 3
@@ -4268,9 +3741,18 @@ bool hook_matrix_change(keyrecord_t record)
 //    uint8_t code = action.key.code;
 //    uprintf ("action keycode:%X modes:%X kid_id:%X\r\n",code,action.key.mods,action.kind.id);
 
-    if (record.event.pressed && (currentLED_RunMode.mode == 5 || currentLED_RunMode.mode == 7)) {
+    if (record.event.pressed && (currentLED_RunMode.mode == 5 )) { //|| currentLED_RunMode.mode == 7
         reactive_level[record.event.key.row][record.event.key.col] = REACTIVE_MAX;
     }
+
+	if (record.event.pressed && currentLED_RunMode.mode == 7) {
+		// led_config_t ripple_color;
+		// ripple_color.red = 180;
+		// ripple_color.green = 220;
+		// ripple_color.blue = 255;
+		// ripple_add_event(record.event.key.row, record.event.key.col, ripple_color);
+		ripple_add_event(record.event.key.row, record.event.key.col, c);
+	}
 	#ifdef socd
 	if(isSOCD){
 		int8_t slot = socd_find_slot_by_keycode(keycode);
@@ -4345,69 +3827,29 @@ bool hook_matrix_change(keyrecord_t record)
 	// }
 	void plusHue(led_config_t in){
 		hsv = rgb_to_hsv(in);
-		hsv.h += 15;   // 每幀轉動色相
-		mosArt.LED = hsv_to_rgb(hsv);
+		current_hsv.h = (current_hsv.h + 15) % 360;
+    	mosArt.LED = hsv_to_rgb(current_hsv);
 	}
 	void minusHue(led_config_t in){
 		hsv = rgb_to_hsv(in);
-		hsv.h -= 15;   // 每幀轉動色相
-		mosArt.LED = hsv_to_rgb(hsv);
+		current_hsv.h = (current_hsv.h + 345) % 360;
+    	mosArt.LED = hsv_to_rgb(current_hsv);
 	}
 	void plusSat(led_config_t in){
-		hsv = rgb_to_hsv(in);
-		// hsv.s += 5;
-		// hsv.s = clamp_u8_i16((int16_t)hsv.s + 5);
-		if(hsv.s > 225){
-			hsv.s = 255;
-		} else {
-			hsv.s += 16;
-		}
-		uprintf("HSV H is %d, S is %d, V is %d\r\n", hsv.h, hsv.s, hsv.v);
-		// if (hsv.s + 5 < 0)   hsv.s = 0;
-    	// if (hsv.s > 255) hsv.s = 255;
-		mosArt.LED = hsv_to_rgb(hsv);
-		uprintf("**************mosArt R is %d, G is %d, B is %d\r\n", mosArt.LED.red, mosArt.LED.green, mosArt.LED.blue);
+		current_hsv.s = (current_hsv.s > 239) ? 255 : current_hsv.s + 16;
+    	mosArt.LED = hsv_to_rgb(current_hsv);
 	}
 	void minusSat(led_config_t in){
-		hsv = rgb_to_hsv(in);
-		// hsv.s -= 5;
-		// hsv.s = clamp_u8_i16((int16_t)hsv.s - 5);
-		if(hsv.s < 30){
-			hsv.s = 0;
-		} else {
-			hsv.s -= 16;
-		}
-		uprintf("hsv h is %d, s is %d, v is %d\r\n", hsv.h, hsv.s, hsv.v);
-		// if (hsv.s < 0)   hsv.s = 0;
-    	// if (hsv.s > 255) hsv.s = 255;
-		mosArt.LED = hsv_to_rgb(hsv);
-		uprintf("**************mosArt R is %d, G is %d, B is %d\r\n", mosArt.LED.red, mosArt.LED.green, mosArt.LED.blue);
+		current_hsv.s = (current_hsv.s < 16) ? 0 : current_hsv.s - 16;
+    	mosArt.LED = hsv_to_rgb(current_hsv);
 	}
 	void plusBri(led_config_t in){
-		hsv = rgb_to_hsv(in);
-		// hsv.v += 5;
-		// hsv.s = clamp_u8_i16((int16_t)hsv.v + 5);
-		if(hsv.v > 225){
-			hsv.v = 255;
-		} else {
-			hsv.v += 16;
-		}
-		uprintf("hsv h is %d, s is %d, v is %d\r\n", hsv.h, hsv.s, hsv.v);
-		mosArt.LED = hsv_to_rgb(hsv);
-		uprintf("**************mosArt R is %d, G is %d, B is %d\r\n", mosArt.LED.red, mosArt.LED.green, mosArt.LED.blue);
+		current_hsv.v = (current_hsv.v > 239) ? 255 : current_hsv.v + 16;
+    	mosArt.LED = hsv_to_rgb(current_hsv);
 	}
 	void minusBri(led_config_t in){
-		hsv = rgb_to_hsv(in);
-		// hsv.v -= 5;
-		// hsv.s = clamp_u8_i16((int16_t)hsv.v - 5);
-		if(hsv.v < 30){
-			hsv.v = 0;
-		} else {
-			hsv.v -= 16;
-		}
-		uprintf("hsv h is %d, s is %d, v is %d\r\n", hsv.h, hsv.s, hsv.v);
-		mosArt.LED = hsv_to_rgb(hsv);
-		uprintf("**************mosArt R is %d, G is %d, B is %d\r\n", mosArt.LED.red, mosArt.LED.green, mosArt.LED.blue);
+		current_hsv.v = (current_hsv.v < 16) ? 0 : current_hsv.v - 16;
+    	mosArt.LED = hsv_to_rgb(current_hsv);
 	}
 
 		if (record.event.pressed){
@@ -4484,7 +3926,6 @@ bool hook_matrix_change(keyrecord_t record)
 					plusHue(mosArt.LED);
 				break;
 				case KC_LM1:
-					uprintf("LM1\r\n");
 					if(isCtrl){
 						currentLED_RunMode.type = normalMode;
 						currentLED_RunMode.mode = 0x00;
@@ -4493,7 +3934,6 @@ bool hook_matrix_change(keyrecord_t record)
 					}
 				break;
 				case KC_LM2:
-					uprintf("LM2\r\n");
 					if(isCtrl){
 						currentLED_RunMode.type = normalMode;
 						currentLED_RunMode.mode = 0x01;
@@ -4502,7 +3942,6 @@ bool hook_matrix_change(keyrecord_t record)
 					}
 				break;
 				case KC_LM3:
-					uprintf("LM3\r\n");
 					if(isCtrl){
 						currentLED_RunMode.type = normalMode;
 						currentLED_RunMode.mode = 0x02;
@@ -4511,7 +3950,6 @@ bool hook_matrix_change(keyrecord_t record)
 					}
 				break;
 				case KC_LM4:
-					uprintf("LM4\r\n");
 					if(isCtrl){
 						currentLED_RunMode.type = normalMode;
 						currentLED_RunMode.mode = 0x03;
@@ -4520,7 +3958,6 @@ bool hook_matrix_change(keyrecord_t record)
 					}
 				break;
 				case KC_LM5:
-					uprintf("L5\r\n");
 					if(isCtrl){
 						currentLED_RunMode.type = normalMode;
 						currentLED_RunMode.mode = 0x04;
@@ -4529,7 +3966,6 @@ bool hook_matrix_change(keyrecord_t record)
 					}
 				break;
 				case KC_LM6:
-					uprintf("L6\r\n");
 					if(isCtrl){
 						currentLED_RunMode.type = normalMode;
 						currentLED_RunMode.mode = 0x05;
@@ -4538,7 +3974,6 @@ bool hook_matrix_change(keyrecord_t record)
 					}
 				break;
 				case KC_LM7:
-					uprintf("L7\r\n");
 					if(isCtrl){
 						currentLED_RunMode.type = normalMode;
 						currentLED_RunMode.mode = 0x06;
@@ -4547,7 +3982,6 @@ bool hook_matrix_change(keyrecord_t record)
 					}
 				break;
 				case KC_LM8:
-					uprintf("L8\r\n");
 					if(isCtrl){
 						currentLED_RunMode.type = normalMode;
 						currentLED_RunMode.mode = 0x07;
@@ -4556,7 +3990,6 @@ bool hook_matrix_change(keyrecord_t record)
 					}
 				break;
 				case KC_LM9:
-					uprintf("L9\r\n");
 					if(isCtrl){
 						currentLED_RunMode.type = normalMode;
 						currentLED_RunMode.mode = 0x08;
@@ -4578,7 +4011,8 @@ bool hook_matrix_change(keyrecord_t record)
 						g_rappy_pairs[0].lay_b, g_rappy_pairs[0].row_b, g_rappy_pairs[0].col_b);
 				break;
 				case KC_M3:
-					eeconfig_rappy_snappy_clear();
+					// eeconfig_rappy_snappy_clear();
+					toggle_key_dump_eeprom();
 				break;
 				case KC_SOCD_TOGG:
 					if(isSOCD){//IS_SOCD_ON_ADD == 0x01){
@@ -4592,11 +4026,9 @@ bool hook_matrix_change(keyrecord_t record)
 						eeclr_pressed = true;
 						eeclr_fired = false;
 						eeclr_timer = timer_read32();
-						uprintf("[EECLR] pressed\r\n");
 					} else {
 						eeclr_pressed = false;
 						eeclr_fired = false;
-						uprintf("[EECLR] released\r\n");
 					}
 					return false; // 不往下送出一般按鍵
 				break;
@@ -4619,6 +4051,134 @@ bool hook_matrix_change(keyrecord_t record)
 					}
 				uprintf("after, KEYLOCK is %d\r\n", isKEYLOCK);
 				break;
+			// case first key: //F1
+			// 	if (isMac) {
+			// 		if (record->event.pressed) {
+			// 			register_code(KC_BRID);
+			// 		} else {
+			// 			unregister_code(KC_BRID);
+			// 		}
+			// 		return false;
+			// 	}
+			// break;
+			case KC_VOLD: //F2
+				if (isMac) {
+					if (record.event.pressed) {
+						register_code(KC_BRIU);
+					} else {
+						unregister_code(KC_BRIU);
+					}
+					return false;
+				}
+			break;
+			case KC_VOLU: //F3 Open Control Center
+				if (isMac) {
+					if (record.event.pressed) {
+						register_code(KC_LCTL);
+						tap_code(KC_UP);
+						unregister_code(KC_LCTL);
+					} 
+					return false;
+				}
+			break;
+			case KC_MUTE: //F4 Open/Close Launchpad
+				if (isMac) {
+					if (record.event.pressed) {
+						register_code(KC_LCTL);
+						tap_code(KC_F4);
+						unregister_code(KC_LCTL);
+					} 
+					return false;
+				}
+			break;
+			case KC_MSTP: //F5
+				if (isMac) {
+					if (record.event.pressed) {
+						register_code(KC_RGB_VAD);
+					} else {
+						unregister_code(KC_RGB_VAD);
+					}
+					return false;
+				}
+			break;
+			case KC_MEDIA_PREV_TRACK:  //F6
+				if (isMac) {
+					if (record.event.pressed) {
+						register_code(KC_RGB_VAI);
+					} else {
+						unregister_code(KC_RGB_VAI);
+					}
+					return false;
+				}
+			break;
+			case KC_MEDIA_PLAY_PAUSE: //F7
+				if (isMac) {
+					if (record.event.pressed) {
+						register_code(KC_MEDIA_NEXT_TRACK);
+					} else {
+						unregister_code(KC_MEDIA_NEXT_TRACK);
+					}
+					return false;
+				}
+			break;
+			case KC_MEDIA_NEXT_TRACK: //F8
+				if (isMac) {
+					if (record.event.pressed) {
+						register_code(KC_MEDIA_PLAY_PAUSE);
+					} else {
+						unregister_code(KC_MEDIA_PLAY_PAUSE);
+					}
+					return false;
+				}
+			break;
+			case KC_MAIL: //F9
+				if (isMac) {
+					if (record.event.pressed) {
+						register_code(KC_MEDIA_PREV_TRACK);
+					} else {
+						unregister_code(KC_MEDIA_PREV_TRACK);
+					}
+					return false;
+				}
+			break;
+			case KC_WWW_HOME: //F10
+				if (isMac) {
+					if (record.event.pressed) {
+						register_code(KC_MUTE);
+					} else {
+						unregister_code(KC_MUTE);
+					}
+					return false;
+				}
+			break;
+			case KC_CALCULATOR: //F11
+				if (isMac) {
+					if (record.event.pressed) {
+						register_code(KC_VOLD);
+					} else {
+						unregister_code(KC_VOLD);
+					}
+					return false;
+				}
+			break;
+			case KC_WWW_SEARCH: //F12
+				if (isMac) {
+					if (record.event.pressed) {
+						register_code(KC_VOLU);
+					} else {
+						unregister_code(KC_VOLU);
+					}
+					return false;
+				}
+			break;
+			case KC_MAC:
+				isMac = 1;
+				eeprom_write_word(EECONFIG_MAC_MODE, isMac);
+			break;
+			case KC_WINDOW:
+				isMac = 0;
+				eeprom_write_word(EECONFIG_MAC_MODE, isMac);
+			break;
 //			case KC_BRIU:
 //				send_consumer(0x00BD);
 //				break;
@@ -4974,68 +4534,6 @@ void analogKeyMatrixConvert(uint8_t group, uint8_t location, uint8_t level)
     //matrix_print();
 }
 
-// void setKnobState(status, knobState){ // THIS FUNCTION CAN CHANGE THE STATE OF FIRST ENCODER
-// 	switch(knobState){
-// 		case 0: // CHANGE VOLUMN
-// 			switch(status){
-// 				case ENCODER_CLOCKWISE:
-// 					tap_code_delay(KC_VOLU, 10);
-// 				break;
-// 				case ENCODER_COUNTER_CLOCKWISE:
-// 					tap_code_delay(KC_VOLD, 10);
-// 				break;
-// 				case ENCODER_BUTTON:
-// 					keycodeOutput = !keycodeOutput;
-//                 	tap_code(KC_MUTE);
-// 				break;
-// 			}
-// 		break;
-// 		case 1: // CHANGE RGB EFFECT
-// 			switch(status){ 
-// 				case ENCODER_CLOCKWISE:
-// 					currentLED_RunMode.mode++;
-//                 	setRunMode(currentLED_RunMode);
-// 				break;
-// 				case ENCODER_COUNTER_CLOCKWISE:
-// 					currentLED_RunMode.mode--;
-//                 	setRunMode(currentLED_RunMode);
-// 				break;
-// 				case ENCODER_BUTTON:
-// 					// keycodeOutput = !keycodeOutput;
-//                 	// tap_code(KC_MUTE);
-// 				break;
-// 			}
-// 		break;
-// 		case 2: // CHANGE RGB COLOR(TDB) 
-// 			switch(status){
-// 				case ENCODER_CLOCKWISE:
-// 					// tap_code_delay(KC_BRIU, 10);
-// 				break;
-// 				case ENCODER_COUNTER_CLOCKWISE:
-// 					// tap_code_delay(KC_BRID, 10);
-// 				break;
-// 				case ENCODER_BUTTON:
-// 					// keycodeOutput = !keycodeOutput;
-//                 	// tap_code(KC_MUTE);
-// 				break;
-// 			}
-// 		break;
-// 		case 3: // MULTIMEDIA
-// 			switch(status){
-// 				case ENCODER_CLOCKWISE:
-// 					tap_code_delay(KC_MNXT, 10);
-// 				break;
-// 				case ENCODER_COUNTER_CLOCKWISE:
-// 					tap_code_delay(KC_MPRV, 10);
-// 				break;
-// 				case ENCODER_BUTTON:
-// 					keycodeOutput = !keycodeOutput;
-//                 	tap_code(KC_MPLY);
-// 				break;
-// 			}
-// 		break;
-// 	}
-// }
 
 bool encoder_update_kb(uint8_t index, uint8_t status)
 {
@@ -5084,7 +4582,6 @@ bool encoder_update_kb(uint8_t index, uint8_t status)
 
                 case ENCODER_BUTTON:
 					if(knobState == 0){
-						// keycodeOutput = !keycodeOutput; //lyon this is testing code(keycode output will toggle)
                 		tap_code(KC_MUTE);
 					}else if(knobState == 1){
 						// currentLED_RunMode.mode++;
@@ -5107,17 +4604,6 @@ bool encoder_update_kb(uint8_t index, uint8_t status)
             }
             //chThdSleepMilliseconds(25);
             break;
-        // case 1: // try not use this lyon
-        //     if (status)
-        //     {           /* Second encoder */
-        //         tap_code(KC_VOLU);
-        //     }
-        //     else
-        //     {
-        //         tap_code(KC_VOLD);
-        //     }
-        //     break;
-
     }
 
     return true;
@@ -5139,70 +4625,6 @@ void hook_usb_suspend_entry(void)
 }
 
 #ifdef rappySnappy
-// void process_snappy_pair(uint8_t layer1, uint8_t row1, uint8_t col1,
-//                          uint8_t layer2, uint8_t row2, uint8_t col2) {
-
-//     // === 取得對應的 Keycode ===
-//     uint16_t keycode1 = keymaps[layer1][row1][col1];//keymaps[0][1][3];//keymaps[layer1][row1][col1];
-//     uint16_t keycode2 = keymaps[layer2][row2][col2];//keymaps[0][2][3];//keymaps[layer2][row2][col2];
-
-// 	// snappy_key1 = {1, 3};  // 對應 KC_A
-// 	// snappy_key2 = {2, 3};  // 對應 KC_B
-// 	// snappy_key1.col = 1;
-// 	// snappy_key1.row = 3;
-// 	// snappy_key2.col = 2;
-// 	// snappy_key2.row = 3;
-
-// 	// snappy_key1.col = col1;
-// 	// snappy_key1.row = row1;
-// 	// snappy_key2.col = col2;
-// 	// snappy_key2.row = row2;
-
-//     // === 取得 ADC 原始資料
-//     analogKey_Config_t info1 = matrixAnalogRelocate[row1][col1];
-//     analogKey_Config_t info2 = matrixAnalogRelocate[row2][col2];
-
-//     int adc1 = samples2[info1.colA][info1.rowA] - initPostionLevel[info1.colA][info1.rowA];
-//     int adc2 = samples2[info2.colA][info2.rowA] - initPostionLevel[info2.colA][info2.rowA];
-
-//     int travel1 = travelPostionLevel[info1.colA][info1.rowA] - initPostionLevel[info1.colA][info1.rowA];
-//     int travel2 = travelPostionLevel[info2.colA][info2.rowA] - initPostionLevel[info2.colA][info2.rowA];
-
-//     if (travel1 <= 0) travel1 = 1;
-//     if (travel2 <= 0) travel2 = 1;
-
-//     float ratio1 = (float)adc1 / travel1;
-//     float ratio2 = (float)adc2 / travel2;
-
-// 	// uprintf("snappy r1=%.2f r2=%.2f pressed1=%d pressed2=%d\r\n", ratio1, ratio2, travel1, travel2);
-
-//     const float trigger_threshold = 0.10f;
-//     const float full_threshold = 0.80f;
-
-//     bool pressed1 = ratio1 > trigger_threshold;
-//     bool pressed2 = ratio2 > trigger_threshold;
-//     bool full1 = ratio1 > full_threshold;
-//     bool full2 = ratio2 > full_threshold;
-
-//     if (!pressed1 && !pressed2) {
-//         if (snappy1_active) { unregister_code(keycode1); snappy1_active = false; }
-//         if (snappy2_active) { unregister_code(keycode2); snappy2_active = false; }
-//     }
-//     else if (full1 && full2) {
-//         if (!snappy1_active) { register_code(keycode1); snappy1_active = true; }
-//         if (!snappy2_active) { register_code(keycode2); snappy2_active = true; }
-//     }
-//     else if (pressed1 && (!pressed2 || ratio1 >= ratio2)) {
-//         if (!snappy1_active) { register_code(keycode1); snappy1_active = true; }
-//         if (snappy2_active)  { unregister_code(keycode2); snappy2_active = false; }
-//     }
-//     else if (pressed2 && (!pressed1 || ratio2 > ratio1)) {
-//         if (!snappy2_active) { register_code(keycode2); snappy2_active = true; }
-//         if (snappy1_active)  { unregister_code(keycode1); snappy1_active = false; }
-//     }
-
-	
-// }
 #endif // rappySnappy
 
 
@@ -5219,16 +4641,6 @@ bool process_rappy_fixed_ratio(rappy_fixed_ratio_t *rappy) {
     float ratio = (float)(adc - init) / travel;
     if (ratio < 0.0f) ratio = 0.0f;
     if (ratio > 1.0f) ratio = 1.0f;
-
-    // if (!rappy->pressed && ratio >= rappy->trigger_ratio) {
-    //     register_code(rappy->keycode);
-    //     rappy->pressed = true;
-    //     uprintf(">>> Rappy PRESS: %.2f\r\n", ratio);
-    // } else if (rappy->pressed && ratio <= rappy->release_ratio) {
-    //     unregister_code(rappy->keycode);
-    //     rappy->pressed = false;
-    //     // uprintf("<<< Rappy RELEASE: %.2f\r\n", ratio);
-    // }
 	
 	if (!rappy->pressed) {
 		if (ratio >= rappy->trigger_ratio) {
@@ -5249,96 +4661,4 @@ bool process_rappy_fixed_ratio(rappy_fixed_ratio_t *rappy) {
     return true;
 }
 
-/*****
-bool process_rappy_ratio_trend(rappy_ratio_trigger_t *rappy) {
-	analogKey_Config_t info1 = matrixAnalogRelocate[rappy->row][rappy->col];
-
-    int adc1 = samples2[info1.colA][info1.rowA] - initPostionLevel[info1.colA][info1.rowA];
-
-    int travel1 = travelPostionLevel[info1.colA][info1.rowA] - initPostionLevel[info1.colA][info1.rowA];
-
-    if (travel1 <= 0) travel1 = 1;
-
-    float ratio1 = (float)adc1 / travel1;
-
-    const float trigger_threshold = 0.10f;
-    const float full_threshold = 0.80f;
-
-    bool pressed1 = ratio1 > trigger_threshold;
-    bool full1 = ratio1 > full_threshold;
-
-	static float oriState = 0.00f;
-	static float newState = 0.00f;
-
-	if(!pressed1){
-		unregister_code(rappy->keycode); rappy->active = false;
-	}else if(full1){
-		register_code(rappy->keycode); rappy->active = true;
-	}else if(pressed1){ //between 0.8-0.1
-		newState = ratio1;
-		if(oriState < newState){
-			if(rappy->active == true){
-				oriState = newState;
-			}else if(newState - oriState > 0.30f){
-				register_code(rappy->keycode);
-				oriState = newState;
-				rappy->active = true;
-			}
-		} else if(oriState > newState){
-			if(rappy->active == false){
-				oriState = newState;
-			}else if(oriState - newState > 0.30f){
-				unregister_code(rappy->keycode);
-				oriState = newState;
-				rappy->active = false;
-			}
-		}
-		if(newState > full_threshold){newState = full_threshold; }
-		if(oriState > full_threshold){oriState = full_threshold; }
-	}
-}
-*****/
-/************
-#define RISE_TREND_COUNT 3
-#define FALL_TREND_COUNT 2
-
-static uint8_t rise_count = 0;
-static uint8_t fall_count = 0;
-static float last_ratio = 0.0f;
-static bool rappy_active = false;
-
-float ratio = (float)(adc - init) / travel;  // 你的行程比率算法
-
-if (!rappy_active) {
-    if (ratio > last_ratio) {
-        rise_count++;
-        fall_count = 0;
-        if (rise_count >= RISE_TREND_COUNT) {
-            register_code(KC_Q);
-            rappy_active = true;
-            uprintf(">>> Rappy PRESS (%.2f)\n", ratio);
-            rise_count = 0;
-        }
-    } else {
-        rise_count = 0;
-        if (ratio < last_ratio) fall_count++;
-    }
-} else {
-    if (ratio < last_ratio) {
-        fall_count++;
-        rise_count = 0;
-        if (fall_count >= FALL_TREND_COUNT) {
-            unregister_code(KC_Q);
-            rappy_active = false;
-            uprintf("<<< Rappy RELEASE (%.2f)\n", ratio);
-            fall_count = 0;
-        }
-    } else {
-        fall_count = 0;
-        if (ratio > last_ratio) rise_count++;
-    }
-}
-
-last_ratio = ratio;
-***********/
 #endif // rappyTrigger

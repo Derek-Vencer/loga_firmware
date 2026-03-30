@@ -11,6 +11,27 @@ Two new RGB animation
 KEYCODE for RGB
 * FN + CTRL + 6
 * FN + CTRL + 9
+
+USB Polling rate change
+* get usb polling rate(0x0110)
+* set usb polling rate(0x0190)
+
+Command payload
+
+| Offset | Value | Comment |
+|--------|-------|---------|
+| 0      | 0x00  | 8000Hz  |
+|        | 0x01  | 4000Hz  |
+|        | 0x02  | 2000Hz  |
+|        | 0x03  | 1000Hz  |
+
+Acknowledgement payload
+
+| Offset | Value | Comment |
+|--------|-------|---------|
+| 0      | 0x00  | Success |
+|        | 0xff  | Fail    |
+
 ## Bug Fixes
 KEYCODE for RGB
 * FN + CTRL + 1

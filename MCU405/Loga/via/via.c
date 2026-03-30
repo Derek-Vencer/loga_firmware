@@ -354,25 +354,6 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length) {
                 currentLED_RunMode.mode = recive_payload[0];
                 setRunMode(currentLED_RunMode);
                 eeprom_update_byte(KB_COLOR_MODE_ADDR, recive_payload[0]);
-
-                // uint8_t effect = recive_payload[0];
-
-                /*switch(effect){
-                    // case 0x00: // Static
-                    // break;
-                    // case 0x01: // Disco
-                    // break;
-                    // case 0x02: // Wave
-                    // break;
-                    // case 0x03: // Prism
-                    // break;
-                    // case 0x04: // Rainfall
-                    // break;
-
-
-                    currentLED_RunMode.mode = ;
-                    setRunMode(currentLED_RunMode);
-                }*/
             } else {
                 *send_status = ione_api_status_fail;
                 uprintf("Payload should be empty\r\n");
@@ -469,16 +450,6 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length) {
 				uprintf ("Fail\r\n");
 			}
 			*payload_length = 2;
-            /*uprintf("API=>Get knob state:\r\n");
-            if (*payload_length == 0) {
-                *send_status = ione_api_status_success;
-                *send_data = knobState;
-                uprintf("Current knob state: %d\r\n", knobState);
-            } else {
-                *send_status = ione_api_status_fail;
-                uprintf("Fail\r\n");
-            }
-            *payload_length = 2;*/
 		break;
 #ifdef buttonLock
         case ione_api_cmd_set_lock_state:
@@ -659,54 +630,7 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length) {
             // socd_test_eeprom();
         break;
 #endif //socd
-#ifdef socd_void
-		case ione_api_cmd_set_snap_tap_SOCD_Binding:
-            uprintf("API=>Set Snap Tap SOCD Binding:\r\n");
-            if (*payload_length == 8) {             
-                *send_status = ione_api_status_success;
-                recive_payload[0]; // primary layer
-                firstSnap.event1.key.row = recive_payload[1];
-                firstSnap.event1.key.col = recive_payload[2];
-                recive_payload[3]; // secondary layer
-                firstSnap.event2.key.row = recive_payload[4];
-                firstSnap.event2.key.col = recive_payload[5];
-                firstSnap.type =  recive_payload[6];
-                recive_payload[7]; // alternative fully pressed behaviour on/off
-            } else {
-                *send_status = ione_api_status_fail;
-                uprintf("Payload should be 6\r\n");
-            }
-            *payload_length = 1;
-		break;
-		case ione_api_cmd_get_snap_tap_SOCD_Binding:
-            uprintf ("API=>Get Snap Tap SOCD Binding:\r\n");
-			if (*payload_length == 0){
-			*send_status = ione_api_status_success;
-			*send_data = 0xaa; // index
-            send_data++;
-            *send_data = 0xa1; // primary layer
-            send_data++;
-            *send_data = firstSnap.event1.key.row; // primary row
-            send_data++;
-            *send_data = firstSnap.event1.key.col; // primary col
-            send_data++;
-            *send_data = 0xa2; // secondary layer
-            send_data++;
-            *send_data = firstSnap.event2.key.row; // secondary row
-            send_data++;
-            *send_data = firstSnap.event2.key.col; // secondary col
-            send_data++;
-            *send_data = firstSnap.type; // type of SOCD
-            send_data++;
-            *send_data = 0xa3; // alternative fully pressed behaviour on/off
-			} else {
-				*send_status = ione_api_status_fail;
-				uprintf ("Fail\r\n");
-			}
-			*payload_length = 10;
-		break;
-#endif
-		case ione_api_cmd_set_dynamic_keystroke:
+		case ione_api_cmd_set_dynamic_keystroke: //
         uprintf("API=>Set dynamic keystroke:\r\n");
             if (*payload_length == 9) {             
                 *send_status = ione_api_status_success;              
@@ -734,6 +658,18 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length) {
                         // rapidTriggerKey[i].key.keycode[3] == recive_payload[6];  // no.4
                     }
                 }
+                // rapidTriggerKey[0].key.enable = 1;
+                // rapidTriggerKey[0].key.layer  = recive_payload[0];
+                // rapidTriggerKey[0].key.row    = recive_payload[1];
+                // rapidTriggerKey[0].key.col    = recive_payload[2];
+                // rapidTriggerKey[0].key.counts = 4;
+
+                // rapidTriggerKey[0].key.keycode[0] = recive_payload[3];
+                // rapidTriggerKey[0].key.keycode[1] = recive_payload[4];
+                // rapidTriggerKey[0].key.keycode[2] = recive_payload[5];
+                // rapidTriggerKey[0].key.keycode[3] = recive_payload[6];
+                // rapidTriggerKey[0].key.keycode[4] = KC_5;
+                // rapidTriggerKey[0].key.keycode[5] = KC_NO;
 
             } else {
                 *send_status = ione_api_status_fail;
@@ -786,7 +722,7 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length) {
             *payload_length = payload_length_count;
 		break;
 #ifdef toggleKey
-		case ione_api_cmd_set_toggle_key: //
+		case ione_api_cmd_set_toggle_key:
             uprintf("API=>Set Toggle Key:\r\n");
             // payload: [0]=layer, [1]=row, [2]=col, [3]=keycode
             if (*payload_length == 4 &&
@@ -814,32 +750,35 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length) {
 		break;
 		case ione_api_cmd_get_toggle_key:
             uprintf("API=>Get Toggle Key:\r\n");
-            // request payload: [0]=layer, [1]=row, [2]=col
-            if (*payload_length == 3 &&
-                recive_payload[0] < KEYMAPS_COUNT &&
-                recive_payload[1] < MATRIX_ROWS &&
-                recive_payload[2] < MATRIX_COLS) {
+            for(uint8_t layerNum = 0; layerNum < KEYMAPS_COUNT; layerNum++){
+                uprintf("=== layer number is %d ===\r\n",layerNum);
+                for(uint8_t rowNum = 0; rowNum < MATRIX_ROWS; rowNum++){
+                    for(uint8_t colNum = 0; colNum < MATRIX_COLS; colNum++){
+                        // toggle_key_slot_t *tk = &toggle_keys[layerNum][rowNum][colNum];
+                        if(toggle_key_get(layerNum, rowNum, colNum) != 0x00){
+                            *(data_start + 3) |= 0x80;
+                            w = send_data;
+                            *send_status = ione_api_status_sending;
 
-                uint8_t layer = recive_payload[0];
-                uint8_t row   = recive_payload[1];
-                uint8_t col   = recive_payload[2];
+                            uint8_t key_code = toggle_key_get(layerNum, rowNum, colNum);// keycode & 0xFF;
 
-                uint8_t keycode = toggle_key_get(layer, row, col);
+                            uprintf("(%d,%d), keycode is %u\r\n",rowNum,colNum, key_code);
 
-                *send_status = ione_api_status_success;
-                *payload_length = 4;
+                            *w = layerNum;      // Layer
+                            w++;
+                            *w = rowNum;        // Row
+                            w++;
+                            *w = colNum;        // Column
+                            w++;
+                            *w = key_code;   // Key Code
+                            w++;
 
-                *send_data++ = layer;
-                *send_data++ = row;
-                *send_data++ = col;
-                *send_data++ = keycode;
-
-                uprintf("  L:%u R:%u C:%u KC:0x%02X\r\n",
-                        layer, row, col, keycode);
-            } else {
-                *send_status    = ione_api_status_fail;
-                *payload_length = 1;
-                uprintf("  Fail (len=%u)\r\n", *payload_length);
+                            *payload_length = (uint8_t)(1 + (w - send_data));  // 1 = status
+                            raw_hid_send(data_start, EP);
+                            payload_length_count+=4;   
+                        }
+                    }
+                }
             }
 		break;
 #endif // toggleKey
@@ -891,61 +830,6 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length) {
             }
             *payload_length = payload_length_count;
             break;
-        #ifdef modTap_test
-        {
-            if (*payload_length == 0) {
-            const size_t EP = LAMP_ARRAY_EPSIZE;   // 32 或 64，依你的端點大小
-            uint8_t *w;                            // 寫入指標（每包都重設）
-            // 把這個 Command 標記為「回覆」
-            *(data_start + 3) |= 0x80;             // CMD_H |= 0x80
-
-            /* -------- 第 1 包 -------- */
-            w = send_data;                         // payload+1（status 後面）
-            *send_status = ione_api_status_sending;
-            *w++ = 0x01;   // index
-            *w++ = 0x02;   // primary layer
-            *w++ = 0x03;   // primary row
-            *w++ = 0x04;   // primary col
-            *w++ = 0x05;   // secondary layer
-            *w++ = 0x06;   // secondary row
-            *w++ = 0x08;   // secondary col
-            *w++ = 0x09;   // type of SOCD
-            *w++ = 0x0A;   // alt fully pressed on/off
-            *payload_length = (uint8_t)(1 + (w - send_data));  // 1 = status
-            raw_hid_send(data_start, EP);          // ← 傳整包（從 header 起）
-
-            /* -------- 第 2 包 -------- */
-            w = send_data;                         // 重設回 payload 起點+1
-            *send_status = ione_api_status_sending;
-            *w++ = 0xA1;  // index
-            *w++ = 0xA2;  // primary layer
-            *w++ = 0xA3;  // primary row
-            *w++ = 0xA4;  // primary col
-            *w++ = 0xA5;  // secondary layer
-            *w++ = 0xA6;  // secondary row
-            *w++ = 0xA7;  // secondary col
-            *w++ = 0xA8;  // type of SOCD
-            *w++ = 0xA9;  // alt fully pressed on/off
-            *payload_length = (uint8_t)(1 + (w - send_data));
-            raw_hid_send(data_start, EP);
-
-            w = send_data;
-            *send_status = ione_api_status_success;
-            *w++ = 0xB1;  // index
-            *w++ = 0xB2;  // primary layer
-            *w++ = 0xB3;  // primary row
-            *w++ = 0xB4;  // primary col
-            *w++ = 0xB5;  // secondary layer
-            *w++ = 0xB6;  // secondary row
-            *w++ = 0xB7;  // secondary col
-            *w++ = 0xB8;  // type of SOCD
-            *w++ = 0xB9;  // alt fully pressed on/off
-            *payload_length = (uint8_t)(1 + (w - send_data));
-
-            break;
-        }
-        break;}
-        #endif
 #endif // modTap
 #ifdef rappySnappy //
         case ione_api_cmd_set_rappy_snappy:
@@ -1079,6 +963,7 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length) {
                 eeconfig_socd_clear();
                 eeconfig_rappy_snappy_clear();
                 eeconfig_modtap_clear();
+                eeconfig_clear_all_toggle_entry();
 				currentLED_RunMode.mode = 8;
 				currentLED_RunMode.type = offMode;
 				setRunMode(currentLED_RunMode);
@@ -1175,6 +1060,86 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length) {
         // break;
         // case ione_api_cmd_factory_reset_and_system_reset:
         // break;
+        case ione_api_cmd_set_lighting_value:
+            uprintf("API=>Set Lighting Value:\r\n");
+            
+            if (*payload_length == 4 && (recive_payload[0] < 5)) {
+                *send_status = ione_api_status_success;
+                switch(recive_payload[0]){
+                    case 1:
+                        uprintf("API=>Bright:\r\n");
+                        // currentLED_RunMode.brightness = recive_payload[1]; // 1-9
+                        // setRunMode(currentLED_RunMode);
+                        // LED_SpeedChange(recive_payload[1], currentLED_RunMode.speed);
+                        currentLED_RunMode.brightness = recive_payload[1];
+                        // normalBrightness = currentLED_RunMode.brightness;   // 如果你現在是 normalMode
+                        LED_SpeedChange(currentLED_RunMode.brightness, currentLED_RunMode.speed);
+                        setRunMode(currentLED_RunMode);
+                    break;
+                    case 2:
+                        uprintf("API=>Effect:\r\n");
+                        currentLED_RunMode.mode = recive_payload[1];
+                        setRunMode(currentLED_RunMode);
+                        eeprom_update_byte(KB_COLOR_MODE_ADDR, recive_payload[1]);
+                    break;
+                    case 3:
+                        uprintf("API=>Speed:\r\n");
+                        currentLED_RunMode.speed = recive_payload[1]; // 0-4?
+                        setRunMode(currentLED_RunMode);
+                    break;
+                    case 4:
+                        uprintf("API=>Color:\r\n");
+                        mosArt.LED.red = recive_payload[1];
+                        mosArt.LED.green = recive_payload[2];
+                        mosArt.LED.blue = recive_payload[3];
+
+                        eeprom_update_byte(KB_COLOR_RED_ADDR, recive_payload[1]);
+                        eeprom_update_byte(KB_COLOR_GREEN_ADDR, recive_payload[2]);
+                        eeprom_update_byte(KB_COLOR_BLUE_ADDR, recive_payload[3]);
+
+                        effectStatus.effect = EffectTypeMosArt;
+                        effectStatus.mode = mosArtStatic;
+                        chBSemSignal(&ledEffetSem);  // 通知 LED_EffectThread 執行
+                    break;
+                } 
+            } else {
+                *send_status = ione_api_status_fail;
+                uprintf("Payload should be empty\r\n");
+            }
+            *payload_length = 1;
+        break;
+        case ione_api_cmd_get_lighting_value:
+            uprintf("API=>Get Lighting Value:\r\n");
+            if (*payload_length == 1 && (recive_payload[0] < 5)) {
+                *send_status = ione_api_status_success;
+                switch(recive_payload[0]){
+                    case 1:
+                        uprintf("API=>Bright:\r\n");
+                        *send_data = currentLED_RunMode.brightness;
+                    break;
+                    case 2:
+                        uprintf("API=>Effect:\r\n");
+                        *send_data = eeprom_read_byte(KB_COLOR_MODE_ADDR);//currentLED_RunMode.mode;
+                    break;
+                    case 3:
+                        uprintf("API=>Speed:\r\n");
+                        *send_data = currentLED_RunMode.speed;
+                    break;
+                    case 4:
+                        uprintf("API=>Color:\r\n");
+                        *send_data = eeprom_read_byte(KB_COLOR_RED_ADDR);//LED_Datas[0].red;
+                        send_data++;
+                        *send_data = eeprom_read_byte(KB_COLOR_GREEN_ADDR);//LED_Datas[0].green;
+                        send_data++;
+                        *send_data = eeprom_read_byte(KB_COLOR_BLUE_ADDR);//LED_Datas[0].blue;
+                    break;
+                } 
+            } else {
+                *send_status = ione_api_status_fail;
+                uprintf("Fail\r\n");
+            }
+            *payload_length = 4;
+        break;
 		// case ione_api_cmd_set_test_mode:
 		// break;
 

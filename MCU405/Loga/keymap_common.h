@@ -53,6 +53,8 @@ enum custom_keycodes{
     KC_M2,
     KC_M3,
     KC_EECLR,
+    KC_MAC,
+    KC_WINDOW,
 };
 
 #ifdef  KEYMAP_IN_EEPROM_ENABLE

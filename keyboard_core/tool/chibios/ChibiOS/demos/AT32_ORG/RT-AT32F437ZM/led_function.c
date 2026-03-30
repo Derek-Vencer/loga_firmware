@@ -11,7 +11,7 @@
 #define LED_SPI_Port					SPID1
 
 
-led_config_t LED_Datas[LedNumbers];
+led_config_t LED_Datas[LedNumbers]; //
 
 
 virtual_timer_t randColor_vt;

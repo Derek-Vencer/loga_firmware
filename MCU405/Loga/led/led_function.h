@@ -147,6 +147,7 @@ enum effectTypes{
 	EffectTypeWheel,
 	EffectTypeReactive,
 	EffectTypeStarlight,
+	EffectTypeRipple,
 	EffectTypeOff,
 };
 
