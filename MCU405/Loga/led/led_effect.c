@@ -55,24 +55,40 @@ static led_config_t starlight_pick_color(void)
 
     switch (r) {
         default:
-        case 0: // 暖白
-            c.red = 255; c.green = 220; c.blue = 180;
+        case 0: // 暖黃星
+            c.red = 255; c.green = 210; c.blue = 120;
             break;
-        case 1: // 中性白
-            c.red = 255; c.green = 245; c.blue = 230;
+        case 1: // 暖白星
+            c.red = 255; c.green = 235; c.blue = 190;
             break;
-        case 2: // 冷白
-            c.red = 220; c.green = 235; c.blue = 255;
+        case 2: // 純白星
+            c.red = 255; c.green = 255; c.blue = 255;
             break;
-        case 3: // 淡藍白
-            c.red = 190; c.green = 215; c.blue = 255;
+        case 3: // 冷白星
+            c.red = 200; c.green = 230; c.blue = 255;
             break;
-        case 4: // 微暖星光
-            c.red = 255; c.green = 235; c.blue = 210;
+        case 4: // 淡藍星
+            c.red = 150; c.green = 200; c.blue = 255;
+            //c.red = 120; c.green = 180; c.blue = 255;
             break;
-        case 5: // 偏冷星光
-            c.red = 210; c.green = 225; c.blue = 255;
-            break;
+        // case 0: // 暖白
+        //     c.red = 255; c.green = 220; c.blue = 180;
+        //     break;
+        // case 1: // 中性白
+        //     c.red = 255; c.green = 245; c.blue = 230;
+        //     break;
+        // case 2: // 冷白
+        //     c.red = 220; c.green = 235; c.blue = 255;
+        //     break;
+        // case 3: // 淡藍白
+        //     c.red = 190; c.green = 215; c.blue = 255;
+        //     break;
+        // case 4: // 微暖星光
+        //     c.red = 255; c.green = 235; c.blue = 210;
+        //     break;
+        // case 5: // 偏冷星光
+        //     c.red = 210; c.green = 225; c.blue = 255;
+        //     break;
     }
 
     return c;
@@ -320,11 +336,11 @@ void LED_SpeedChange(int8_t brightness, uint8_t speed){
 //					randColor.brightness = brightness;
 					break;
 		        case EffectTypeMosArt:
-//					mosArt.Brightness = brightness;
+					mosArt.Brightness = brightness;
 //					effectStatus.speed = 33;
 		        	break;
 		        case EffectTypeRainbowFlow:
-//	                ranbowFlow.Brightness = brightness;
+	                ranbowFlow.Brightness = brightness;
 //	                effectStatus.speed = speed * (ledUpdateInterval);
 		        	break;
 		        case EffectTypeKeytest:
@@ -463,46 +479,41 @@ bool LED_Effect(uint8_t effect, bool enable, uint32_t interval, uint8_t colorMod
                 chVTSet(&randColor_vt, TIME_MS2I(effectStatus.speed), (vtfunc_t)led_cb, NULL);
             }
             break;
-        // case EffectTypeStarlight:
-        //     if (enable)
-        //     {
-        //         if (speed > 5 || (brightness < 1 || brightness > 10)) {
-        //             return false;
-        //         }
+        case EffectTypeStarlight:
+            if (enable)
+            {
+                if (speed > 5 || (brightness < 1 || brightness > 10)) {
+                    return false;
+                }
 
-        //         starlight.enable = true;
+                starlight.enable = true;
 
-        //         /* 密一點 */
-        //         starlight.density = 8 + speed;   // speed 越高，每幀越多顆新星
-        //         starlight.base_dim = 0;
+                starlight.density = 8 + speed;   // 12 + speed * 2;
+                starlight.base_dim = 0;
 
-        //         starlight_reset_all();
+                starlight_reset_all();
 
-        //         effectStatus.speed = 35;   // 固定更新節奏，避免太慢或太快
-        //         chVTSet(&randColor_vt, TIME_MS2I(effectStatus.speed), (vtfunc_t)led_cb, NULL);
-        //     }
-        //     else
-        //     {
-        //         starlight.enable = false;
-        //     }
-        //     break;
-        // case EffectTypeWheel:
-        //     // effectStatus.speed = speed * ledUpdateInterval;
-        //     // mosArt.TimerBase = 0;
-        //     // chVTSet(&randColor_vt, TIME_MS2I(effectStatus.speed), (vtfunc_t)led_cb, NULL);
-        //     if (enable){
-        //         if (speed > 5 || (brightness < 1 || brightness > 10)){
-        //             return false;
-        //         }
+                effectStatus.speed = 35;
+                chVTSet(&randColor_vt, TIME_MS2I(effectStatus.speed), (vtfunc_t)led_cb, NULL);
+            }
+            else
+            {
+                starlight.enable = false;
+            }
+            break;
+        case EffectTypeRipple:
+            if (enable)
+            {
+                if (speed > 5 || (brightness < 1 || brightness > 10)) {
+                    return false;
+                }
 
-        //         effectStatus.speed = speed * ledUpdateInterval;
-        //         chVTSet(&randColor_vt, TIME_MS2I(effectStatus.speed), (vtfunc_t)led_cb, NULL);
-        //     }
-        //     break;
-        // case EffectTypeReactive:
-        //     effectStatus.speed = speed * ledUpdateInterval;
-        //     chVTSet(&randColor_vt, TIME_MS2I(effectStatus.speed), (vtfunc_t)led_cb, NULL);
-        //     break;
+                ripple_clear_events();
+
+                effectStatus.speed = speed * ledUpdateInterval;
+                chVTSet(&randColor_vt, TIME_MS2I(effectStatus.speed), (vtfunc_t)led_cb, NULL);
+            }
+            break;
         case EffectTypeOff:
             if (randColor.enable)
             {
@@ -510,7 +521,12 @@ bool LED_Effect(uint8_t effect, bool enable, uint32_t interval, uint8_t colorMod
                 randColor.ranbowIndex++;
                 chVTReset(&randColor_vt);
             }
-            ledAllOff(true);
+            // ledAllOff(true);
+            led_config_t bg;
+            bg.red = 0;
+            bg.green = 0;
+            bg.blue = 2;
+            led_updateFrameBufferSingle(0, LedNumbers, &bg);
             effectStatus.effect = EffectIdle;
             return true;
             break;
@@ -849,77 +865,6 @@ bool EffectTypeWheelProcess(void)
 
     chBSemSignal(&ledUpdateSem);
     return true;
-    // /* 依你目前鍵盤實際 row LED 數量 */
-    // static const uint8_t wheel_row_lengths[LED_MATRIX_ROWS] = {26, 16, 17, 17, 16, 15, 12};
-
-    // /*
-    //  * 這裡用「置中後的 row offset」模擬鍵盤幾何位置
-    //  * 假設每顆 key 的水平間距為 16，短列往中間靠
-    //  */
-    // const float pitch_x = 16.0f;
-    // const float pitch_y = 16.0f;
-
-    // float row_offset[LED_MATRIX_ROWS];
-    // float center_x;
-    // float center_y;
-
-    // static uint8_t wheel_offset = 0;   // 旋轉偏移，持續累加 = 逆時針
-    // uint8_t row, column;
-
-    // if (effectStatus.interval != 0 &&
-    //     (get_system_time_ticks() - effectStatus.timeStamp > effectStatus.interval)) {
-    //     chVTReset(&randColor_vt);
-    //     ledAllOff(false);
-    //     effectStatus.effect = EffectIdle;
-
-    //     if (effectStatus.runMode == demoMode) {
-    //         chBSemSignal(&ledRunmodeSem);
-    //     }
-    //     return false;
-    // }
-
-    // /* 讓每一列依最長列置中 */
-    // for (row = 0; row < LED_MATRIX_ROWS; row++) {
-    //     row_offset[row] = ((26.0f - wheel_row_lengths[row]) * pitch_x) * 0.5f;
-    // }
-
-    // /* 幾何中心：以最長列寬度與總列高為基準 */
-    // center_x = ((26.0f - 1.0f) * pitch_x) * 0.5f;
-    // center_y = ((LED_MATRIX_ROWS - 1.0f) * pitch_y) * 0.5f;
-
-    // for (row = 0; row < LED_MATRIX_ROWS; row++) {
-    //     for (column = 0; column < wheel_row_lengths[row]; column++) {
-    //         float x = row_offset[row] + (column * pitch_x);
-    //         float y = row * pitch_y;
-
-    //         float dx = x - center_x;
-    //         float dy = y - center_y;
-
-    //         /* atan2 -> -pi ~ pi */
-    //         float angle = atan2f(dy, dx);
-
-    //         /* 轉成 0~255 hue */
-    //         float norm = (angle + (float)M_PI) / (2.0f * (float)M_PI);
-    //         uint8_t base_hue = (uint8_t)(norm * 255.0f);
-
-    //         /*
-    //          * 逆時針旋轉：
-    //          * 如果你實機看起來變順時針，把 +wheel_offset 改成 -wheel_offset
-    //          */
-    //         uint8_t hue = base_hue + wheel_offset;
-
-    //         led_config_t color = wheel_hue_to_rgb(hue);
-    //         color = wheel_apply_brightness(color, effectStatus.brightness);
-
-    //         setRemapLED(row, column, color);
-    //     }
-    // }
-
-    // /* speed 越大，轉越快 */
-    // wheel_offset = (effectStatus.speed);// / 20); //
-
-    // chBSemSignal(&ledUpdateSem);
-    // return true;
 }
 
 bool EffectTypeReactiveProcess(void)
@@ -954,7 +899,82 @@ bool EffectTypeReactiveProcess(void)
     return true;
 }
 
+bool EffectTypeStarlightProcess(void)
+{
+    uint16_t i;
+    uint8_t spawn_count;
 
+    if (!starlight.enable) {
+        chVTReset(&randColor_vt);
+        ledAllOff(false);
+        effectStatus.effect = EffectIdle;
+        return false;
+    }
+
+    if (effectStatus.interval != 0 &&
+        (get_system_time_ticks() - effectStatus.timeStamp > effectStatus.interval)) {
+        chVTReset(&randColor_vt);
+        starlight.enable = false;
+        ledAllOff(false);
+        effectStatus.effect = EffectIdle;
+
+        if (effectStatus.runMode == demoMode) {
+            chBSemSignal(&ledRunmodeSem);
+        }
+        return false;
+    }
+
+    /* 先清空整體畫面 */
+    ledAllOff(false);
+
+    /* 每幀生成更多星星，密度高一點 */
+    spawn_count = starlight.density;
+
+    for (i = 0; i < spawn_count; i++) {
+        uint16_t idx = starlight_rand() % LedNumbers;
+
+        if (!starlight_leds[idx].active) {
+            starlight_leds[idx].active = 1;
+            starlight_leds[idx].phase = starlight_rand8();
+            starlight_leds[idx].speed = 8 + (starlight_rand8() % 18);  // 8~25
+            starlight_leds[idx].color = starlight_pick_color();
+        }
+    }
+
+    /* 更新所有星星 */
+    for (i = 0; i < LedNumbers; i++) {
+        if (starlight_leds[i].active) {
+            uint8_t bright;
+            led_config_t c;
+
+            bright = starlight_triangle_wave(starlight_leds[i].phase);
+
+            /* 讓星星整體不要太刺眼，但仍明顯 */
+            bright = (uint8_t)(((uint16_t)bright * (120 + effectStatus.brightness * 12)) / 255);
+            if (bright > 180) {
+                bright = 180;
+            }
+
+            c = starlight_scale_color(starlight_leds[i].color, bright);
+            LED_Datas[i] = c;
+
+            starlight_leds[i].phase += starlight_leds[i].speed;
+
+            /* 閃完就消失，之後重新隨機生成 */
+            if (starlight_leds[i].phase >= 250 || starlight_leds[i].phase <= starlight_leds[i].speed) {
+                if ((starlight_rand8() & 0x03) == 0) {
+                    starlight_leds[i].active = 0;
+                    LED_Datas[i].red = 0;
+                    LED_Datas[i].green = 0;
+                    LED_Datas[i].blue = 0;
+                }
+            }
+        }
+    }
+
+    chBSemSignal(&ledUpdateSem);
+    return true;
+}
 //Mos Art effect
 void Calculate_Colorful_Color(uint8_t speed, uint32_t timebase, led_config_t* LED)
 {
@@ -1197,8 +1217,8 @@ void buildNormalModes(void){
 
 	LED_ModesBuilder(addPresetEffect , false,EffectTypeMosArt, true, 5000, single, mosArtWave,  c, normalBrightness, normalSpeed, 0);
 	LED_ModesBuilder(addPresetEffect , false,EffectTypeReactive,true,5000, single, mosArtStatic, rainbowColor[white], normalBrightness, normalSpeed, 0); //5
-    LED_ModesBuilder(addPresetEffect , false, EffectTypeWheel, true, 5000, single, mosArtStatic, rainbowColor[orange], normalBrightness, normalSpeed, 0);
-	LED_ModesBuilder(addPresetEffect , false,EffectTypeMosArt, true, 5000, single, mosArtStatic,  rainbowColor[violet], normalBrightness, normalSpeed, 0);
+    LED_ModesBuilder(addPresetEffect , false, EffectTypeStarlight, true, 5000, single, mosArtStatic, rainbowColor[orange], normalBrightness, normalSpeed, 0); //6
+	LED_ModesBuilder(addPresetEffect , false, EffectTypeRipple, true, 5000, single, mosArtStatic,  rainbowColor[violet], normalBrightness, normalSpeed, 0);
     LED_ModesBuilder(addPresetEffect , false, EffectTypeWheel, true, 5000, single, mosArtStatic, rainbowColor[orange], normalBrightness, normalSpeed, 0); //8
 	LED_ModesBuilder(addPresetEffect , false,EffectTypeRainbowFlow, true, 5000, 0, 0,  LED_NULL, normalBrightness, normalSpeed, false);
 	LED_ModesBuilder(addPresetEffect , false,EffectTypeRainbowFlow, true, 5000, 0, 0,  LED_NULL, normalBrightness, normalSpeed, true);
