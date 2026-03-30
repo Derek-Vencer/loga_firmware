@@ -28,5 +28,5 @@ Set payload
 |        |            | 0x04(Slowest) |
 
 ## Bug Fixes
-
+set color
 ## Known Issue
