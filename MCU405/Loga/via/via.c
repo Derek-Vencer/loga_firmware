@@ -642,20 +642,31 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length) {
                 // uprintf("triggerlevel: %d\r\n", keyMatrixTriggerLevel); 
                 // uprintf("ReleaseLevel: %d\r\n", keyMatrixReleaseLevel); 
 
-                for (uint8_t i=0;i<RAPID_TRIGGER_COUNT;i++){ //logic have some issue
+                for (uint8_t i=0;i<RAPID_TRIGGER_COUNT;i++){ //logic have some issue //
                     if(rapidTriggerKey[i].key.row == recive_payload[1] && rapidTriggerKey[i].key.col == recive_payload[2]){
-                        rapidTriggerKey[i].key.keycode[0] == recive_payload[3];   // no.1
-                        rapidTriggerKey[i].key.keycode[1] == recive_payload[4];  // no.2
-                        rapidTriggerKey[i].key.keycode[2] == recive_payload[5];  // no.3
-                        rapidTriggerKey[i].key.keycode[3] == recive_payload[6];  // no.4
-                    } else {
+                        rapidTriggerKey[i].key.enable = 0x01 ; 
+                        rapidTriggerKey[i].key.counts = 0x04 ; 
+                        rapidTriggerKey[i].key.keycode[0] = recive_payload[3];   // no.1
+                        rapidTriggerKey[i].key.keycode[1] = recive_payload[4];  // no.2
+                        rapidTriggerKey[i].key.keycode[2] = recive_payload[5];  // no.3
+                        rapidTriggerKey[i].key.keycode[3] = recive_payload[6];  // no.4
+                        eeconfig_write_rapidTrigger(i, rapidTriggerKey[i].key);
+                        rapidTriggerProcess(true, i);
+                        break;
+                    } else if (rapidTriggerKey[i].key.enable != 0x01){
                         // *w++ = 0xaa;// = mt_map[i].L;      // layer
-                        // rapidTriggerKey[i].key.row == recive_payload[1];      // row
-                        // rapidTriggerKey[i].key.col == recive_payload[2];      // col
-                        // rapidTriggerKey[i].key.keycode[0] == recive_payload[3];   // no.1
-                        // rapidTriggerKey[i].key.keycode[1] == recive_payload[4];  // no.2
-                        // rapidTriggerKey[i].key.keycode[2] == recive_payload[5];  // no.3
-                        // rapidTriggerKey[i].key.keycode[3] == recive_payload[6];  // no.4
+                        // rapidTriggerKey[i].key.layer == recive_payload[0];      // layer
+                        rapidTriggerKey[i].key.enable = 0x01 ; 
+                        rapidTriggerKey[i].key.counts = 0x04 ; 
+                        rapidTriggerKey[i].key.row = recive_payload[1];      // row
+                        rapidTriggerKey[i].key.col = recive_payload[2];      // col
+                        rapidTriggerKey[i].key.keycode[0] = recive_payload[3];   // no.1
+                        rapidTriggerKey[i].key.keycode[1] = recive_payload[4];  // no.2
+                        rapidTriggerKey[i].key.keycode[2] = recive_payload[5];  // no.3
+                        rapidTriggerKey[i].key.keycode[3] = recive_payload[6];  // no.4
+                        eeconfig_write_rapidTrigger(i, rapidTriggerKey[i].key);
+                        rapidTriggerProcess(true, i);
+                        break;
                     }
                 }
                 // rapidTriggerKey[0].key.enable = 1;
@@ -693,7 +704,7 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length) {
                     //     	rapidTrigger.enable,rapidTrigger.row,rapidTrigger.col,rapidTrigger.counts
                     //     	,rapidTrigger.keycode[0],rapidTrigger.keycode[1],rapidTrigger.keycode[2],rapidTrigger.keycode[3],rapidTrigger.keycode[4],rapidTrigger.keycode[5]);
                     
-                    if(rapidTriggerKey[i].key.enable == TRUE){
+                    // if(rapidTriggerKey[i].key.enable == TRUE){
                         uprintf("layer 2\r\n");
                         *(data_start + 3) |= 0x80;
                         w = send_data;
@@ -714,7 +725,7 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length) {
                         // uprintf ("enable:%d row:%d col:%d counts:%d code[0]:%x code[1]:%x code[2]:%x code[3]:%x code[4]:%x code[5]:%x\r\n",
                         // 	rapidTrigger.enable,rapidTrigger.row,rapidTrigger.col,rapidTrigger.counts
                         // 	,rapidTrigger.keycode[0],rapidTrigger.keycode[1],rapidTrigger.keycode[2],rapidTrigger.keycode[3],rapidTrigger.keycode[4],rapidTrigger.keycode[5]);
-                    }
+                    // }
                 }
             } else {
                 *send_status = ione_api_status_fail;

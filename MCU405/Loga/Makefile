@@ -82,7 +82,7 @@ SRC =	keymap_common.c \
 		socd.c \
 		feature.c \
 		rappy_snappy.c \
-
+# 		macro_engine.c \
 SRC := keymap_jp.c $(SRC) # lyon fix error
 
 

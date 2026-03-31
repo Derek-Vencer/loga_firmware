@@ -418,7 +418,6 @@ void toggle_key_set(uint8_t layer, uint8_t row, uint8_t col, uint8_t keycode) {
                 tmp.col == tk->col) {
                 eeconfig_clear_toggle_entry(i);
                 uprintf("clear toggle eeprom idx=%d\r\n", i);
-				tap_code(KC_Z);
                 break;
             }
         }
