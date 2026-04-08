@@ -3,6 +3,7 @@
 # include "report.h"
 # include "matrix.h"
 # include "dynamic_macro.h"
+# include "macro_engine.h"
 # include "usb_main.h"
 # include "../led/led_function.h"
 # include "loga_function.h" // lyon for layer_keypos_t
@@ -1037,20 +1038,205 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length) {
                 *payload_length = 1;
             }
         break;
-        // case ione_api_cmd_set_macro_record:
+        // case ione_api_cmd_set_macro_record: //
         // break;
         // case ione_api_cmd_set_stop_macro_record:
         // break;
-        // case ione_api_cmd_set_macro_playback:
-        // break;
-        // case ione_api_cmd_get_macro_playback:
-        // break;
-        // case ione_api_cmd_set_macro_data:
-        // break;
-        // case ione_api_cmd_get_macro_data:
-        // break;
-        // case ione_api_cmd_clear_macro:
-        // break;
+        case ione_api_cmd_set_macro_playback:
+            uprintf("API=>Set Macro Playback:\r\n");
+            if (*payload_length == 1 && recive_payload[0] < MACRO_GROUP_COUNT) {
+                *send_status = macro_engine_start(recive_payload[0]) ? ione_api_status_success : ione_api_status_fail;
+            } else {
+                *send_status = ione_api_status_fail;
+                uprintf("Fail\r\n");
+            }
+            *payload_length = 1;
+        break;
+        case ione_api_cmd_get_macro_playback:
+            uprintf("API=>Get Macro Playback:\r\n");
+
+            uint8_t macro_index = recive_payload[0];
+            uint8_t start       = recive_payload[1];
+            uint8_t req_count   = recive_payload[2];
+
+            if (macro_index >= MACRO_GROUP_COUNT) {
+                break;
+            }
+
+            const macro_config_t *cfg = macro_engine_get_config(macro_index);
+            if (cfg == NULL) {
+                break;
+            }
+
+            if (start >= cfg->step_count) {
+                *send_status = ione_api_status_sending;
+                *send_data++ = macro_index;
+                *send_data++ = start;
+                *send_data++ = 0;
+
+                for (uint8_t i = 5; i < 32; i++) {
+                    *send_data++ = 0;
+                }
+
+                raw_hid_send(send_data, 32);
+                break;
+            }
+
+            uint8_t count = req_count;
+            if (count > 4) {
+                count = 4;
+            }
+            if ((uint16_t)start + count > cfg->step_count) {
+                count = cfg->step_count - start;
+            }
+
+            *send_status = ione_api_status_sending;
+            *send_data++ = macro_index;
+            *send_data++ = start;
+            *send_data++ = count;
+
+            for (uint8_t i = 0; i < count; i++) {
+                const macro_step_t *s = &cfg->step[start + i];
+                uint8_t *p = &send_data[5 + (i * 6)];
+
+                p[0] = s->delay_type;
+                p[1] = (uint8_t)(s->delay_ms & 0xFF);
+                p[2] = (uint8_t)(s->delay_ms >> 8);
+                p[3] = s->action;
+                p[4] = (uint8_t)(s->keycode & 0xFF);
+                p[5] = (uint8_t)(s->keycode >> 8);
+            }
+
+            for (uint8_t i = 5 + count * 6; i < 32; i++) {
+                *send_data++ = 0;
+            }
+
+            raw_hid_send(send_data, 32);
+        break;
+        case ione_api_cmd_set_macro_data:
+            uprintf("API=>Set Macro Data:\r\n");
+            /*
+             * payload:
+             * [0] macro index
+             * [1] step index
+             * [2] keycode low
+             * [3] keycode high
+             * [4] delay_type (0x00 fix)
+             * [5] delay_ms low
+             * [6] delay_ms high 
+             * [7] action(0x01 press 0x02 release)
+             */
+            if (*payload_length == 8 && recive_payload[0] < MACRO_GROUP_COUNT && recive_payload[1] < MACRO_MAX_STEPS) {
+                uint8_t macro_index = recive_payload[0];
+                uint8_t step_index  = recive_payload[1];
+                macro_config_t *cfg = macro_engine_get_config(macro_index);
+
+                if (cfg != NULL) {
+                    cfg->step[step_index].keycode    = (uint16_t)recive_payload[2] | ((uint16_t)recive_payload[3] << 8);
+                    cfg->step[step_index].delay_type = recive_payload[4];
+                    cfg->step[step_index].delay_ms   = (uint16_t)recive_payload[5] | ((uint16_t)recive_payload[6] << 8);
+                    cfg->step[step_index].action     = recive_payload[7];
+
+                    if (cfg->step_count <= step_index) {
+                        cfg->step_count = (uint8_t)(step_index + 1);
+                    }
+
+                    macro_save_to_eeprom(macro_index);
+                    *send_status = ione_api_status_success;
+                } else {
+                    *send_status = ione_api_status_fail;
+                    uprintf("Fail\r\n");
+                }
+            } else {
+                *send_status = ione_api_status_fail;
+                uprintf("Fail\r\n");
+            }
+            *payload_length = 1;
+        break;
+        case ione_api_cmd_get_macro_data:
+            uprintf("API=>Get Macro Data:\r\n");
+            /*
+             * payload:
+             * [0] macro index
+             *
+             * sending response payload per packet:
+             * [0] macro index
+             * [1] step index
+             * [2] keycode low
+             * [3] keycode high
+             * [4] delay_type
+             * [5] delay_ms low
+             * [6] delay_ms high
+             * [7] action
+             *
+             * final response payload:
+             * [0] macro index
+             * [1] step_count
+             */
+            if (*payload_length == 1 && recive_payload[0] < MACRO_GROUP_COUNT) {
+                uint8_t macro_index = recive_payload[0];
+                macro_config_t *cfg = macro_engine_get_config(macro_index);
+                const size_t EP = LAMP_ARRAY_EPSIZE;
+                uint8_t *w;
+
+                if (cfg != NULL) {
+                    if (cfg->step_count < MACRO_MIN_STEPS || cfg->step_count > MACRO_MAX_STEPS) {
+                        *send_status = ione_api_status_fail;
+                        *payload_length = 1;
+                        uprintf("Fail: invalid macro step_count=%u for idx=%u\r\n", cfg->step_count, macro_index);
+                        break;
+                    }
+
+                    for (uint8_t step_index = 0; step_index < cfg->step_count; step_index++) {
+                        const macro_step_t *step = &cfg->step[step_index];
+
+                        *(data_start + 3) |= 0x80;
+                        w = send_data;
+                        *send_status = ione_api_status_sending;
+
+                        *w++ = macro_index;
+                        *w++ = step_index;
+                        *w++ = (uint8_t)(step->keycode & 0xFF);
+                        *w++ = (uint8_t)(step->keycode >> 8);
+                        *w++ = step->delay_type;
+                        *w++ = (uint8_t)(step->delay_ms & 0xFF);
+                        *w++ = (uint8_t)(step->delay_ms >> 8);
+                        *w++ = step->action;
+
+                        *payload_length = (uint8_t)(1 + (w - send_data));
+                        raw_hid_send(data_start, EP);
+                    }
+
+                    *send_status = ione_api_status_success;
+                    *send_data++ = macro_index;
+                    *send_data++ = cfg->step_count;
+                    *payload_length = 3;
+                } else {
+                    *send_status = ione_api_status_fail;
+                    uprintf("Fail\r\n");
+                    *payload_length = 1;
+                }
+            } else {
+                *send_status = ione_api_status_fail;
+                uprintf("Fail\r\n");
+                *payload_length = 1;
+            }
+        break;
+       case ione_api_cmd_clear_macro:
+            uprintf("API=>Clear Macro:\r\n");
+            macro_engine_stop();
+            if (*payload_length == 1 && recive_payload[0] < MACRO_GROUP_COUNT) {
+                macro_clear(recive_payload[0]);
+                *send_status = ione_api_status_success;
+            } else if (*payload_length == 0) {
+                macro_delete();
+                *send_status = ione_api_status_success;
+            } else {
+                *send_status = ione_api_status_fail;
+                uprintf("Fail\r\n");
+            }
+            *payload_length = 1;
+        break;
         case ione_api_cmd_reset_all_key:
             uprintf("API=>Reset All Key:\r\n");
 			if (*payload_length == 0){
@@ -1067,10 +1253,48 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length) {
         // break;
         // case ione_api_cmd_get_dead_zone_settings:
         // break;
-        // case ione_api_cmd_system_reset:
-        // break;
-        // case ione_api_cmd_factory_reset_and_system_reset:
-        // break;
+        case ione_api_cmd_system_reset:
+            uprintf("API=>System Reset:\r\n");
+            if (*payload_length == 0) {
+                *send_status = ione_api_status_success;
+                *payload_length = 1;
+                *(data_start+3) |= 0x80;
+                raw_hid_send(data_start, length);
+                chThdSleepMilliseconds(100);
+                NVIC_SystemReset();
+                return false;
+            } else {
+                *send_status = ione_api_status_fail;
+                uprintf("Fail\r\n");
+                *payload_length = 1;
+            }
+        break;
+        case ione_api_cmd_factory_reset_and_system_reset:
+            uprintf("API=>Factory Reset And System Reset:\r\n");
+            if (*payload_length == 0) {
+                *send_status = ione_api_status_success;
+                *payload_length = 1;
+                knobState = 0;
+                eeprom_update_byte(KB_ENCODER_MODE_ADDR, knobState);
+                eeconfig_socd_clear();
+                eeconfig_rappy_snappy_clear();
+                eeconfig_modtap_clear();
+                eeconfig_clear_all_toggle_entry();
+                write_keymap_to_eeprom();
+                dynamic_macro_reset_eeprom();
+                macro_delete();
+                eeconfig_rapidTrigger_init();
+                *(data_start+3) |= 0x80;
+                raw_hid_send(data_start, length);
+                chThdSleepMilliseconds(100);
+                NVIC_SystemReset();
+                return false;
+            } else {
+                *send_status = ione_api_status_fail;
+                uprintf("Fail\r\n");
+                *payload_length = 1;
+            }
+        break;
         case ione_api_cmd_set_lighting_value:
             uprintf("API=>Set Lighting Value:\r\n");
             

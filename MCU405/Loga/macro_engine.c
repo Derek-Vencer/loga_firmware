@@ -5,6 +5,8 @@
 // #include "quantum.h"
 #include "uart.h"
 #include "print.h"
+#include "keycode.h"
+#include "wait.h"
 // #include "sleep_manager.h"
 #include <string.h>
 
@@ -104,42 +106,42 @@ static void whid_send_if_changed(void) {
 // Keycode -> HID helpers
 // -----------------------------
 
-// static bool whid_is_basic_modifier(uint16_t kc) {
-//     return (kc == KC_LCTL) || (kc == KC_LSFT) || (kc == KC_LALT) || (kc == KC_LGUI) ||
-//            (kc == KC_RCTL) || (kc == KC_RSFT) || (kc == KC_RALT) || (kc == KC_RGUI);
-// }
+static bool whid_is_basic_modifier(uint16_t kc) {
+    return (kc == KC_LCTL) || (kc == KC_LSFT) || (kc == KC_LALT) || (kc == KC_LGUI) ||
+           (kc == KC_RCTL) || (kc == KC_RSFT) || (kc == KC_RALT) || (kc == KC_RGUI);
+}
 
-// static uint8_t whid_modifier_bit(uint16_t kc) {
-//     switch (kc) {
-//         case KC_LCTL: return (1u << 0);
-//         case KC_LSFT: return (1u << 1);
-//         case KC_LALT: return (1u << 2);
-//         case KC_LGUI: return (1u << 3);
-//         case KC_RCTL: return (1u << 4);
-//         case KC_RSFT: return (1u << 5);
-//         case KC_RALT: return (1u << 6);
-//         case KC_RGUI: return (1u << 7);
-//         default:      return 0;
-//     }
-// }
+static uint8_t whid_modifier_bit(uint16_t kc) {
+    switch (kc) {
+        case KC_LCTL: return (1u << 0);
+        case KC_LSFT: return (1u << 1);
+        case KC_LALT: return (1u << 2);
+        case KC_LGUI: return (1u << 3);
+        case KC_RCTL: return (1u << 4);
+        case KC_RSFT: return (1u << 5);
+        case KC_RALT: return (1u << 6);
+        case KC_RGUI: return (1u << 7);
+        default:      return 0;
+    }
+}
 
 __attribute__((weak)) uint8_t keycode_to_hid(uint16_t keycode);
 
-// static uint8_t whid_keycode_to_hid_usage(uint16_t kc) {
-//     if (keycode_to_hid) {
-//         return keycode_to_hid(kc);
-//     }
+static uint8_t whid_keycode_to_hid_usage(uint16_t kc) {
+    if (keycode_to_hid) {
+        return keycode_to_hid(kc);
+    }
 
-//     if (kc >= KC_A && kc <= KC_Z) return (uint8_t)(0x04 + (kc - KC_A));
-//     if (kc >= KC_1 && kc <= KC_0) return (uint8_t)(0x1E + (kc - KC_1));
-//     if (kc == KC_ENTER) return 0x28;
-//     if (kc == KC_ESC)   return 0x29;
-//     if (kc == KC_BSPC)  return 0x2A;
-//     if (kc == KC_TAB)   return 0x2B;
-//     if (kc == KC_SPC)   return 0x2C;
+    if (kc >= KC_A && kc <= KC_Z) return (uint8_t)(0x04 + (kc - KC_A));
+    if (kc >= KC_1 && kc <= KC_0) return (uint8_t)(0x1E + (kc - KC_1));
+    if (kc == KC_ENTER) return 0x28;
+    if (kc == KC_ESC)   return 0x29;
+    if (kc == KC_BSPC)  return 0x2A;
+    if (kc == KC_TAB)   return 0x2B;
+    if (kc == KC_SPC)   return 0x2C;
 
-//     return 0;
-// }
+    return 0;
+}
 
 // -----------------------------
 // 6KRO slot management
@@ -379,18 +381,41 @@ bool macro_engine_start(uint8_t macro_index) {
     g_me.running = true;
     g_me.macro_index = macro_index;
     g_me.step_index = 0;
-    g_me.state = ME_WAIT_DELAY;
+    g_me.state = ME_EXECUTE_STEP;
     g_me.deadline_ms = 0;
 
-    if (cfg->step_count > 0) {
-        uint16_t d = get_effective_delay_ms(&cfg->step[0]);
-        set_deadline_from_now(d);
-        uprintf("[MACRO] start ok idx=%u first_delay=%u\n", macro_index, d);
-    } else {
-        uprintf("[MACRO] start fail: step_count=0\n");
-        return false;
+    for (uint8_t i = 0; i < cfg->step_count; i++) {
+        macro_step_t *st = &cfg->step[i];
+        uint16_t delay_ms = get_effective_delay_ms(st);
+
+        if (delay_ms > 0) {
+            wait_ms(delay_ms);
+        }
+
+        switch (st->action) {
+            case MACRO_ACTION_PRESS:
+                if (st->keycode != KC_NO) {
+                    press_key(st->keycode);
+                }
+                break;
+
+            case MACRO_ACTION_RELEASE:
+                if (st->keycode != KC_NO) {
+                    release_key(st->keycode);
+                }
+                break;
+
+            case MACRO_ACTION_NONE:
+            default:
+                uprintf("[MACRO] skip action=%u at step=%u\n", st->action, i);
+                break;
+        }
+
+        g_me.step_index = (uint8_t)(i + 1);
     }
 
+    macro_engine_stop();
+    uprintf("[MACRO] start ok idx=%u executed=%u\n", macro_index, cfg->step_count);
     return true;
 }
 
@@ -401,7 +426,7 @@ void macro_engine_init(void) {
     memset(&g_macro_cfg, 0, sizeof(g_macro_cfg));
     g_loaded_macro_index = 0xFF;
 
-    //macro_eeprom_init_if_needed();
+    // macro_eeprom_init_if_needed();
 }
 
 void macro_engine_task(void) {
@@ -436,15 +461,15 @@ void macro_engine_task(void) {
 
             switch (st->action) {
                 case MACRO_ACTION_PRESS:
-                    // if (st->keycode != KC_NO) {
-                    //     press_key(st->keycode);
-                    // }
+                    if (st->keycode != KC_NO) {
+                        press_key(st->keycode);
+                    }
                     break;
 
                 case MACRO_ACTION_RELEASE:
-                    // if (st->keycode != KC_NO) {
-                    //     release_key(st->keycode);
-                    // }
+                    if (st->keycode != KC_NO) {
+                        release_key(st->keycode);
+                    }
                     break;
 
                 case MACRO_ACTION_NONE:
@@ -495,6 +520,8 @@ void macro_load_from_eeprom(uint8_t index) {
 
 void macro_save_to_eeprom(uint8_t index) {
     if (index >= MACRO_GROUP_COUNT) return;
+    uint8_t step_count = g_macro_cfg.step_count;
+    size_t used_size = 1;
 
     /*
      * Save current RAM cache to the specified EEPROM slot.
@@ -504,28 +531,56 @@ void macro_save_to_eeprom(uint8_t index) {
         g_loaded_macro_index = index;
     }
 
+    if (step_count > MACRO_MAX_STEPS) {
+        step_count = MACRO_MAX_STEPS;
+        g_macro_cfg.step_count = step_count;
+    }
+
+    used_size += (size_t)step_count * sizeof(macro_step_t);
+
     eeprom_update_block(
         &g_macro_cfg,
         (void *)EEPROM_MACRO_SLOT_ADDR(index),
-        sizeof(macro_config_t)
+        used_size
     );
+}
+
+void macro_clear(uint8_t index) {
+    if (index >= MACRO_GROUP_COUNT) return;
+    uint16_t base_addr = EEPROM_MACRO_SLOT_ADDR(index);
+    uint8_t step_count = (g_loaded_macro_index == index)
+        ? g_macro_cfg.step_count
+        : eeprom_read_byte((uint8_t *)base_addr);
+    size_t used_size = 1;
+    static const uint8_t zero_chunk[32] = {0};
+
+    if (step_count > MACRO_MAX_STEPS) {
+        step_count = MACRO_MAX_STEPS;
+    }
+
+    used_size += (size_t)step_count * sizeof(macro_step_t);
+
+    for (size_t offset = 0; offset < used_size; offset += sizeof(zero_chunk)) {
+        size_t chunk_size = used_size - offset;
+        if (chunk_size > sizeof(zero_chunk)) {
+            chunk_size = sizeof(zero_chunk);
+        }
+
+        eeprom_update_block(
+            zero_chunk,
+            (void *)(base_addr + offset),
+            chunk_size
+        );
+    }
+
+    if (g_loaded_macro_index == index) {
+        memset(&g_macro_cfg, 0, sizeof(g_macro_cfg));
+    }
 }
 
 void macro_delete(void) {
     for (uint8_t i = 0; i < MACRO_GROUP_COUNT; i++) {
-        macro_config_t *cfg = macro_engine_get_config(i);
-        if (cfg == NULL) {
-            uprintf("[MACRO][DEL][ERR] cfg is NULL, index=%u\n", i);
-            continue;
-        }
-
-        // Clear RAM cache
-        memset(cfg, 0, sizeof(macro_config_t));
-        cfg->step_count = 0;
-
-        // Save cleared data to EEPROM
-        macro_save_to_eeprom(i);
-
+        macro_clear(i);
         wait_ms(2);
 
         uprintf("[MACRO][DEL] macro %u cleared\n", i + 1);

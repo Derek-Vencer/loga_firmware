@@ -17,6 +17,7 @@
 # include "math.h"
 # include "action_layer.h"
 # include "dynamic_macro.h"
+# include "macro_engine.h"
 # include "led/main.h"
 # include "rappy_snappy.h"
 
@@ -63,6 +64,63 @@ void send_A_to_Z(void) {
         tap_code(kc);       // 輸出單一按鍵
         // 如果需要節奏感或避免主機合併事件，可以加一點延遲：
         // chThdSleepMilliseconds(10);
+    }
+}
+
+static void macro_engine_setup_test_copy_paste(void) {
+    macro_config_t *cfg = macro_engine_get_config(0);
+
+    if (cfg == NULL) {
+        uprintf("[MACRO] test setup failed: slot 0 unavailable\r\n");
+        return;
+    }
+
+    memset(cfg, 0, sizeof(*cfg));
+    cfg->step_count = 8;
+
+    cfg->step[0] = (macro_step_t){ .delay_type = MACRO_DELAY_FIXED, .delay_ms = 0,   .action = MACRO_ACTION_PRESS,   .keycode = KC_LCTL };
+    cfg->step[1] = (macro_step_t){ .delay_type = MACRO_DELAY_FIXED, .delay_ms = 10,  .action = MACRO_ACTION_PRESS,   .keycode = KC_C };
+    cfg->step[2] = (macro_step_t){ .delay_type = MACRO_DELAY_FIXED, .delay_ms = 20,  .action = MACRO_ACTION_RELEASE, .keycode = KC_C };
+    cfg->step[3] = (macro_step_t){ .delay_type = MACRO_DELAY_FIXED, .delay_ms = 10,  .action = MACRO_ACTION_RELEASE, .keycode = KC_LCTL };
+    cfg->step[4] = (macro_step_t){ .delay_type = MACRO_DELAY_FIXED, .delay_ms = 120, .action = MACRO_ACTION_PRESS,   .keycode = KC_LCTL };
+    cfg->step[5] = (macro_step_t){ .delay_type = MACRO_DELAY_FIXED, .delay_ms = 10,  .action = MACRO_ACTION_PRESS,   .keycode = KC_V };
+    cfg->step[6] = (macro_step_t){ .delay_type = MACRO_DELAY_FIXED, .delay_ms = 20,  .action = MACRO_ACTION_RELEASE, .keycode = KC_V };
+    cfg->step[7] = (macro_step_t){ .delay_type = MACRO_DELAY_FIXED, .delay_ms = 10,  .action = MACRO_ACTION_RELEASE, .keycode = KC_LCTL };
+
+    macro_save_to_eeprom(0);
+    uprintf("[MACRO] test copy/paste macro loaded to slot 0\r\n");
+}
+
+static void macro_engine_dump_eeprom_slot(uint8_t index) {
+    macro_config_t cfg = {0};
+
+    if (index >= MACRO_GROUP_COUNT) {
+        uprintf("[MACRO][EEPROM] invalid slot=%u\r\n", index);
+        return;
+    }
+
+    eeprom_read_block(
+        &cfg,
+        (const void *)EEPROM_MACRO_SLOT_ADDR(index),
+        sizeof(cfg)
+    );
+
+    uprintf("[MACRO][EEPROM] slot=%u step_count=%u\r\n", index, cfg.step_count);
+
+    if (cfg.step_count > MACRO_MAX_STEPS) {
+        uprintf("[MACRO][EEPROM] invalid step_count=%u\r\n", cfg.step_count);
+        return;
+    }
+
+    for (uint8_t i = 0; i < cfg.step_count; i++) {
+        uprintf(
+            "[MACRO][EEPROM] step=%u kc=0x%04X delay_type=%u delay_ms=%u action=%u\r\n",
+            i,
+            cfg.step[i].keycode,
+            cfg.step[i].delay_type,
+            cfg.step[i].delay_ms,
+            cfg.step[i].action
+        );
     }
 }
 
@@ -372,18 +430,8 @@ const int8_t hatSwitchMap[] = {0,1,5,0,7,8,6,0,3,2,4,0,0,0,0,0,0};
 //#define nonOP
 #ifdef toggleKey
 /* matrix state(1:on, 0:off) */
-#define toggle_key_pair_count	10
 matrix_row_t matrix[MATRIX_ROWS];
 static matrix_row_t matrix_temp[MATRIX_ROWS];
-
-typedef struct {
-    bool    enabled;   // 這個位置有沒有設定成 toggle key
-    bool    state;     // 當前 ON(1) / OFF(0) 狀態
-    uint8_t keycode;   // 要被「保持按住」的 keycode（1 byte）
-	uint8_t layer;
-	uint8_t row;
-	uint8_t col;
-} toggle_key_slot_t;
 
 // [layer][row][col]
 static toggle_key_slot_t toggle_keys[KEYMAPS_COUNT][MATRIX_ROWS][MATRIX_COLS];
@@ -954,6 +1002,9 @@ void hook_late_init()
 {
     palSetPad(GPIOB, 3);
     palSetPad(GPIOB, 4);
+
+    macro_engine_init();
+    // macro_engine_setup_test_copy_paste();
 
 	#ifdef toggleKey
 	// test code
@@ -3377,6 +3428,7 @@ static counts = 0;
 //	chBSemWait(&matrixScanSem);
 	uprintf ("Matrix scan\r\n");
 	keyboard_taskTMR();
+	macro_engine_task();
 //	if (counts++<5000){ss
 //		chThdSleepMilliseconds(1);
 //	}
@@ -3790,7 +3842,7 @@ bool hook_matrix_change(keyrecord_t record)
 
 		uprintf("\r\n=== EEPROM DUMP START ===\r\n");
 
-		for (uint16_t addr = 0; addr < 16384/*EEPROM_SIZE*/; addr += 32)
+		for (uint16_t addr = EEPROM_MACRO_SLOT_ADDR(0); addr < EEPROM_MACRO_SLOT_ADDR(1)/*EEPROM_SIZE*/; addr += 32)
 		{
 			eeprom_read_block(buffer, (const void*)addr, 32);
 
@@ -3997,21 +4049,69 @@ bool hook_matrix_change(keyrecord_t record)
 					}
 				break;
 				case KC_M1:
-				// at keycode i 
-					// uprintf("load_all_rappy_snappy\r\n");
-					// void load_all_rappy_snappy(void);
-					// uprintf("modtap_load_form_eeprom\r\n");
-					// void modtap_load_form_eeprom(void);
-					// uprintf("usb mode is %d\r\n", );
+					// macro_engine_setup_test_copy_paste();
+					macro_engine_start(0);
+					// macro_engine_dump_eeprom_slot(0);
+					uprintf("KC_M1 TRIGGER \r\n");
+					// void dump_eeprom_range(uint32_t start, uint32_t end) {
+					// 	uprintf("---- EEPROM DUMP (0x%04lX ~ 0x%04lX) ----\n",
+					// 			(unsigned long)start, (unsigned long)end);
+
+					// 	for (uint32_t addr = start; addr <= end; addr++) {
+					// 		if ((addr % 16) == 0) {
+					// 			uprintf("\n0x%04lX: ", (unsigned long)addr);
+					// 		}
+
+					// 		//uint8_t val = eeprom_read_byte((const void *)(uintptr_t)addr);
+					// 		//uprintf("%02X ", val);
+					// 	}
+
+					// 	uprintf("\n\n-------------------------------\n");
+					// }
+					// dump_eeprom_range(EEPROM_MACRO_SLOT_ADDR(0),EEPROM_MACRO_SLOT_ADDR(1));
+					// dump_eeprom();
+					return false;
 				break;
 				case KC_M2:
-					uprintf("matrix (%d)_(%d)_(%d),(%d)_(%d)_(%d)\r\n",
-						g_rappy_pairs[0].lay_a, g_rappy_pairs[0].row_a, g_rappy_pairs[0].col_a,
-						g_rappy_pairs[0].lay_b, g_rappy_pairs[0].row_b, g_rappy_pairs[0].col_b);
+					// macro_save_to_eeprom(0);
+					uprintf("KC_M2 TRIGGER \r\n");
+					// uprintf("matrix (%d)_(%d)_(%d),(%d)_(%d)_(%d)\r\n",
+					// 	g_rappy_pairs[0].lay_a, g_rappy_pairs[0].row_a, g_rappy_pairs[0].col_a,
+					// 	g_rappy_pairs[0].lay_b, g_rappy_pairs[0].row_b, g_rappy_pairs[0].col_b);
 				break;
 				case KC_M3:
 					// eeconfig_rappy_snappy_clear();
 					toggle_key_dump_eeprom();
+				break;
+				case KC_MACRO_C1:
+					macro_engine_start(0);
+				break;
+				case KC_MACRO_C2:
+					macro_engine_start(1);
+				break;
+				case KC_MACRO_C3:
+					macro_engine_start(2);
+				break;
+				case KC_MACRO_C4:
+					macro_engine_start(3);
+				break;
+				case KC_MACRO_C5:
+					macro_engine_start(4);
+				break;
+				case KC_MACRO_C6:
+					macro_engine_start(5);
+				break;
+				case KC_MACRO_C7:
+					macro_engine_start(6);
+				break;
+				case KC_MACRO_C8:
+					macro_engine_start(7);
+				break;
+				case KC_MACRO_C9:
+					macro_engine_start(8);
+				break;
+				case KC_MACRO_C10:
+					macro_engine_start(9);
 				break;
 				case KC_SOCD_TOGG:
 					if(isSOCD){//IS_SOCD_ON_ADD == 0x01){

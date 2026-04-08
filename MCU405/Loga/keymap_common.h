@@ -55,6 +55,16 @@ enum custom_keycodes{
     KC_EECLR,
     KC_MAC,
     KC_WINDOW,
+    KC_MACRO_C1,
+    KC_MACRO_C2,
+    KC_MACRO_C3,
+    KC_MACRO_C4,
+    KC_MACRO_C5,
+    KC_MACRO_C6,
+    KC_MACRO_C7,
+    KC_MACRO_C8,
+    KC_MACRO_C9,
+    KC_MACRO_C10,
 };
 
 #ifdef  KEYMAP_IN_EEPROM_ENABLE

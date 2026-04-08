@@ -10,10 +10,10 @@
 #define MACRO_MAX_STEPS   180
 #define MACRO_MIN_STEPS   1
 
-#define MACRO_EEPROM_VERSION 0x0006
+// #define MACRO_EEPROM_VERSION 0x0006
 
 #define EEPROM_MACRO_BASE         (EECONFIG_TOGGLE_KEY_ADDR + EECONFIG_TOGGLE_KEY_SIZE)
-#define EEPROM_MACRO_VERSION_ADDR (EEPROM_MACRO_BASE)
+// #define EEPROM_MACRO_VERSION_ADDR (EEPROM_MACRO_BASE)
 #define EEPROM_MACRO_SLOT_BASE    (EEPROM_MACRO_BASE + 4)
 #define EEPROM_MACRO_SLOT_SIZE    (sizeof(macro_config_t))
 #define EEPROM_MACRO_SLOT_ADDR(i) \
@@ -57,6 +57,7 @@ bool macro_engine_is_running(void);
 
 void macro_load_from_eeprom(uint8_t index);
 void macro_save_to_eeprom(uint8_t index);
+void macro_clear(uint8_t index);
 
 macro_config_t *macro_engine_get_config(uint8_t macro_index);
 uint8_t macro_engine_get_loaded_index(void);

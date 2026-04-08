@@ -1,7 +1,6 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 #include "socd.h"
-// #include "rappy_snappy.h"
 #define AT32F405RCT7
 
 /* USB Device descriptor parameter */
@@ -37,6 +36,9 @@
 #define KEYMAPS_COUNT LAYERS_PER_PROFILE * PROFILE_COUNT
 #define RAPID_TRIGGER_COUNT 24
 #define RAPID_TRIGGER_LEVELS 6
+
+#include "../../keyboard_core/common/matrix.h"
+#include "rappy_snappy.h"
 
 #define MATRIX_SIZE (matrix_rows() * matrix_cols())
 
@@ -112,6 +114,11 @@
 #define EECONFIG_TOGGLE_KEY_ADDR             (EECONFIG_RAPPYSNAPPY_ADDR + EECONFIG_RAPPYSNAPPY_SIZE)
 #define EECONFIG_TOGGLE_KEY_SIZE             (sizeof(toggle_key_slot_t) * toggle_key_pair_count)
 #define EECONFIG_TOGGLE_KEY_ADDR_END         (EECONFIG_TOGGLE_KEY_ADDR + EECONFIG_TOGGLE_KEY_SIZE)
+
+// new macro
+#define EEPROM_MACRO_SLOT_ADDR             (EECONFIG_TOGGLE_KEY_ADDR + EECONFIG_TOGGLE_KEY_SIZE)
+#define EEPROM_MACRO_SLOT_SIZE             (sizeof(macro_config_t) * MACRO_GROUP_COUNT)
+#define EEPROM_MACRO_SLOT_ADDR_END         (EEPROM_MACRO_SLOT_ADDR + EEPROM_MACRO_SLOT_SIZE)
 
 // #define EECONFIG_KEYMAP_TRAVEL_2MM 	        (uint16_t*)(DYNAMIC_MACRO_EEPROM_BLOCK0_ADDR+2)
 

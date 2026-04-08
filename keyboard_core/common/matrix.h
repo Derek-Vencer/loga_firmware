@@ -108,6 +108,19 @@ typedef struct {
 extern mt_entry_t mt_map[MT_CAP_MAP];   // 只有宣告，沒有初始化
 #endif //modTap
 
+#ifdef toggleKey
+#define toggle_key_pair_count 10
+
+typedef struct {
+    bool    enabled;
+    bool    state;
+    uint8_t keycode;
+    uint8_t layer;
+    uint8_t row;
+    uint8_t col;
+} toggle_key_slot_t;
+#endif // toggleKey
+
 // move from matrix.c because i want to use these in via.c (lyon)
 #define TriggerMax	1500
 #define TriggerMin  3
