@@ -91,35 +91,107 @@ static void macro_engine_setup_test_copy_paste(void) {
     uprintf("[MACRO] test copy/paste macro loaded to slot 0\r\n");
 }
 
+static bool macro_engine_set_step_like_api(
+    uint8_t macro_index,
+    uint8_t step_index,
+    uint16_t keycode,
+    uint8_t delay_type,
+    uint16_t delay_ms,
+    uint8_t action
+) {
+    macro_config_t *cfg = macro_engine_get_config(macro_index);
+
+    if (cfg == NULL || macro_index >= MACRO_GROUP_COUNT || step_index >= MACRO_MAX_STEPS) {
+        uprintf("[MACRO][API-SIM] set step fail idx=%u step=%u\r\n", macro_index, step_index);
+        return false;
+    }
+
+    cfg->step[step_index].keycode    = keycode;
+    cfg->step[step_index].delay_type = delay_type;
+    cfg->step[step_index].delay_ms   = delay_ms;
+    cfg->step[step_index].action     = action;
+
+    if (cfg->step_count <= step_index) {
+        cfg->step_count = (uint8_t)(step_index + 1);
+    }
+
+    macro_save_to_eeprom(macro_index);
+    return true;
+}
+
+static void macro_engine_write_test_copy_paste_api_style(uint8_t macro_index) {
+    macro_clear(macro_index);
+
+    if (!macro_engine_set_step_like_api(macro_index, 0, KC_LCTL, MACRO_DELAY_FIXED, 0,   MACRO_ACTION_PRESS))   return;
+    if (!macro_engine_set_step_like_api(macro_index, 1, KC_C,    MACRO_DELAY_FIXED, 10,  MACRO_ACTION_PRESS))   return;
+    if (!macro_engine_set_step_like_api(macro_index, 2, KC_C,    MACRO_DELAY_FIXED, 20,  MACRO_ACTION_RELEASE)) return;
+    if (!macro_engine_set_step_like_api(macro_index, 3, KC_LCTL, MACRO_DELAY_FIXED, 10,  MACRO_ACTION_RELEASE)) return;
+    if (!macro_engine_set_step_like_api(macro_index, 4, KC_LCTL, MACRO_DELAY_FIXED, 120, MACRO_ACTION_PRESS))   return;
+    if (!macro_engine_set_step_like_api(macro_index, 5, KC_V,    MACRO_DELAY_FIXED, 10,  MACRO_ACTION_PRESS))   return;
+    if (!macro_engine_set_step_like_api(macro_index, 6, KC_V,    MACRO_DELAY_FIXED, 20,  MACRO_ACTION_RELEASE)) return;
+    if (!macro_engine_set_step_like_api(macro_index, 7, KC_LCTL, MACRO_DELAY_FIXED, 10,  MACRO_ACTION_RELEASE)) return;
+
+    uprintf("[MACRO][API-SIM] full macro written idx=%u step_count=8\r\n", macro_index);
+}
+
+static void macro_engine_write_full_slot_api_style(uint8_t macro_index) {
+    macro_clear(macro_index);
+
+    for (uint8_t step_index = 0; step_index < MACRO_MAX_STEPS; step_index++) {
+        uint8_t pair_index = (uint8_t)(step_index / 2);
+        uint16_t keycode = (uint16_t)(KC_A + (pair_index % 26));
+        uint16_t delay_ms = (step_index % 2 == 0) ? 0 : 5;
+        uint8_t action = (step_index % 2 == 0) ? MACRO_ACTION_PRESS : MACRO_ACTION_RELEASE;
+
+        if (!macro_engine_set_step_like_api(
+                macro_index,
+                step_index,
+                keycode,
+                MACRO_DELAY_FIXED,
+                delay_ms,
+                action)) {
+            uprintf("[MACRO][API-SIM] full-slot write stopped at step=%u\r\n", step_index);
+            return;
+        }
+    }
+
+    uprintf("[MACRO][API-SIM] full-slot macro written idx=%u step_count=%u\r\n", macro_index, MACRO_MAX_STEPS);
+}
+
 static void macro_engine_dump_eeprom_slot(uint8_t index) {
-    macro_config_t cfg = {0};
+    uint16_t base_addr;
+    uint8_t step_count;
+    macro_step_t step = {0};
 
     if (index >= MACRO_GROUP_COUNT) {
         uprintf("[MACRO][EEPROM] invalid slot=%u\r\n", index);
         return;
     }
 
-    eeprom_read_block(
-        &cfg,
-        (const void *)EEPROM_MACRO_SLOT_ADDR(index),
-        sizeof(cfg)
-    );
+    base_addr = EEPROM_MACRO_SLOT_ADDR(index);
+    step_count = eeprom_read_byte((const uint8_t *)base_addr);
 
-    uprintf("[MACRO][EEPROM] slot=%u step_count=%u\r\n", index, cfg.step_count);
+    uprintf("[MACRO][EEPROM] slot=%u step_count=%u\r\n", index, step_count);
 
-    if (cfg.step_count > MACRO_MAX_STEPS) {
-        uprintf("[MACRO][EEPROM] invalid step_count=%u\r\n", cfg.step_count);
+    if (step_count > MACRO_MAX_STEPS) {
+        uprintf("[MACRO][EEPROM] invalid step_count=%u\r\n", step_count);
         return;
     }
 
-    for (uint8_t i = 0; i < cfg.step_count; i++) {
+    for (uint8_t i = 0; i < step_count; i++) {
+        eeprom_read_block(
+            &step,
+            (const void *)(base_addr + 1 + ((uint16_t)i * sizeof(macro_step_t))),
+            sizeof(step)
+        );
+
         uprintf(
             "[MACRO][EEPROM] step=%u kc=0x%04X delay_type=%u delay_ms=%u action=%u\r\n",
             i,
-            cfg.step[i].keycode,
-            cfg.step[i].delay_type,
-            cfg.step[i].delay_ms,
-            cfg.step[i].action
+            step.keycode,
+            step.delay_type,
+            step.delay_ms,
+            step.action
         );
     }
 }
@@ -3842,7 +3914,7 @@ bool hook_matrix_change(keyrecord_t record)
 
 		uprintf("\r\n=== EEPROM DUMP START ===\r\n");
 
-		for (uint16_t addr = EEPROM_MACRO_SLOT_ADDR(0); addr < EEPROM_MACRO_SLOT_ADDR(1)/*EEPROM_SIZE*/; addr += 32)
+		for (uint16_t addr = EEPROM_MACRO_SLOT_ADDR(0); addr < EEPROM_MACRO_SLOT_ADDR(9)/*EEPROM_SIZE*/; addr += 32)
 		{
 			eeprom_read_block(buffer, (const void*)addr, 32);
 
@@ -4050,7 +4122,8 @@ bool hook_matrix_change(keyrecord_t record)
 				break;
 				case KC_M1:
 					// macro_engine_setup_test_copy_paste();
-					macro_engine_start(0);
+					// macro_engine_start(0);
+					// dump_eeprom();
 					// macro_engine_dump_eeprom_slot(0);
 					uprintf("KC_M1 TRIGGER \r\n");
 					// void dump_eeprom_range(uint32_t start, uint32_t end) {
@@ -4073,15 +4146,31 @@ bool hook_matrix_change(keyrecord_t record)
 					return false;
 				break;
 				case KC_M2:
-					// macro_save_to_eeprom(0);
-					uprintf("KC_M2 TRIGGER \r\n");
+					// macro_engine_write_full_slot_api_style(0);
+					// macro_engine_write_full_slot_api_style(1);
+					// macro_engine_write_full_slot_api_style(2);
+					// macro_engine_write_full_slot_api_style(3);
+					// macro_engine_write_full_slot_api_style(4);
+					// macro_engine_write_full_slot_api_style(5);
+					// macro_engine_write_full_slot_api_style(6);
+					// macro_engine_write_full_slot_api_style(7);
+					// macro_engine_write_full_slot_api_style(8);
+					// macro_engine_write_full_slot_api_style(9);
+					// macro_engine_dump_eeprom_slot(0);
+					// macro_engine_dump_eeprom_slot(1);
+					// macro_engine_dump_eeprom_slot(8);
+					// macro_engine_dump_eeprom_slot(9);
+
+					uprintf("KC_M2 API-SIM FULL WRITE \r\n");
+					// dump_eeprom();
+					return false;
 					// uprintf("matrix (%d)_(%d)_(%d),(%d)_(%d)_(%d)\r\n",
 					// 	g_rappy_pairs[0].lay_a, g_rappy_pairs[0].row_a, g_rappy_pairs[0].col_a,
 					// 	g_rappy_pairs[0].lay_b, g_rappy_pairs[0].row_b, g_rappy_pairs[0].col_b);
 				break;
 				case KC_M3:
 					// eeconfig_rappy_snappy_clear();
-					toggle_key_dump_eeprom();
+					// toggle_key_dump_eeprom();
 				break;
 				case KC_MACRO_C1:
 					macro_engine_start(0);

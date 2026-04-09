@@ -50,10 +50,25 @@ void eeprom_write_dword(uint32_t *addr, uint32_t value) {
 }
 
 void eeprom_update_block(const void *buf, void *addr, size_t len) {
-    uint8_t read_buf[len];
-    eeprom_read_block(read_buf, addr, len);
-    if (memcmp(buf, read_buf, len) != 0) {
-        eeprom_write_block(buf, addr, len);
+    const uint8_t *src = (const uint8_t *)buf;
+    uintptr_t target   = (uintptr_t)addr;
+    uint8_t read_buf[32];
+
+    while (len > 0) {
+        size_t chunk = len;
+
+        if (chunk > sizeof(read_buf)) {
+            chunk = sizeof(read_buf);
+        }
+
+        eeprom_read_block(read_buf, (const void *)target, chunk);
+        if (memcmp(src, read_buf, chunk) != 0) {
+            eeprom_write_block(src, (void *)target, chunk);
+        }
+
+        src += chunk;
+        target += chunk;
+        len -= chunk;
     }
 }
 
