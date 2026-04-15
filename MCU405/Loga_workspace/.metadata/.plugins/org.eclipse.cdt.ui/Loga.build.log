@@ -1,55 +1,5 @@
-16:58:42 **** Incremental Build of configuration Default for project Loga ****
+16:37:55 **** Incremental Build of configuration Default for project Loga ****
 make all 
-Compiling keymap_common.c
-In file included from ../../keyboard_core/tool/chibios/chibios/os/hal/include/hal.h:314,
-                 from ../../keyboard_core/protocol/chibios/usb_main.h:26,
-                 from ../../keyboard_core/common/report.h:146,
-                 from ../../keyboard_core/common/action_util.h:21,
-                 from keymap_common.h:25,
-                 from keymap_common.c:18:
-../../keyboard_core/tool/chibios/chibios/os/hal/include/hal_i2c.h:50: warning: "I2C_TIMEOUT" redefined
-   50 | #define I2C_TIMEOUT                0x20    /**< @brief Hardware timeout.    */
-      | 
-In file included from <command-line>:
-./config.h:180: note: this is the location of the previous definition
-  180 | #define I2C_TIMEOUT 1000 // milliseconds
-      | 
-In file included from ../../keyboard_core/common/action_util.h:21,
-                 from keymap_common.h:25,
-                 from keymap_common.c:18:
-../../keyboard_core/common/report.h:303:1: warning: no semicolon at end of struct or union
-  303 | } trm_calibration_t;
-      | ^
-In file included from ../../keyboard_core/common/action_util.h:21,
-                 from keymap_common.h:25,
-                 from keymap_common.c:18:
-../../keyboard_core/common/report.h:354:1: warning: multi-line comment [-Wcomment]
-  354 | // #define KEYCODE2CONSUMER(key) \
-      | ^
-In file included from keymap_common.h:27,
-                 from keymap_common.c:18:
-../../keyboard_core/common/report.h:354:1: warning: multi-line comment [-Wcomment]
-  354 | // #define KEYCODE2CONSUMER(key) \
-      | ^
-In file included from keymap_common.c:19:
-../../keyboard_core/common/keymap_in_eeprom.h:33:16: note: '#pragma message: EECONFIG_KEYMAP_IN_EEPROM=(uint16_t *)((uint16_t *)((uint16_t *)((uint16_t *)((uint16_t *)(0x80) + (7*16*2)) + (7*16*2))+4)+4)'
-   33 | #       pragma message(VAR_NAME_VALUE(EECONFIG_KEYMAP_IN_EEPROM))
-      |                ^~~~~~~
-keymap_common.c:30:1: warning: multi-line comment [-Wcomment]
-   30 | //   ESC,   F1,   F2,   F3,   F4,   F5,   F6,   F7,   F8,   F9,   F10,   F11,   F12,   PSCR,\
-      | ^
-keymap_common.c:38:1: warning: multi-line comment [-Wcomment]
-   38 | //   BTLD,   TRNS,  TRNS,  TRNS,  TRNS,  TRNS,  TRNS,  TRNS,  TRNS, MEDIA_STOP,  MEDIA_PREV_TRACK,  MEDIA_PLAY_PAUSE,  MEDIA_NEXT_TRACK,  TRNS,\
-      | ^
-keymap_common.c:47:1: warning: multi-line comment [-Wcomment]
-   47 | //   KC_SYRST,   TRNS,  TRNS,  TRNS,  TRNS,  TRNS,  TRNS,  TRNS,  TRNS, MEDIA_STOP,  MEDIA_PREV_TRACK,  MEDIA_PLAY_PAUSE,  MEDIA_NEXT_TRACK,  TRNS,\
-      | ^
-keymap_common.c:83:1: warning: multi-line comment [-Wcomment]
-   83 | //   KC_SYRST,   TRNS,  TRNS,  TRNS,  TRNS,  TRNS,  TRNS,  TRNS,  TRNS, MEDIA_STOP,  MEDIA_PREV_TRACK,  MEDIA_PLAY_PAUSE,  MEDIA_NEXT_TRACK,  TRNS,\
-      | ^
-keymap_common.c:118:1: warning: multi-line comment [-Wcomment]
-  118 | //   KC_SYRST,   TRNS,  TRNS,  TRNS,  TRNS,  TRNS,  TRNS,  TRNS,  TRNS, MEDIA_STOP,  MEDIA_PREV_TRACK,  MEDIA_PLAY_PAUSE,  MEDIA_NEXT_TRACK,  TRNS,\
-      | ^
 Compiling matrix.c
 In file included from ../../keyboard_core/tool/chibios/chibios/os/hal/include/hal.h:314,
                  from matrix.c:2:
@@ -112,7 +62,7 @@ In file included from led/led_effect.h:5,
 ../../keyboard_core/common/report.h:354:1: warning: multi-line comment [-Wcomment]
   354 | // #define KEYCODE2CONSUMER(key) \
       | ^
-In file included from matrix.c:20:
+In file included from matrix.c:21:
 macro_engine.h:18: warning: "EEPROM_MACRO_SLOT_SIZE" redefined
    18 | #define EEPROM_MACRO_SLOT_SIZE    (sizeof(macro_config_t))
       | 
@@ -120,7 +70,7 @@ In file included from <command-line>:
 ./config.h:120: note: this is the location of the previous definition
   120 | #define EEPROM_MACRO_SLOT_SIZE             (sizeof(macro_config_t) * MACRO_GROUP_COUNT)
       | 
-In file included from matrix.c:20:
+In file included from matrix.c:21:
 macro_engine.h:19: warning: "EEPROM_MACRO_SLOT_ADDR" redefined
    19 | #define EEPROM_MACRO_SLOT_ADDR(i) \
       | 
@@ -130,215 +80,262 @@ In file included from <command-line>:
       | 
 In file included from ../../keyboard_core/common/action_util.h:21,
                  from keymap_common.h:25,
-                 from matrix.c:32:
+                 from matrix.c:33:
 ../../keyboard_core/common/report.h:354:1: warning: multi-line comment [-Wcomment]
   354 | // #define KEYCODE2CONSUMER(key) \
       | ^
+In file included from <command-line>:
+matrix.c: In function 'idle_led_note_activity':
+./config.h:70:39: warning: passing argument 1 of 'eeprom_read_byte' makes pointer from integer without a cast [-Wint-conversion]
+   70 | #define KB_COLOR_MODE_ADDR            0x007E
+      |                                       ^~~~~~
+      |                                       |
+      |                                       int
+matrix.c:80:101: note: in expansion of macro 'KB_COLOR_MODE_ADDR'
+   80 |         led_runMode_t wake_mode = idle_led_build_mode(lastLED_RunMode, normalMode, eeprom_read_byte(KB_COLOR_MODE_ADDR));
+      |                                                                                                     ^~~~~~~~~~~~~~~~~~
+In file included from ../../keyboard_core/tool/chibios/chibios/os/hal/include/hal_eeprom.h:19,
+                 from ../../keyboard_core/tool/chibios/chibios/os/hal/include/hal.h:332,
+                 from matrix.c:2:
+../../keyboard_core/tool/chibios/chibios/os/hal/include/eeprom.h:11:42: note: expected 'const uint8_t *' {aka 'const unsigned char *'} but argument is of type 'int'
+   11 | uint8_t  eeprom_read_byte(const uint8_t *__p);
+      |                           ~~~~~~~~~~~~~~~^~~
+In file included from <command-line>:
+matrix.c: In function 'idle_led_maybe_report_timeout':
+./config.h:70:39: warning: passing argument 1 of 'eeprom_read_byte' makes pointer from integer without a cast [-Wint-conversion]
+   70 | #define KB_COLOR_MODE_ADDR            0x007E
+      |                                       ^~~~~~
+      |                                       |
+      |                                       int
+matrix.c:102:95: note: in expansion of macro 'KB_COLOR_MODE_ADDR'
+  102 |     idle_led_restore_mode = idle_led_build_mode(lastLED_RunMode, normalMode, eeprom_read_byte(KB_COLOR_MODE_ADDR));
+      |                                                                                               ^~~~~~~~~~~~~~~~~~
+In file included from ../../keyboard_core/tool/chibios/chibios/os/hal/include/hal_eeprom.h:19,
+                 from ../../keyboard_core/tool/chibios/chibios/os/hal/include/hal.h:332,
+                 from matrix.c:2:
+../../keyboard_core/tool/chibios/chibios/os/hal/include/eeprom.h:11:42: note: expected 'const uint8_t *' {aka 'const unsigned char *'} but argument is of type 'int'
+   11 | uint8_t  eeprom_read_byte(const uint8_t *__p);
+      |                           ~~~~~~~~~~~~~~~^~~
 matrix.c: In function 'send_string':
-matrix.c:56:9: warning: implicit declaration of function 'tap_code16' [-Wimplicit-function-declaration]
-   56 |         tap_code16(*str++);
+matrix.c:118:9: warning: implicit declaration of function 'tap_code16' [-Wimplicit-function-declaration]
+  118 |         tap_code16(*str++);
       |         ^~~~~~~~~~
 matrix.c: In function 'send_A_to_Z':
-matrix.c:64:9: warning: implicit declaration of function 'tap_code' [-Wimplicit-function-declaration]
-   64 |         tap_code(kc);       // Ëº∏Âá∫?ñÆ‰∏???âÈçµ
+matrix.c:126:9: warning: implicit declaration of function 'tap_code' [-Wimplicit-function-declaration]
+  126 |         tap_code(kc);       // Ëº∏Âá∫?ñÆ‰∏???âÈçµ
       |         ^~~~~~~~
 matrix.c: In function 'macro_engine_setup_test_copy_paste':
-matrix.c:78:5: warning: implicit declaration of function 'memset' [-Wimplicit-function-declaration]
-   78 |     memset(cfg, 0, sizeof(*cfg));
+matrix.c:140:5: warning: implicit declaration of function 'memset' [-Wimplicit-function-declaration]
+  140 |     memset(cfg, 0, sizeof(*cfg));
       |     ^~~~~~
-matrix.c:78:5: warning: incompatible implicit declaration of built-in function 'memset'
-matrix.c:36:1: note: include '<string.h>' or provide a declaration of 'memset'
-   35 | #include "../../keyboard_core/protocol/chibios/usb_main.h"
+matrix.c:140:5: warning: incompatible implicit declaration of built-in function 'memset'
+matrix.c:37:1: note: include '<string.h>' or provide a declaration of 'memset'
+   36 | #include "../../keyboard_core/protocol/chibios/usb_main.h"
   +++ |+#include <string.h>
-   36 | #define TRAVEL_STEPS 350
+   37 | #define TRAVEL_STEPS 350
 matrix.c: In function 'macro_engine_dump_eeprom_slot':
-matrix.c:171:15: warning: assignment to 'uint16_t' {aka 'short unsigned int'} from 'uint16_t *' {aka 'short unsigned int *'} makes integer from pointer without a cast [-Wint-conversion]
-  171 |     base_addr = EEPROM_MACRO_SLOT_ADDR(index);
+matrix.c:233:15: warning: assignment to 'uint16_t' {aka 'short unsigned int'} from 'uint16_t *' {aka 'short unsigned int *'} makes integer from pointer without a cast [-Wint-conversion]
+  233 |     base_addr = EEPROM_MACRO_SLOT_ADDR(index);
       |               ^
-matrix.c:172:35: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
-  172 |     step_count = eeprom_read_byte((const uint8_t *)base_addr);
+matrix.c:234:35: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
+  234 |     step_count = eeprom_read_byte((const uint8_t *)base_addr);
       |                                   ^
 matrix.c: In function 'mt_set':
-matrix.c:358:2: warning: implicit declaration of function 'eeconfig_write_modtap'; did you mean 'eeconfig_write_keymap'? [-Wimplicit-function-declaration]
-  358 |  eeconfig_write_modtap(k, &mt_map[k]);
+matrix.c:420:2: warning: implicit declaration of function 'eeconfig_write_modtap'; did you mean 'eeconfig_write_keymap'? [-Wimplicit-function-declaration]
+  420 |  eeconfig_write_modtap(k, &mt_map[k]);
       |  ^~~~~~~~~~~~~~~~~~~~~
       |  eeconfig_write_keymap
 matrix.c: In function 'mt_tick':
-matrix.c:393:36: warning: unused parameter 'L' [-Wunused-parameter]
-  393 | static inline void mt_tick(uint8_t L){
+matrix.c:455:36: warning: unused parameter 'L' [-Wunused-parameter]
+  455 | static inline void mt_tick(uint8_t L){
       |                            ~~~~~~~~^
 matrix.c: At top level:
-matrix.c:430:6: warning: conflicting types for 'eeconfig_write_modtap'
-  430 | void eeconfig_write_modtap(uint8_t idx, const mt_entry_t* in)
+matrix.c:492:6: warning: conflicting types for 'eeconfig_write_modtap'
+  492 | void eeconfig_write_modtap(uint8_t idx, const mt_entry_t* in)
       |      ^~~~~~~~~~~~~~~~~~~~~
-matrix.c:358:2: note: previous implicit declaration of 'eeconfig_write_modtap' was here
-  358 |  eeconfig_write_modtap(k, &mt_map[k]);
+matrix.c:420:2: note: previous implicit declaration of 'eeconfig_write_modtap' was here
+  420 |  eeconfig_write_modtap(k, &mt_map[k]);
       |  ^~~~~~~~~~~~~~~~~~~~~
 matrix.c: In function 'eeconfig_read_modtap':
-matrix.c:444:9: warning: incompatible implicit declaration of built-in function 'memset'
-  444 |         memset(out, 0, sizeof(*out));
+matrix.c:506:9: warning: incompatible implicit declaration of built-in function 'memset'
+  506 |         memset(out, 0, sizeof(*out));
       |         ^~~~~~
-matrix.c:444:9: note: include '<string.h>' or provide a declaration of 'memset'
+matrix.c:506:9: note: include '<string.h>' or provide a declaration of 'memset'
 matrix.c: In function 'modtap_load_form_eeprom':
-matrix.c:459:27: warning: passing argument 2 of 'eeconfig_read_modtap' from incompatible pointer type [-Wincompatible-pointer-types]
-  459 |   eeconfig_read_modtap(i, m);
+matrix.c:521:27: warning: passing argument 2 of 'eeconfig_read_modtap' from incompatible pointer type [-Wincompatible-pointer-types]
+  521 |   eeconfig_read_modtap(i, m);
       |                           ^
       |                           |
       |                           mt_entry_t *
-matrix.c:441:55: note: expected 'socd_config_t *' but argument is of type 'mt_entry_t *'
-  441 | void eeconfig_read_modtap(uint8_t idx, socd_config_t* out)
+matrix.c:503:55: note: expected 'socd_config_t *' but argument is of type 'mt_entry_t *'
+  503 | void eeconfig_read_modtap(uint8_t idx, socd_config_t* out)
       |                                        ~~~~~~~~~~~~~~~^~~
 matrix.c: In function 'eeconfig_modtap_clear':
-matrix.c:482:5: warning: incompatible implicit declaration of built-in function 'memset'
-  482 |     memset(&empty, 0xff, sizeof(empty));
+matrix.c:544:5: warning: incompatible implicit declaration of built-in function 'memset'
+  544 |     memset(&empty, 0xff, sizeof(empty));
       |     ^~~~~~
-matrix.c:482:5: note: include '<string.h>' or provide a declaration of 'memset'
+matrix.c:544:5: note: include '<string.h>' or provide a declaration of 'memset'
 matrix.c: In function 'toggle_key_set':
-matrix.c:533:13: warning: implicit declaration of function 'eeconfig_read_toggle_entry' [-Wimplicit-function-declaration]
-  533 |             eeconfig_read_toggle_entry(i, &tmp);
+matrix.c:595:13: warning: implicit declaration of function 'eeconfig_read_toggle_entry' [-Wimplicit-function-declaration]
+  595 |             eeconfig_read_toggle_entry(i, &tmp);
       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~
-matrix.c:539:17: warning: implicit declaration of function 'eeconfig_clear_toggle_entry' [-Wimplicit-function-declaration]
-  539 |                 eeconfig_clear_toggle_entry(i);
+matrix.c:601:17: warning: implicit declaration of function 'eeconfig_clear_toggle_entry' [-Wimplicit-function-declaration]
+  601 |                 eeconfig_clear_toggle_entry(i);
       |                 ^~~~~~~~~~~~~~~~~~~~~~~~~~~
-matrix.c:567:17: warning: implicit declaration of function 'eeconfig_write_toggle_entry'; did you mean 'eeconfig_write_Trigger'? [-Wimplicit-function-declaration]
-  567 |                 eeconfig_write_toggle_entry(i, tk);
+matrix.c:629:17: warning: implicit declaration of function 'eeconfig_write_toggle_entry'; did you mean 'eeconfig_write_Trigger'? [-Wimplicit-function-declaration]
+  629 |                 eeconfig_write_toggle_entry(i, tk);
       |                 ^~~~~~~~~~~~~~~~~~~~~~~~~~~
       |                 eeconfig_write_Trigger
-matrix.c:552:11: warning: unused variable 'data_start' [-Wunused-variable]
-  552 |   uint8_t data_start;
+matrix.c:614:11: warning: unused variable 'data_start' [-Wunused-variable]
+  614 |   uint8_t data_start;
       |           ^~~~~~~~~~
 matrix.c: At top level:
-matrix.c:656:6: warning: conflicting types for 'eeconfig_write_toggle_entry'
-  656 | void eeconfig_write_toggle_entry(uint8_t index, const toggle_key_slot_t *entry)
+matrix.c:718:6: warning: conflicting types for 'eeconfig_write_toggle_entry'
+  718 | void eeconfig_write_toggle_entry(uint8_t index, const toggle_key_slot_t *entry)
       |      ^~~~~~~~~~~~~~~~~~~~~~~~~~~
-matrix.c:567:17: note: previous implicit declaration of 'eeconfig_write_toggle_entry' was here
-  567 |                 eeconfig_write_toggle_entry(i, tk);
+matrix.c:629:17: note: previous implicit declaration of 'eeconfig_write_toggle_entry' was here
+  629 |                 eeconfig_write_toggle_entry(i, tk);
       |                 ^~~~~~~~~~~~~~~~~~~~~~~~~~~
 In file included from <command-line>:
 matrix.c: In function 'eeconfig_write_toggle_entry':
 ./config.h:114:46: warning: initialization of 'uint16_t' {aka 'short unsigned int'} from 'uint16_t *' {aka 'short unsigned int *'} makes integer from pointer without a cast [-Wint-conversion]
   114 | #define EECONFIG_TOGGLE_KEY_ADDR             (EECONFIG_RAPPYSNAPPY_ADDR + EECONFIG_RAPPYSNAPPY_SIZE)
       |                                              ^
-matrix.c:660:21: note: in expansion of macro 'EECONFIG_TOGGLE_KEY_ADDR'
-  660 |     uint16_t addr = EECONFIG_TOGGLE_KEY_ADDR + index * sizeof(toggle_key_slot_t);
+matrix.c:722:21: note: in expansion of macro 'EECONFIG_TOGGLE_KEY_ADDR'
+  722 |     uint16_t addr = EECONFIG_TOGGLE_KEY_ADDR + index * sizeof(toggle_key_slot_t);
       |                     ^~~~~~~~~~~~~~~~~~~~~~~~
-matrix.c:661:46: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
-  661 |     eeprom_update_block((const void *)entry, (void *)addr, sizeof(toggle_key_slot_t));
+matrix.c:723:46: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
+  723 |     eeprom_update_block((const void *)entry, (void *)addr, sizeof(toggle_key_slot_t));
       |                                              ^
 matrix.c: At top level:
-matrix.c:664:6: warning: conflicting types for 'eeconfig_read_toggle_entry'
-  664 | void eeconfig_read_toggle_entry(uint8_t index, toggle_key_slot_t *entry)
+matrix.c:726:6: warning: conflicting types for 'eeconfig_read_toggle_entry'
+  726 | void eeconfig_read_toggle_entry(uint8_t index, toggle_key_slot_t *entry)
       |      ^~~~~~~~~~~~~~~~~~~~~~~~~~
-matrix.c:533:13: note: previous implicit declaration of 'eeconfig_read_toggle_entry' was here
-  533 |             eeconfig_read_toggle_entry(i, &tmp);
+matrix.c:595:13: note: previous implicit declaration of 'eeconfig_read_toggle_entry' was here
+  595 |             eeconfig_read_toggle_entry(i, &tmp);
       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~
 In file included from <command-line>:
 matrix.c: In function 'eeconfig_read_toggle_entry':
 ./config.h:114:46: warning: initialization of 'uint16_t' {aka 'short unsigned int'} from 'uint16_t *' {aka 'short unsigned int *'} makes integer from pointer without a cast [-Wint-conversion]
   114 | #define EECONFIG_TOGGLE_KEY_ADDR             (EECONFIG_RAPPYSNAPPY_ADDR + EECONFIG_RAPPYSNAPPY_SIZE)
       |                                              ^
-matrix.c:668:21: note: in expansion of macro 'EECONFIG_TOGGLE_KEY_ADDR'
-  668 |     uint16_t addr = EECONFIG_TOGGLE_KEY_ADDR + index * sizeof(toggle_key_slot_t);
+matrix.c:730:21: note: in expansion of macro 'EECONFIG_TOGGLE_KEY_ADDR'
+  730 |     uint16_t addr = EECONFIG_TOGGLE_KEY_ADDR + index * sizeof(toggle_key_slot_t);
       |                     ^~~~~~~~~~~~~~~~~~~~~~~~
-matrix.c:669:38: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
-  669 |     eeprom_read_block((void *)entry, (const void *)addr, sizeof(toggle_key_slot_t));
+matrix.c:731:38: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
+  731 |     eeprom_read_block((void *)entry, (const void *)addr, sizeof(toggle_key_slot_t));
       |                                      ^
 matrix.c: At top level:
-matrix.c:672:6: warning: conflicting types for 'eeconfig_clear_toggle_entry'
-  672 | void eeconfig_clear_toggle_entry(uint8_t index)
+matrix.c:734:6: warning: conflicting types for 'eeconfig_clear_toggle_entry'
+  734 | void eeconfig_clear_toggle_entry(uint8_t index)
       |      ^~~~~~~~~~~~~~~~~~~~~~~~~~~
-matrix.c:539:17: note: previous implicit declaration of 'eeconfig_clear_toggle_entry' was here
-  539 |                 eeconfig_clear_toggle_entry(i);
+matrix.c:601:17: note: previous implicit declaration of 'eeconfig_clear_toggle_entry' was here
+  601 |                 eeconfig_clear_toggle_entry(i);
       |                 ^~~~~~~~~~~~~~~~~~~~~~~~~~~
-matrix.c:678:6: warning: function declaration isn't a prototype [-Wstrict-prototypes]
-  678 | void eeconfig_clear_all_toggle_entry(){
+matrix.c:740:6: warning: function declaration isn't a prototype [-Wstrict-prototypes]
+  740 | void eeconfig_clear_all_toggle_entry(){
       |      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-matrix.c:859:125: warning: excess elements in array initializer
-  859 |   { { 0, 0},{ 0, 6},{ 1, 0},{ 1, 5},{ 1,10},{ 2, 0},{ 2, 6},{ 2,11},{ 3, 0},{ 3, 5},{ 3,11},{ 4, 0},{ 4, 4},{ 4,10},{-1,-1},{-1,-1},{-1,-1}},      //16
+matrix.c:921:125: warning: excess elements in array initializer
+  921 |   { { 0, 0},{ 0, 6},{ 1, 0},{ 1, 5},{ 1,10},{ 2, 0},{ 2, 6},{ 2,11},{ 3, 0},{ 3, 5},{ 3,11},{ 4, 0},{ 4, 4},{ 4,10},{-1,-1},{-1,-1},{-1,-1}},      //16
       |                                                                                                                             ^
-matrix.c:859:125: note: (near initialization for 'matrixAnalogRelocate[0]')
-matrix.c:859:133: warning: excess elements in array initializer
-  859 |   { { 0, 0},{ 0, 6},{ 1, 0},{ 1, 5},{ 1,10},{ 2, 0},{ 2, 6},{ 2,11},{ 3, 0},{ 3, 5},{ 3,11},{ 4, 0},{ 4, 4},{ 4,10},{-1,-1},{-1,-1},{-1,-1}},      //16
+matrix.c:921:125: note: (near initialization for 'matrixAnalogRelocate[0]')
+matrix.c:921:133: warning: excess elements in array initializer
+  921 |   { { 0, 0},{ 0, 6},{ 1, 0},{ 1, 5},{ 1,10},{ 2, 0},{ 2, 6},{ 2,11},{ 3, 0},{ 3, 5},{ 3,11},{ 4, 0},{ 4, 4},{ 4,10},{-1,-1},{-1,-1},{-1,-1}},      //16
       |                                                                                                                                     ^
-matrix.c:859:133: note: (near initialization for 'matrixAnalogRelocate[0]')
-matrix.c:860:125: warning: excess elements in array initializer
-  860 |   { { 0, 1},{ 0, 7},{ 0,11},{ 1, 1},{ 1, 6},{ 1,11},{ 2, 1},{ 2, 7},{ 2,12},{ 3, 1},{ 3, 6},{ 3,12},{ 4, 1},{ 4, 5},{ 5, 4},{-1,-1},{-1,-1}},      //17
+matrix.c:921:133: note: (near initialization for 'matrixAnalogRelocate[0]')
+matrix.c:922:125: warning: excess elements in array initializer
+  922 |   { { 0, 1},{ 0, 7},{ 0,11},{ 1, 1},{ 1, 6},{ 1,11},{ 2, 1},{ 2, 7},{ 2,12},{ 3, 1},{ 3, 6},{ 3,12},{ 4, 1},{ 4, 5},{ 5, 4},{-1,-1},{-1,-1}},      //17
       |                                                                                                                             ^
-matrix.c:860:125: note: (near initialization for 'matrixAnalogRelocate[1]')
-matrix.c:860:133: warning: excess elements in array initializer
-  860 |   { { 0, 1},{ 0, 7},{ 0,11},{ 1, 1},{ 1, 6},{ 1,11},{ 2, 1},{ 2, 7},{ 2,12},{ 3, 1},{ 3, 6},{ 3,12},{ 4, 1},{ 4, 5},{ 5, 4},{-1,-1},{-1,-1}},      //17
+matrix.c:922:125: note: (near initialization for 'matrixAnalogRelocate[1]')
+matrix.c:922:133: warning: excess elements in array initializer
+  922 |   { { 0, 1},{ 0, 7},{ 0,11},{ 1, 1},{ 1, 6},{ 1,11},{ 2, 1},{ 2, 7},{ 2,12},{ 3, 1},{ 3, 6},{ 3,12},{ 4, 1},{ 4, 5},{ 5, 4},{-1,-1},{-1,-1}},      //17
       |                                                                                                                                     ^
-matrix.c:860:133: note: (near initialization for 'matrixAnalogRelocate[1]')
-matrix.c:861:125: warning: excess elements in array initializer
-  861 |   { { 0, 2},{ 0, 8},{ 0,12},{ 1, 2},{ 1, 7},{ 1,12},{ 2, 2},{ 2, 8},{ 2,13},{ 3, 2},{ 3, 7},{ 3,13},{ 4, 2},{ 4, 6},{ 6, 5},{-1,-1},{-1,-1}},      //17
+matrix.c:922:133: note: (near initialization for 'matrixAnalogRelocate[1]')
+matrix.c:923:125: warning: excess elements in array initializer
+  923 |   { { 0, 2},{ 0, 8},{ 0,12},{ 1, 2},{ 1, 7},{ 1,12},{ 2, 2},{ 2, 8},{ 2,13},{ 3, 2},{ 3, 7},{ 3,13},{ 4, 2},{ 4, 6},{ 6, 5},{-1,-1},{-1,-1}},      //17
       |                                                                                                                             ^
-matrix.c:861:125: note: (near initialization for 'matrixAnalogRelocate[2]')
-matrix.c:861:133: warning: excess elements in array initializer
-  861 |   { { 0, 2},{ 0, 8},{ 0,12},{ 1, 2},{ 1, 7},{ 1,12},{ 2, 2},{ 2, 8},{ 2,13},{ 3, 2},{ 3, 7},{ 3,13},{ 4, 2},{ 4, 6},{ 6, 5},{-1,-1},{-1,-1}},      //17
+matrix.c:923:125: note: (near initialization for 'matrixAnalogRelocate[2]')
+matrix.c:923:133: warning: excess elements in array initializer
+  923 |   { { 0, 2},{ 0, 8},{ 0,12},{ 1, 2},{ 1, 7},{ 1,12},{ 2, 2},{ 2, 8},{ 2,13},{ 3, 2},{ 3, 7},{ 3,13},{ 4, 2},{ 4, 6},{ 6, 5},{-1,-1},{-1,-1}},      //17
       |                                                                                                                                     ^
-matrix.c:861:133: note: (near initialization for 'matrixAnalogRelocate[2]')
-matrix.c:862:125: warning: excess elements in array initializer
-  862 |   { { 0, 3},{ 0, 9},{ 0,13},{ 1, 3},{ 1, 8},{ 1,13},{ 2, 3},{ 2, 9},{ 2,14},{ 3, 3},{ 3, 8},{ 4, 3},{ 4, 7},{ 6, 6},{-1,-1},{-1,-1},{-1,-1}},      //13
+matrix.c:923:133: note: (near initialization for 'matrixAnalogRelocate[2]')
+matrix.c:924:125: warning: excess elements in array initializer
+  924 |   { { 0, 3},{ 0, 9},{ 0,13},{ 1, 3},{ 1, 8},{ 1,13},{ 2, 3},{ 2, 9},{ 2,14},{ 3, 3},{ 3, 8},{ 4, 3},{ 4, 7},{ 6, 6},{-1,-1},{-1,-1},{-1,-1}},      //13
       |                                                                                                                             ^
-matrix.c:862:125: note: (near initialization for 'matrixAnalogRelocate[3]')
-matrix.c:862:133: warning: excess elements in array initializer
-  862 |   { { 0, 3},{ 0, 9},{ 0,13},{ 1, 3},{ 1, 8},{ 1,13},{ 2, 3},{ 2, 9},{ 2,14},{ 3, 3},{ 3, 8},{ 4, 3},{ 4, 7},{ 6, 6},{-1,-1},{-1,-1},{-1,-1}},      //13
+matrix.c:924:125: note: (near initialization for 'matrixAnalogRelocate[3]')
+matrix.c:924:133: warning: excess elements in array initializer
+  924 |   { { 0, 3},{ 0, 9},{ 0,13},{ 1, 3},{ 1, 8},{ 1,13},{ 2, 3},{ 2, 9},{ 2,14},{ 3, 3},{ 3, 8},{ 4, 3},{ 4, 7},{ 6, 6},{-1,-1},{-1,-1},{-1,-1}},      //13
       |                                                                                                                                     ^
-matrix.c:862:133: note: (near initialization for 'matrixAnalogRelocate[3]')
-matrix.c:863:125: warning: excess elements in array initializer
-  863 |   { { 0, 4},{ 0,14},{ 1, 4},{ 1, 9},{ 1,14},{ 2, 4},{ 2,10},{ 2,15},{ 3, 4},{ 3, 9},{ 3,14},{ 4, 8},{ 6, 1},{-1,-1},{-1,-1},{-1,-1},{-1,-1}},      //13
+matrix.c:924:133: note: (near initialization for 'matrixAnalogRelocate[3]')
+matrix.c:925:125: warning: excess elements in array initializer
+  925 |   { { 0, 4},{ 0,14},{ 1, 4},{ 1, 9},{ 1,14},{ 2, 4},{ 2,10},{ 2,15},{ 3, 4},{ 3, 9},{ 3,14},{ 4, 8},{ 6, 1},{-1,-1},{-1,-1},{-1,-1},{-1,-1}},      //13
       |                                                                                                                             ^
-matrix.c:863:125: note: (near initialization for 'matrixAnalogRelocate[4]')
-matrix.c:863:133: warning: excess elements in array initializer
-  863 |   { { 0, 4},{ 0,14},{ 1, 4},{ 1, 9},{ 1,14},{ 2, 4},{ 2,10},{ 2,15},{ 3, 4},{ 3, 9},{ 3,14},{ 4, 8},{ 6, 1},{-1,-1},{-1,-1},{-1,-1},{-1,-1}},      //13
+matrix.c:925:125: note: (near initialization for 'matrixAnalogRelocate[4]')
+matrix.c:925:133: warning: excess elements in array initializer
+  925 |   { { 0, 4},{ 0,14},{ 1, 4},{ 1, 9},{ 1,14},{ 2, 4},{ 2,10},{ 2,15},{ 3, 4},{ 3, 9},{ 3,14},{ 4, 8},{ 6, 1},{-1,-1},{-1,-1},{-1,-1},{-1,-1}},      //13
       |                                                                                                                                     ^
-matrix.c:863:133: note: (near initialization for 'matrixAnalogRelocate[4]')
-matrix.c:864:125: warning: excess elements in array initializer
-  864 |   { { 0, 5},{ 0,10},{ 0,15},{ 2, 5},{ 3,10},{ 3,15},{ 4, 9},{ 5, 0},{ 5, 2},{ 5, 3},{-1,-1},{-1,-1},{-1,-1},{-1,-1},{-1,-1},{-1,-1},{-1,-1}},      //11
+matrix.c:925:133: note: (near initialization for 'matrixAnalogRelocate[4]')
+matrix.c:926:125: warning: excess elements in array initializer
+  926 |   { { 0, 5},{ 0,10},{ 0,15},{ 2, 5},{ 3,10},{ 3,15},{ 4, 9},{ 5, 0},{ 5, 2},{ 5, 3},{-1,-1},{-1,-1},{-1,-1},{-1,-1},{-1,-1},{-1,-1},{-1,-1}},      //11
       |                                                                                                                             ^
-matrix.c:864:125: note: (near initialization for 'matrixAnalogRelocate[5]')
-matrix.c:864:133: warning: excess elements in array initializer
-  864 |   { { 0, 5},{ 0,10},{ 0,15},{ 2, 5},{ 3,10},{ 3,15},{ 4, 9},{ 5, 0},{ 5, 2},{ 5, 3},{-1,-1},{-1,-1},{-1,-1},{-1,-1},{-1,-1},{-1,-1},{-1,-1}},      //11
+matrix.c:926:125: note: (near initialization for 'matrixAnalogRelocate[5]')
+matrix.c:926:133: warning: excess elements in array initializer
+  926 |   { { 0, 5},{ 0,10},{ 0,15},{ 2, 5},{ 3,10},{ 3,15},{ 4, 9},{ 5, 0},{ 5, 2},{ 5, 3},{-1,-1},{-1,-1},{-1,-1},{-1,-1},{-1,-1},{-1,-1},{-1,-1}},      //11
       |                                                                                                                                     ^
-matrix.c:864:133: note: (near initialization for 'matrixAnalogRelocate[5]')
+matrix.c:926:133: note: (near initialization for 'matrixAnalogRelocate[5]')
 matrix.c: In function 'on_key_changed':
-matrix.c:915:21: warning: implicit declaration of function 'get_highest_layer' [-Wimplicit-function-declaration]
-  915 |     uint8_t layer = get_highest_layer(layer_state);
+matrix.c:977:21: warning: implicit declaration of function 'get_highest_layer' [-Wimplicit-function-declaration]
+  977 |     uint8_t layer = get_highest_layer(layer_state);
       |                     ^~~~~~~~~~~~~~~~~
 matrix.c: In function 'calc_pressed_now':
-matrix.c:941:24: warning: implicit declaration of function 'eeconfig_read_Trigger'; did you mean 'eeconfig_read_Trigge'? [-Wimplicit-function-declaration]
-  941 |         if (adcCalc > (eeconfig_read_Trigger(row, col) + draftValue)) return true;
+matrix.c:1003:24: warning: implicit declaration of function 'eeconfig_read_Trigger'; did you mean 'eeconfig_read_Trigge'? [-Wimplicit-function-declaration]
+ 1003 |         if (adcCalc > (eeconfig_read_Trigger(row, col) + draftValue)) return true;
       |                        ^~~~~~~~~~~~~~~~~~~~~
       |                        eeconfig_read_Trigge
 matrix.c: In function 'hook_early_init':
-matrix.c:962:5: warning: implicit declaration of function 'i2c_init'; did you mean 'i2cInit'? [-Wimplicit-function-declaration]
-  962 |     i2c_init();
+matrix.c:1024:5: warning: implicit declaration of function 'i2c_init'; did you mean 'i2cInit'? [-Wimplicit-function-declaration]
+ 1024 |     i2c_init();
       |     ^~~~~~~~
       |     i2cInit
-matrix.c:1015:2: warning: implicit declaration of function 'eeconfig_keyBuffer_init' [-Wimplicit-function-declaration]
- 1015 |  eeconfig_keyBuffer_init();
+matrix.c:1077:2: warning: implicit declaration of function 'eeconfig_keyBuffer_init' [-Wimplicit-function-declaration]
+ 1077 |  eeconfig_keyBuffer_init();
       |  ^~~~~~~~~~~~~~~~~~~~~~~
-matrix.c:1027:5: warning: incompatible implicit declaration of built-in function 'memset'
- 1027 |     memset(matrix, 0, MATRIX_ROWS);
+matrix.c:1089:5: warning: incompatible implicit declaration of built-in function 'memset'
+ 1089 |     memset(matrix, 0, MATRIX_ROWS);
       |     ^~~~~~
-matrix.c:1027:5: note: include '<string.h>' or provide a declaration of 'memset'
-matrix.c:1027:5: warning: 'memset' used with length equal to number of elements without multiplication by element size [-Wmemset-elt-size]
-matrix.c:955:13: warning: unused variable 'i' [-Wunused-variable]
-  955 |     int16_t i;
+matrix.c:1089:5: note: include '<string.h>' or provide a declaration of 'memset'
+matrix.c:1089:5: warning: 'memset' used with length equal to number of elements without multiplication by element size [-Wmemset-elt-size]
+matrix.c:1017:13: warning: unused variable 'i' [-Wunused-variable]
+ 1017 |     int16_t i;
       |             ^
 matrix.c: At top level:
-matrix.c:1073:6: warning: function declaration isn't a prototype [-Wstrict-prototypes]
- 1073 | void hook_late_init()
+matrix.c:1135:6: warning: function declaration isn't a prototype [-Wstrict-prototypes]
+ 1135 | void hook_late_init()
       |      ^~~~~~~~~~~~~~
 In file included from <command-line>:
 matrix.c: In function 'hook_late_init':
+./config.h:70:39: warning: passing argument 1 of 'eeprom_read_byte' makes pointer from integer without a cast [-Wint-conversion]
+   70 | #define KB_COLOR_MODE_ADDR            0x007E
+      |                                       ^~~~~~
+      |                                       |
+      |                                       int
+matrix.c:1144:98: note: in expansion of macro 'KB_COLOR_MODE_ADDR'
+ 1144 |     idle_led_restore_mode = idle_led_build_mode(currentLED_RunMode, normalMode, eeprom_read_byte(KB_COLOR_MODE_ADDR));
+      |                                                                                                  ^~~~~~~~~~~~~~~~~~
+In file included from ../../keyboard_core/tool/chibios/chibios/os/hal/include/hal_eeprom.h:19,
+                 from ../../keyboard_core/tool/chibios/chibios/os/hal/include/hal.h:332,
+                 from matrix.c:2:
+../../keyboard_core/tool/chibios/chibios/os/hal/include/eeprom.h:11:42: note: expected 'const uint8_t *' {aka 'const unsigned char *'} but argument is of type 'int'
+   11 | uint8_t  eeprom_read_byte(const uint8_t *__p);
+      |                           ~~~~~~~~~~~~~~~^~~
+In file included from <command-line>:
 ./config.h:61:39: warning: passing argument 1 of 'eeprom_read_byte' makes pointer from integer without a cast [-Wint-conversion]
    61 | #define EECONFIG_POLLING_RATE         0x0070
       |                                       ^~~~~~
       |                                       |
       |                                       int
-matrix.c:1091:40: note: in expansion of macro 'EECONFIG_POLLING_RATE'
- 1091 |  usb_set_polling_rate(eeprom_read_byte(EECONFIG_POLLING_RATE));
+matrix.c:1160:40: note: in expansion of macro 'EECONFIG_POLLING_RATE'
+ 1160 |  usb_set_polling_rate(eeprom_read_byte(EECONFIG_POLLING_RATE));
       |                                        ^~~~~~~~~~~~~~~~~~~~~
 In file included from ../../keyboard_core/tool/chibios/chibios/os/hal/include/hal_eeprom.h:19,
                  from ../../keyboard_core/tool/chibios/chibios/os/hal/include/hal.h:332,
@@ -352,8 +349,8 @@ In file included from <command-line>:
       |                                       ^~~~~~
       |                                       |
       |                                       int
-matrix.c:1096:21: note: in expansion of macro 'EEPROM_FACTORY_INIT_FLAG_ADDR'
- 1096 |   eeprom_write_word(EEPROM_FACTORY_INIT_FLAG_ADDR, 0xF2);
+matrix.c:1165:21: note: in expansion of macro 'EEPROM_FACTORY_INIT_FLAG_ADDR'
+ 1165 |   eeprom_write_word(EEPROM_FACTORY_INIT_FLAG_ADDR, 0xF2);
       |                     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In file included from ../../keyboard_core/tool/chibios/chibios/os/hal/include/hal_eeprom.h:19,
                  from ../../keyboard_core/tool/chibios/chibios/os/hal/include/hal.h:332,
@@ -367,8 +364,8 @@ In file included from <command-line>:
       |                                       ^~~~~~
       |                                       |
       |                                       int
-matrix.c:1101:37: note: in expansion of macro 'RAPID_KEY_ENABLE_ADDR'
- 1101 |   rapidKeyEnable = eeprom_read_byte(RAPID_KEY_ENABLE_ADDR);
+matrix.c:1170:37: note: in expansion of macro 'RAPID_KEY_ENABLE_ADDR'
+ 1170 |   rapidKeyEnable = eeprom_read_byte(RAPID_KEY_ENABLE_ADDR);
       |                                     ^~~~~~~~~~~~~~~~~~~~~
 In file included from ../../keyboard_core/tool/chibios/chibios/os/hal/include/hal_eeprom.h:19,
                  from ../../keyboard_core/tool/chibios/chibios/os/hal/include/hal.h:332,
@@ -382,8 +379,8 @@ In file included from <command-line>:
       |                                       ^~~~~~
       |                                       |
       |                                       int
-matrix.c:1102:22: note: in expansion of macro 'KB_COLOR_MODE_ADDR'
- 1102 |   eeprom_update_byte(KB_COLOR_MODE_ADDR, 8);
+matrix.c:1171:22: note: in expansion of macro 'KB_COLOR_MODE_ADDR'
+ 1171 |   eeprom_update_byte(KB_COLOR_MODE_ADDR, 8);
       |                      ^~~~~~~~~~~~~~~~~~
 In file included from ../../keyboard_core/tool/chibios/chibios/os/hal/include/hal_eeprom.h:19,
                  from ../../keyboard_core/tool/chibios/chibios/os/hal/include/hal.h:332,
@@ -397,8 +394,8 @@ In file included from <command-line>:
       |                                       ^~~~~~
       |                                       |
       |                                       int
-matrix.c:1103:21: note: in expansion of macro 'EECONFIG_POLLING_RATE'
- 1103 |   eeprom_write_word(EECONFIG_POLLING_RATE, 0x00);
+matrix.c:1172:21: note: in expansion of macro 'EECONFIG_POLLING_RATE'
+ 1172 |   eeprom_write_word(EECONFIG_POLLING_RATE, 0x00);
       |                     ^~~~~~~~~~~~~~~~~~~~~
 In file included from ../../keyboard_core/tool/chibios/chibios/os/hal/include/hal_eeprom.h:19,
                  from ../../keyboard_core/tool/chibios/chibios/os/hal/include/hal.h:332,
@@ -412,8 +409,8 @@ In file included from <command-line>:
       |                                       ^~~~~~
       |                                       |
       |                                       int
-matrix.c:1104:21: note: in expansion of macro 'EECONFIG_MAC_MODE'
- 1104 |   eeprom_write_word(EECONFIG_MAC_MODE, 0x00);
+matrix.c:1173:21: note: in expansion of macro 'EECONFIG_MAC_MODE'
+ 1173 |   eeprom_write_word(EECONFIG_MAC_MODE, 0x00);
       |                     ^~~~~~~~~~~~~~~~~
 In file included from ../../keyboard_core/tool/chibios/chibios/os/hal/include/hal_eeprom.h:19,
                  from ../../keyboard_core/tool/chibios/chibios/os/hal/include/hal.h:332,
@@ -427,8 +424,8 @@ In file included from <command-line>:
       |                                       ^~~~~~
       |                                       |
       |                                       int
-matrix.c:1110:22: note: in expansion of macro 'IS_SOCD_ON_ADD'
- 1110 |  if(eeprom_read_word(IS_SOCD_ON_ADD) == 0x01){
+matrix.c:1179:22: note: in expansion of macro 'IS_SOCD_ON_ADD'
+ 1179 |  if(eeprom_read_word(IS_SOCD_ON_ADD) == 0x01){
       |                      ^~~~~~~~~~~~~~
 In file included from ../../keyboard_core/tool/chibios/chibios/os/hal/include/hal_eeprom.h:19,
                  from ../../keyboard_core/tool/chibios/chibios/os/hal/include/hal.h:332,
@@ -442,8 +439,8 @@ In file included from <command-line>:
       |                                       ^~~~~~
       |                                       |
       |                                       int
-matrix.c:1115:27: note: in expansion of macro 'EECONFIG_MAC_MODE'
- 1115 |  isMac = eeprom_read_word(EECONFIG_MAC_MODE);
+matrix.c:1184:27: note: in expansion of macro 'EECONFIG_MAC_MODE'
+ 1184 |  isMac = eeprom_read_word(EECONFIG_MAC_MODE);
       |                           ^~~~~~~~~~~~~~~~~
 In file included from ../../keyboard_core/tool/chibios/chibios/os/hal/include/hal_eeprom.h:19,
                  from ../../keyboard_core/tool/chibios/chibios/os/hal/include/hal.h:332,
@@ -452,65 +449,65 @@ In file included from ../../keyboard_core/tool/chibios/chibios/os/hal/include/ha
    12 | uint16_t eeprom_read_word(const uint16_t *__p);
       |                           ~~~~~~~~~~~~~~~~^~~
 matrix.c: In function 'irq_storm_gpt9_cb':
-matrix.c:1410:18: warning: unused variable 'toggleGpio' [-Wunused-variable]
- 1410 |      static bool toggleGpio = 0;
+matrix.c:1479:18: warning: unused variable 'toggleGpio' [-Wunused-variable]
+ 1479 |      static bool toggleGpio = 0;
       |                  ^~~~~~~~~~
-matrix.c:1382:35: warning: unused parameter 'gptp' [-Wunused-parameter]
- 1382 | void irq_storm_gpt9_cb(GPTDriver* gptp)
+matrix.c:1451:35: warning: unused parameter 'gptp' [-Wunused-parameter]
+ 1451 | void irq_storm_gpt9_cb(GPTDriver* gptp)
       |                        ~~~~~~~~~~~^~~~
 matrix.c: In function 'adcOffsetGet':
-matrix.c:1462:9: warning: incompatible implicit declaration of built-in function 'memset'
- 1462 |         memset(initPostionLevel, 0, sizeof(initPostionLevel));
+matrix.c:1531:9: warning: incompatible implicit declaration of built-in function 'memset'
+ 1531 |         memset(initPostionLevel, 0, sizeof(initPostionLevel));
       |         ^~~~~~
-matrix.c:1462:9: note: include '<string.h>' or provide a declaration of 'memset'
+matrix.c:1531:9: note: include '<string.h>' or provide a declaration of 'memset'
 matrix.c: In function 'adcOffsetCalc':
-matrix.c:1482:5: warning: incompatible implicit declaration of built-in function 'memset'
- 1482 |     memset(initPostionLevel, 0, sizeof(initPostionLevel));
+matrix.c:1551:5: warning: incompatible implicit declaration of built-in function 'memset'
+ 1551 |     memset(initPostionLevel, 0, sizeof(initPostionLevel));
       |     ^~~~~~
-matrix.c:1482:5: note: include '<string.h>' or provide a declaration of 'memset'
-matrix.c:1480:14: warning: unused variable 'k' [-Wunused-variable]
- 1480 |     uint16_t k = 0;
+matrix.c:1551:5: note: include '<string.h>' or provide a declaration of 'memset'
+matrix.c:1549:14: warning: unused variable 'k' [-Wunused-variable]
+ 1549 |     uint16_t k = 0;
       |              ^
-matrix.c:1478:25: warning: unused parameter 'findMax' [-Wunused-parameter]
- 1478 | void adcOffsetCalc(bool findMax, bool update, uint16_t samples)
+matrix.c:1547:25: warning: unused parameter 'findMax' [-Wunused-parameter]
+ 1547 | void adcOffsetCalc(bool findMax, bool update, uint16_t samples)
       |                         ^
 matrix.c: In function 'adcTravelCalc':
-matrix.c:1561:13: warning: implicit declaration of function 'ledAllOff' [-Wimplicit-function-declaration]
- 1561 |             ledAllOff(true);
+matrix.c:1630:13: warning: implicit declaration of function 'ledAllOff' [-Wimplicit-function-declaration]
+ 1630 |             ledAllOff(true);
       |             ^~~~~~~~~
-matrix.c:1565:13: warning: incompatible implicit declaration of built-in function 'memset'
- 1565 |             memset(travelPostionLevel, 0, sizeof(travelPostionLevel));
+matrix.c:1634:13: warning: incompatible implicit declaration of built-in function 'memset'
+ 1634 |             memset(travelPostionLevel, 0, sizeof(travelPostionLevel));
       |             ^~~~~~
-matrix.c:1565:13: note: include '<string.h>' or provide a declaration of 'memset'
-matrix.c:1551:14: warning: unused variable 'SampleTimer' [-Wunused-variable]
- 1551 |     uint32_t SampleTimer;
+matrix.c:1634:13: note: include '<string.h>' or provide a declaration of 'memset'
+matrix.c:1620:14: warning: unused variable 'SampleTimer' [-Wunused-variable]
+ 1620 |     uint32_t SampleTimer;
       |              ^~~~~~~~~~~
 matrix.c: In function 'muxSelect':
-matrix.c:1650:44: warning: suggest parentheses around arithmetic in operand of '|' [-Wparentheses]
- 1650 |  data_pa = (((data & 0x01) | ((data >> 2)) & 0x1e)) << 3;
+matrix.c:1719:44: warning: suggest parentheses around arithmetic in operand of '|' [-Wparentheses]
+ 1719 |  data_pa = (((data & 0x01) | ((data >> 2)) & 0x1e)) << 3;
       |                              ~~~~~~~~~~~~~~^~~~~~
 matrix.c: In function 'adccallback':
-matrix.c:1819:36: warning: unused parameter 'adcp' [-Wunused-parameter]
- 1819 | static void adccallback(ADCDriver* adcp)
+matrix.c:1888:36: warning: unused parameter 'adcp' [-Wunused-parameter]
+ 1888 | static void adccallback(ADCDriver* adcp)
       |                         ~~~~~~~~~~~^~~~
 matrix.c: In function 'analogPowerSwitch':
-matrix.c:1848:44: warning: suggest parentheses around arithmetic in operand of '|' [-Wparentheses]
- 1848 |  data_pa = (((data & 0x01) | ((data >> 2)) & 0x1e)) << 3;
+matrix.c:1917:44: warning: suggest parentheses around arithmetic in operand of '|' [-Wparentheses]
+ 1917 |  data_pa = (((data & 0x01) | ((data >> 2)) & 0x1e)) << 3;
       |                              ~~~~~~~~~~~~~~^~~~~~
 matrix.c: In function 'perform_factory_reset':
-matrix.c:2199:2: warning: implicit declaration of function 'write_Release_to_eeprom'; did you mean 'write_keymap_to_eeprom'? [-Wimplicit-function-declaration]
- 2199 |  write_Release_to_eeprom();
+matrix.c:2268:2: warning: implicit declaration of function 'write_Release_to_eeprom'; did you mean 'write_keymap_to_eeprom'? [-Wimplicit-function-declaration]
+ 2268 |  write_Release_to_eeprom();
       |  ^~~~~~~~~~~~~~~~~~~~~~~
       |  write_keymap_to_eeprom
 matrix.c: In function 'matrixAnalogScan':
-matrix.c:2257:16: warning: unused variable 'now' [-Wunused-variable]
- 2257 |    adcsample_t now    = samples2[channel][group];
+matrix.c:2326:16: warning: unused variable 'now' [-Wunused-variable]
+ 2326 |    adcsample_t now    = samples2[channel][group];
       |                ^~~
-matrix.c:2723:4: warning: implicit declaration of function 'memcpy' [-Wimplicit-function-declaration]
- 2723 |    memcpy(matrix, matrix_temp, sizeof(matrix));
+matrix.c:2792:4: warning: implicit declaration of function 'memcpy' [-Wimplicit-function-declaration]
+ 2792 |    memcpy(matrix, matrix_temp, sizeof(matrix));
       |    ^~~~~~
-matrix.c:2723:4: warning: incompatible implicit declaration of built-in function 'memcpy'
-matrix.c:2723:4: note: include '<string.h>' or provide a declaration of 'memcpy'
+matrix.c:2792:4: warning: incompatible implicit declaration of built-in function 'memcpy'
+matrix.c:2792:4: note: include '<string.h>' or provide a declaration of 'memcpy'
 In file included from <command-line>:
 matrix.c: In function 'eeclr_task':
 ./config.h:66:39: warning: passing argument 1 of 'eeprom_update_byte' makes pointer from integer without a cast [-Wint-conversion]
@@ -518,8 +515,8 @@ matrix.c: In function 'eeclr_task':
       |                                       ^~~~~~
       |                                       |
       |                                       int
-matrix.c:2779:23: note: in expansion of macro 'KB_ENCODER_MODE_ADDR'
- 2779 |    eeprom_update_byte(KB_ENCODER_MODE_ADDR, knobState);
+matrix.c:2848:23: note: in expansion of macro 'KB_ENCODER_MODE_ADDR'
+ 2848 |    eeprom_update_byte(KB_ENCODER_MODE_ADDR, knobState);
       |                       ^~~~~~~~~~~~~~~~~~~~
 In file included from ../../keyboard_core/tool/chibios/chibios/os/hal/include/hal_eeprom.h:19,
                  from ../../keyboard_core/tool/chibios/chibios/os/hal/include/hal.h:332,
@@ -527,8 +524,8 @@ In file included from ../../keyboard_core/tool/chibios/chibios/os/hal/include/ha
 ../../keyboard_core/tool/chibios/chibios/os/hal/include/eeprom.h:19:38: note: expected 'uint8_t *' {aka 'unsigned char *'} but argument is of type 'int'
    19 | void     eeprom_update_byte(uint8_t *__p, uint8_t __value);
       |                             ~~~~~~~~~^~~
-matrix.c:2781:4: warning: implicit declaration of function 'eeconfig_rappy_snappy_clear' [-Wimplicit-function-declaration]
- 2781 |    eeconfig_rappy_snappy_clear();
+matrix.c:2850:4: warning: implicit declaration of function 'eeconfig_rappy_snappy_clear' [-Wimplicit-function-declaration]
+ 2850 |    eeconfig_rappy_snappy_clear();
       |    ^~~~~~~~~~~~~~~~~~~~~~~~~~~
 In file included from <command-line>:
 ./config.h:70:39: warning: passing argument 1 of 'eeprom_update_byte' makes pointer from integer without a cast [-Wint-conversion]
@@ -536,8 +533,8 @@ In file included from <command-line>:
       |                                       ^~~~~~
       |                                       |
       |                                       int
-matrix.c:2786:23: note: in expansion of macro 'KB_COLOR_MODE_ADDR'
- 2786 |    eeprom_update_byte(KB_COLOR_MODE_ADDR, currentLED_RunMode.mode);
+matrix.c:2855:23: note: in expansion of macro 'KB_COLOR_MODE_ADDR'
+ 2855 |    eeprom_update_byte(KB_COLOR_MODE_ADDR, currentLED_RunMode.mode);
       |                       ^~~~~~~~~~~~~~~~~~
 In file included from ../../keyboard_core/tool/chibios/chibios/os/hal/include/hal_eeprom.h:19,
                  from ../../keyboard_core/tool/chibios/chibios/os/hal/include/hal.h:332,
@@ -551,8 +548,8 @@ In file included from <command-line>:
       |                                       ^~~~~~
       |                                       |
       |                                       int
-matrix.c:2787:22: note: in expansion of macro 'EECONFIG_POLLING_RATE'
- 2787 |    eeprom_write_word(EECONFIG_POLLING_RATE, 0x00);
+matrix.c:2856:22: note: in expansion of macro 'EECONFIG_POLLING_RATE'
+ 2856 |    eeprom_write_word(EECONFIG_POLLING_RATE, 0x00);
       |                      ^~~~~~~~~~~~~~~~~~~~~
 In file included from ../../keyboard_core/tool/chibios/chibios/os/hal/include/hal_eeprom.h:19,
                  from ../../keyboard_core/tool/chibios/chibios/os/hal/include/hal.h:332,
@@ -566,8 +563,8 @@ In file included from <command-line>:
       |                                       ^~~~~~
       |                                       |
       |                                       int
-matrix.c:2807:22: note: in expansion of macro 'EEPROM_FACTORY_INIT_FLAG_ADDR'
- 2807 |    eeprom_write_word(EEPROM_FACTORY_INIT_FLAG_ADDR, 0xFA);
+matrix.c:2876:22: note: in expansion of macro 'EEPROM_FACTORY_INIT_FLAG_ADDR'
+ 2876 |    eeprom_write_word(EEPROM_FACTORY_INIT_FLAG_ADDR, 0xFA);
       |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In file included from ../../keyboard_core/tool/chibios/chibios/os/hal/include/hal_eeprom.h:19,
                  from ../../keyboard_core/tool/chibios/chibios/os/hal/include/hal.h:332,
@@ -576,50 +573,50 @@ In file included from ../../keyboard_core/tool/chibios/chibios/os/hal/include/ha
    16 | void     eeprom_write_word(uint16_t *__p, uint16_t __value);
       |                            ~~~~~~~~~~^~~
 matrix.c: In function 'matrixAnalogScan':
-matrix.c:2180:24: warning: unused variable 'rapidEndCheck' [-Wunused-variable]
- 2180 |  bool rapidStartCheck, rapidEndCheck;
+matrix.c:2249:24: warning: unused variable 'rapidEndCheck' [-Wunused-variable]
+ 2249 |  bool rapidStartCheck, rapidEndCheck;
       |                        ^~~~~~~~~~~~~
-matrix.c:2180:7: warning: unused variable 'rapidStartCheck' [-Wunused-variable]
- 2180 |  bool rapidStartCheck, rapidEndCheck;
+matrix.c:2249:7: warning: unused variable 'rapidStartCheck' [-Wunused-variable]
+ 2249 |  bool rapidStartCheck, rapidEndCheck;
       |       ^~~~~~~~~~~~~~~
 matrix.c: In function 'matrixAnalogFind':
-matrix.c:3153:13: warning: unused variable 'releaseLevel' [-Wunused-variable]
- 3153 |         int releaseLevel = 5;
+matrix.c:3222:13: warning: unused variable 'releaseLevel' [-Wunused-variable]
+ 3222 |         int releaseLevel = 5;
       |             ^~~~~~~~~~~~
-matrix.c:3152:13: warning: unused variable 'triggerLevel' [-Wunused-variable]
- 3152 |         int triggerLevel = 20;
+matrix.c:3221:13: warning: unused variable 'triggerLevel' [-Wunused-variable]
+ 3221 |         int triggerLevel = 20;
       |             ^~~~~~~~~~~~
 matrix.c: In function 'ADC_ProcessThread':
-matrix.c:3244:2: warning: implicit declaration of function 'via_init' [-Wimplicit-function-declaration]
- 3244 |  via_init();
+matrix.c:3313:2: warning: implicit declaration of function 'via_init' [-Wimplicit-function-declaration]
+ 3313 |  via_init();
       |  ^~~~~~~~
-matrix.c:3267:2: warning: implicit declaration of function 'rapidTriggerProcess' [-Wimplicit-function-declaration]
- 3267 |  rapidTriggerProcess(true,0);
+matrix.c:3336:2: warning: implicit declaration of function 'rapidTriggerProcess' [-Wimplicit-function-declaration]
+ 3336 |  rapidTriggerProcess(true,0);
       |  ^~~~~~~~~~~~~~~~~~~
 In file included from ../../keyboard_core/tool/chibios/chibios/os/rt/include/chport.h:37,
                  from ../../keyboard_core/tool/chibios/chibios/os/rt/include/ch.h:106,
                  from matrix.c:1:
-matrix.c:3176:40: warning: unused parameter 'arg' [-Wunused-parameter]
- 3176 | static THD_FUNCTION(ADC_ProcessThread, arg)
+matrix.c:3245:40: warning: unused parameter 'arg' [-Wunused-parameter]
+ 3245 | static THD_FUNCTION(ADC_ProcessThread, arg)
 ../../keyboard_core/tool/chibios/chibios/os/common/ports/ARMv7-M/chcore.h:553:56: note: in definition of macro 'PORT_THD_FUNCTION'
   553 | #define PORT_THD_FUNCTION(tname, arg) void tname(void *arg)
       |                                                        ^~~
-matrix.c:3176:8: note: in expansion of macro 'THD_FUNCTION'
- 3176 | static THD_FUNCTION(ADC_ProcessThread, arg)
+matrix.c:3245:8: note: in expansion of macro 'THD_FUNCTION'
+ 3245 | static THD_FUNCTION(ADC_ProcessThread, arg)
       |        ^~~~~~~~~~~~
 matrix.c: In function 'rapidTriggerKeyBuilder':
-matrix.c:3320:10: warning: unused variable 'shiftValue' [-Wunused-variable]
- 3320 | uint16_t shiftValue;
+matrix.c:3389:10: warning: unused variable 'shiftValue' [-Wunused-variable]
+ 3389 | uint16_t shiftValue;
       |          ^~~~~~~~~~
-matrix.c:3319:12: warning: variable 'event' set but not used [-Wunused-but-set-variable]
- 3319 | keyevent_t event;
+matrix.c:3388:12: warning: variable 'event' set but not used [-Wunused-but-set-variable]
+ 3388 | keyevent_t event;
       |            ^~~~~
 matrix.c: At top level:
-matrix.c:3361:6: warning: conflicting types for 'rapidTriggerProcess'
- 3361 | void rapidTriggerProcess(bool mode, uint8_t key){
+matrix.c:3430:6: warning: conflicting types for 'rapidTriggerProcess'
+ 3430 | void rapidTriggerProcess(bool mode, uint8_t key){
       |      ^~~~~~~~~~~~~~~~~~~
-matrix.c:3267:2: note: previous implicit declaration of 'rapidTriggerProcess' was here
- 3267 |  rapidTriggerProcess(true,0);
+matrix.c:3336:2: note: previous implicit declaration of 'rapidTriggerProcess' was here
+ 3336 |  rapidTriggerProcess(true,0);
       |  ^~~~~~~~~~~~~~~~~~~
 In file included from <command-line>:
 matrix.c: In function 'matrix_init':
@@ -628,8 +625,8 @@ matrix.c: In function 'matrix_init':
       |                                       ^~~~~~
       |                                       |
       |                                       int
-matrix.c:3468:31: note: in expansion of macro 'KB_ENCODER_MODE_ADDR'
- 3468 |  knobState = eeprom_read_byte(KB_ENCODER_MODE_ADDR);
+matrix.c:3529:31: note: in expansion of macro 'KB_ENCODER_MODE_ADDR'
+ 3529 |  knobState = eeprom_read_byte(KB_ENCODER_MODE_ADDR);
       |                               ^~~~~~~~~~~~~~~~~~~~
 In file included from ../../keyboard_core/tool/chibios/chibios/os/hal/include/hal_eeprom.h:19,
                  from ../../keyboard_core/tool/chibios/chibios/os/hal/include/hal.h:332,
@@ -638,71 +635,71 @@ In file included from ../../keyboard_core/tool/chibios/chibios/os/hal/include/ha
    11 | uint8_t  eeprom_read_byte(const uint8_t *__p);
       |                           ~~~~~~~~~~~~~~~^~~
 matrix.c: In function 'matrix_scan':
-matrix.c:3498:8: warning: type defaults to 'int' in declaration of 'counts' [-Wimplicit-int]
- 3498 | static counts = 0;
+matrix.c:3559:8: warning: type defaults to 'int' in declaration of 'counts' [-Wimplicit-int]
+ 3559 | static counts = 0;
       |        ^~~~~~
-matrix.c:3498:8: warning: unused variable 'counts' [-Wunused-variable]
+matrix.c:3559:8: warning: unused variable 'counts' [-Wunused-variable]
 matrix.c: In function 'process_gamepad':
-matrix.c:3640:34: warning: initialization of 'uint8_t *' {aka 'unsigned char *'} from incompatible pointer type 'report_gamepad_report *' [-Wincompatible-pointer-types]
- 3640 | uint8_t * gamepad_report_Index = &extra_game_report;
+matrix.c:3701:34: warning: initialization of 'uint8_t *' {aka 'unsigned char *'} from incompatible pointer type 'report_gamepad_report *' [-Wincompatible-pointer-types]
+ 3701 | uint8_t * gamepad_report_Index = &extra_game_report;
       |                                  ^
-matrix.c:3641:8: warning: type defaults to 'int' in declaration of 'hatSwTest' [-Wimplicit-int]
- 3641 | static hatSwTest = 0;
+matrix.c:3702:8: warning: type defaults to 'int' in declaration of 'hatSwTest' [-Wimplicit-int]
+ 3702 | static hatSwTest = 0;
       |        ^~~~~~~~~
-matrix.c:3790:5: warning: 'return' with no value, in function returning non-void [-Wreturn-type]
- 3790 |     return;
+matrix.c:3851:5: warning: 'return' with no value, in function returning non-void [-Wreturn-type]
+ 3851 |     return;
       |     ^~~~~~
-matrix.c:3639:6: note: declared here
- 3639 | bool process_gamepad(keyrecord_t record, uint16_t keycode){
+matrix.c:3700:6: note: declared here
+ 3700 | bool process_gamepad(keyrecord_t record, uint16_t keycode){
       |      ^~~~~~~~~~~~~~~
-matrix.c:3849:4: warning: implicit declaration of function 'send_gamepad' [-Wimplicit-function-declaration]
- 3849 |    send_gamepad(extra_game_report);
+matrix.c:3910:4: warning: implicit declaration of function 'send_gamepad' [-Wimplicit-function-declaration]
+ 3910 |    send_gamepad(extra_game_report);
       |    ^~~~~~~~~~~~
-matrix.c:3641:8: warning: unused variable 'hatSwTest' [-Wunused-variable]
- 3641 | static hatSwTest = 0;
+matrix.c:3702:8: warning: unused variable 'hatSwTest' [-Wunused-variable]
+ 3702 | static hatSwTest = 0;
       |        ^~~~~~~~~
-matrix.c:3640:11: warning: unused variable 'gamepad_report_Index' [-Wunused-variable]
- 3640 | uint8_t * gamepad_report_Index = &extra_game_report;
+matrix.c:3701:11: warning: unused variable 'gamepad_report_Index' [-Wunused-variable]
+ 3701 | uint8_t * gamepad_report_Index = &extra_game_report;
       |           ^~~~~~~~~~~~~~~~~~~~
-In file included from matrix.c:20:
+In file included from matrix.c:21:
 matrix.c: In function 'dump_eeprom':
 macro_engine.h:20:5: warning: initialization of 'uint16_t' {aka 'short unsigned int'} from 'uint16_t *' {aka 'short unsigned int *'} makes integer from pointer without a cast [-Wint-conversion]
    20 |     (EEPROM_MACRO_SLOT_BASE + ((i) * EEPROM_MACRO_SLOT_SIZE))
       |     ^
-matrix.c:3917:24: note: in expansion of macro 'EEPROM_MACRO_SLOT_ADDR'
- 3917 |   for (uint16_t addr = EEPROM_MACRO_SLOT_ADDR(0); addr < EEPROM_MACRO_SLOT_ADDR(9)/*EEPROM_SIZE*/; addr += 32)
+matrix.c:3986:24: note: in expansion of macro 'EEPROM_MACRO_SLOT_ADDR'
+ 3986 |   for (uint16_t addr = EEPROM_MACRO_SLOT_ADDR(0); addr < EEPROM_MACRO_SLOT_ADDR(9)/*EEPROM_SIZE*/; addr += 32)
       |                        ^~~~~~~~~~~~~~~~~~~~~~
-matrix.c:3917:56: warning: comparison between pointer and integer
- 3917 |   for (uint16_t addr = EEPROM_MACRO_SLOT_ADDR(0); addr < EEPROM_MACRO_SLOT_ADDR(9)/*EEPROM_SIZE*/; addr += 32)
+matrix.c:3986:56: warning: comparison between pointer and integer
+ 3986 |   for (uint16_t addr = EEPROM_MACRO_SLOT_ADDR(0); addr < EEPROM_MACRO_SLOT_ADDR(9)/*EEPROM_SIZE*/; addr += 32)
       |                                                        ^
-matrix.c:3919:30: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
- 3919 |    eeprom_read_block(buffer, (const void*)addr, 32);
+matrix.c:3988:30: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
+ 3988 |    eeprom_read_block(buffer, (const void*)addr, 32);
       |                              ^
 matrix.c: In function 'eeprom_write8_verify':
-matrix.c:3936:37: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
- 3936 |   uint8_t before = eeprom_read_byte((const uint8_t*)addr);
+matrix.c:4005:37: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
+ 4005 |   uint8_t before = eeprom_read_byte((const uint8_t*)addr);
       |                                     ^
-matrix.c:3938:22: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
- 3938 |   eeprom_update_byte((uint8_t*)addr, value);
+matrix.c:4007:22: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
+ 4007 |   eeprom_update_byte((uint8_t*)addr, value);
       |                      ^
-matrix.c:3940:37: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
- 3940 |   uint8_t after  = eeprom_read_byte((const uint8_t*)addr);
+matrix.c:4009:37: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
+ 4009 |   uint8_t after  = eeprom_read_byte((const uint8_t*)addr);
       |                                     ^
 matrix.c: In function 'plusSat':
-matrix.c:3961:28: warning: unused parameter 'in' [-Wunused-parameter]
- 3961 |  void plusSat(led_config_t in){
+matrix.c:4030:28: warning: unused parameter 'in' [-Wunused-parameter]
+ 4030 |  void plusSat(led_config_t in){
       |               ~~~~~~~~~~~~~^~
 matrix.c: In function 'minusSat':
-matrix.c:3965:29: warning: unused parameter 'in' [-Wunused-parameter]
- 3965 |  void minusSat(led_config_t in){
+matrix.c:4034:29: warning: unused parameter 'in' [-Wunused-parameter]
+ 4034 |  void minusSat(led_config_t in){
       |                ~~~~~~~~~~~~~^~
 matrix.c: In function 'plusBri':
-matrix.c:3969:28: warning: unused parameter 'in' [-Wunused-parameter]
- 3969 |  void plusBri(led_config_t in){
+matrix.c:4038:28: warning: unused parameter 'in' [-Wunused-parameter]
+ 4038 |  void plusBri(led_config_t in){
       |               ~~~~~~~~~~~~~^~
 matrix.c: In function 'minusBri':
-matrix.c:3973:29: warning: unused parameter 'in' [-Wunused-parameter]
- 3973 |  void minusBri(led_config_t in){
+matrix.c:4042:29: warning: unused parameter 'in' [-Wunused-parameter]
+ 4042 |  void minusBri(led_config_t in){
       |                ~~~~~~~~~~~~~^~
 In file included from <command-line>:
 matrix.c: In function 'hook_matrix_change':
@@ -711,8 +708,8 @@ matrix.c: In function 'hook_matrix_change':
       |                                       ^~~~~~
       |                                       |
       |                                       int
-matrix.c:4056:26: note: in expansion of macro 'KB_COLOR_MODE_ADDR'
- 4056 |       eeprom_update_byte(KB_COLOR_MODE_ADDR, 0);
+matrix.c:4125:26: note: in expansion of macro 'KB_COLOR_MODE_ADDR'
+ 4125 |       eeprom_update_byte(KB_COLOR_MODE_ADDR, 0);
       |                          ^~~~~~~~~~~~~~~~~~
 In file included from ../../keyboard_core/tool/chibios/chibios/os/hal/include/hal_eeprom.h:19,
                  from ../../keyboard_core/tool/chibios/chibios/os/hal/include/hal.h:332,
@@ -726,8 +723,8 @@ In file included from <command-line>:
       |                                       ^~~~~~
       |                                       |
       |                                       int
-matrix.c:4064:26: note: in expansion of macro 'KB_COLOR_MODE_ADDR'
- 4064 |       eeprom_update_byte(KB_COLOR_MODE_ADDR, 1);
+matrix.c:4133:26: note: in expansion of macro 'KB_COLOR_MODE_ADDR'
+ 4133 |       eeprom_update_byte(KB_COLOR_MODE_ADDR, 1);
       |                          ^~~~~~~~~~~~~~~~~~
 In file included from ../../keyboard_core/tool/chibios/chibios/os/hal/include/hal_eeprom.h:19,
                  from ../../keyboard_core/tool/chibios/chibios/os/hal/include/hal.h:332,
@@ -741,8 +738,8 @@ In file included from <command-line>:
       |                                       ^~~~~~
       |                                       |
       |                                       int
-matrix.c:4072:26: note: in expansion of macro 'KB_COLOR_MODE_ADDR'
- 4072 |       eeprom_update_byte(KB_COLOR_MODE_ADDR, 2);
+matrix.c:4141:26: note: in expansion of macro 'KB_COLOR_MODE_ADDR'
+ 4141 |       eeprom_update_byte(KB_COLOR_MODE_ADDR, 2);
       |                          ^~~~~~~~~~~~~~~~~~
 In file included from ../../keyboard_core/tool/chibios/chibios/os/hal/include/hal_eeprom.h:19,
                  from ../../keyboard_core/tool/chibios/chibios/os/hal/include/hal.h:332,
@@ -756,8 +753,8 @@ In file included from <command-line>:
       |                                       ^~~~~~
       |                                       |
       |                                       int
-matrix.c:4080:26: note: in expansion of macro 'KB_COLOR_MODE_ADDR'
- 4080 |       eeprom_update_byte(KB_COLOR_MODE_ADDR, 3);
+matrix.c:4149:26: note: in expansion of macro 'KB_COLOR_MODE_ADDR'
+ 4149 |       eeprom_update_byte(KB_COLOR_MODE_ADDR, 3);
       |                          ^~~~~~~~~~~~~~~~~~
 In file included from ../../keyboard_core/tool/chibios/chibios/os/hal/include/hal_eeprom.h:19,
                  from ../../keyboard_core/tool/chibios/chibios/os/hal/include/hal.h:332,
@@ -771,8 +768,8 @@ In file included from <command-line>:
       |                                       ^~~~~~
       |                                       |
       |                                       int
-matrix.c:4088:26: note: in expansion of macro 'KB_COLOR_MODE_ADDR'
- 4088 |       eeprom_update_byte(KB_COLOR_MODE_ADDR, 4);
+matrix.c:4157:26: note: in expansion of macro 'KB_COLOR_MODE_ADDR'
+ 4157 |       eeprom_update_byte(KB_COLOR_MODE_ADDR, 4);
       |                          ^~~~~~~~~~~~~~~~~~
 In file included from ../../keyboard_core/tool/chibios/chibios/os/hal/include/hal_eeprom.h:19,
                  from ../../keyboard_core/tool/chibios/chibios/os/hal/include/hal.h:332,
@@ -786,8 +783,8 @@ In file included from <command-line>:
       |                                       ^~~~~~
       |                                       |
       |                                       int
-matrix.c:4096:26: note: in expansion of macro 'KB_COLOR_MODE_ADDR'
- 4096 |       eeprom_update_byte(KB_COLOR_MODE_ADDR, 5);
+matrix.c:4165:26: note: in expansion of macro 'KB_COLOR_MODE_ADDR'
+ 4165 |       eeprom_update_byte(KB_COLOR_MODE_ADDR, 5);
       |                          ^~~~~~~~~~~~~~~~~~
 In file included from ../../keyboard_core/tool/chibios/chibios/os/hal/include/hal_eeprom.h:19,
                  from ../../keyboard_core/tool/chibios/chibios/os/hal/include/hal.h:332,
@@ -801,8 +798,8 @@ In file included from <command-line>:
       |                                       ^~~~~~
       |                                       |
       |                                       int
-matrix.c:4104:26: note: in expansion of macro 'KB_COLOR_MODE_ADDR'
- 4104 |       eeprom_update_byte(KB_COLOR_MODE_ADDR, 6);
+matrix.c:4173:26: note: in expansion of macro 'KB_COLOR_MODE_ADDR'
+ 4173 |       eeprom_update_byte(KB_COLOR_MODE_ADDR, 6);
       |                          ^~~~~~~~~~~~~~~~~~
 In file included from ../../keyboard_core/tool/chibios/chibios/os/hal/include/hal_eeprom.h:19,
                  from ../../keyboard_core/tool/chibios/chibios/os/hal/include/hal.h:332,
@@ -816,8 +813,8 @@ In file included from <command-line>:
       |                                       ^~~~~~
       |                                       |
       |                                       int
-matrix.c:4112:26: note: in expansion of macro 'KB_COLOR_MODE_ADDR'
- 4112 |       eeprom_update_byte(KB_COLOR_MODE_ADDR, 7);
+matrix.c:4181:26: note: in expansion of macro 'KB_COLOR_MODE_ADDR'
+ 4181 |       eeprom_update_byte(KB_COLOR_MODE_ADDR, 7);
       |                          ^~~~~~~~~~~~~~~~~~
 In file included from ../../keyboard_core/tool/chibios/chibios/os/hal/include/hal_eeprom.h:19,
                  from ../../keyboard_core/tool/chibios/chibios/os/hal/include/hal.h:332,
@@ -831,8 +828,8 @@ In file included from <command-line>:
       |                                       ^~~~~~
       |                                       |
       |                                       int
-matrix.c:4120:26: note: in expansion of macro 'KB_COLOR_MODE_ADDR'
- 4120 |       eeprom_update_byte(KB_COLOR_MODE_ADDR, 8);
+matrix.c:4189:26: note: in expansion of macro 'KB_COLOR_MODE_ADDR'
+ 4189 |       eeprom_update_byte(KB_COLOR_MODE_ADDR, 8);
       |                          ^~~~~~~~~~~~~~~~~~
 In file included from ../../keyboard_core/tool/chibios/chibios/os/hal/include/hal_eeprom.h:19,
                  from ../../keyboard_core/tool/chibios/chibios/os/hal/include/hal.h:332,
@@ -840,17 +837,17 @@ In file included from ../../keyboard_core/tool/chibios/chibios/os/hal/include/ha
 ../../keyboard_core/tool/chibios/chibios/os/hal/include/eeprom.h:19:38: note: expected 'uint8_t *' {aka 'unsigned char *'} but argument is of type 'int'
    19 | void     eeprom_update_byte(uint8_t *__p, uint8_t __value);
       |                             ~~~~~~~~~^~~
-matrix.c:4285:21: warning: unsigned conversion from 'int' to 'uint8_t' {aka 'unsigned char'} changes value from '23754' to '202' [-Woverflow]
- 4285 |       register_code(KC_RGB_VAD);
+matrix.c:4354:21: warning: unsigned conversion from 'int' to 'uint8_t' {aka 'unsigned char'} changes value from '23754' to '202' [-Woverflow]
+ 4354 |       register_code(KC_RGB_VAD);
       |                     ^~~~~~~~~~
-matrix.c:4287:23: warning: unsigned conversion from 'int' to 'uint8_t' {aka 'unsigned char'} changes value from '23754' to '202' [-Woverflow]
- 4287 |       unregister_code(KC_RGB_VAD);
+matrix.c:4356:23: warning: unsigned conversion from 'int' to 'uint8_t' {aka 'unsigned char'} changes value from '23754' to '202' [-Woverflow]
+ 4356 |       unregister_code(KC_RGB_VAD);
       |                       ^~~~~~~~~~
-matrix.c:4295:21: warning: unsigned conversion from 'int' to 'uint8_t' {aka 'unsigned char'} changes value from '23753' to '201' [-Woverflow]
- 4295 |       register_code(KC_RGB_VAI);
+matrix.c:4364:21: warning: unsigned conversion from 'int' to 'uint8_t' {aka 'unsigned char'} changes value from '23753' to '201' [-Woverflow]
+ 4364 |       register_code(KC_RGB_VAI);
       |                     ^~~~~~~~~~
-matrix.c:4297:23: warning: unsigned conversion from 'int' to 'uint8_t' {aka 'unsigned char'} changes value from '23753' to '201' [-Woverflow]
- 4297 |       unregister_code(KC_RGB_VAI);
+matrix.c:4366:23: warning: unsigned conversion from 'int' to 'uint8_t' {aka 'unsigned char'} changes value from '23753' to '201' [-Woverflow]
+ 4366 |       unregister_code(KC_RGB_VAI);
       |                       ^~~~~~~~~~
 In file included from <command-line>:
 ./config.h:60:39: warning: passing argument 1 of 'eeprom_write_word' makes pointer from integer without a cast [-Wint-conversion]
@@ -858,8 +855,8 @@ In file included from <command-line>:
       |                                       ^~~~~~
       |                                       |
       |                                       int
-matrix.c:4364:23: note: in expansion of macro 'EECONFIG_MAC_MODE'
- 4364 |     eeprom_write_word(EECONFIG_MAC_MODE, isMac);
+matrix.c:4433:23: note: in expansion of macro 'EECONFIG_MAC_MODE'
+ 4433 |     eeprom_write_word(EECONFIG_MAC_MODE, isMac);
       |                       ^~~~~~~~~~~~~~~~~
 In file included from ../../keyboard_core/tool/chibios/chibios/os/hal/include/hal_eeprom.h:19,
                  from ../../keyboard_core/tool/chibios/chibios/os/hal/include/hal.h:332,
@@ -873,8 +870,8 @@ In file included from <command-line>:
       |                                       ^~~~~~
       |                                       |
       |                                       int
-matrix.c:4368:23: note: in expansion of macro 'EECONFIG_MAC_MODE'
- 4368 |     eeprom_write_word(EECONFIG_MAC_MODE, isMac);
+matrix.c:4437:23: note: in expansion of macro 'EECONFIG_MAC_MODE'
+ 4437 |     eeprom_write_word(EECONFIG_MAC_MODE, isMac);
       |                       ^~~~~~~~~~~~~~~~~
 In file included from ../../keyboard_core/tool/chibios/chibios/os/hal/include/hal_eeprom.h:19,
                  from ../../keyboard_core/tool/chibios/chibios/os/hal/include/hal.h:332,
@@ -882,71 +879,71 @@ In file included from ../../keyboard_core/tool/chibios/chibios/os/hal/include/ha
 ../../keyboard_core/tool/chibios/chibios/os/hal/include/eeprom.h:16:38: note: expected 'uint16_t *' {aka 'short unsigned int *'} but argument is of type 'int'
    16 | void     eeprom_write_word(uint16_t *__p, uint16_t __value);
       |                            ~~~~~~~~~~^~~
-matrix.c:4572:6: warning: implicit declaration of function 'tap_code_delay' [-Wimplicit-function-declaration]
- 4572 |      tap_code_delay(KC_D, 10);
+matrix.c:4641:6: warning: implicit declaration of function 'tap_code_delay' [-Wimplicit-function-declaration]
+ 4641 |      tap_code_delay(KC_D, 10);
       |      ^~~~~~~~~~~~~~
-matrix.c:3858:18: warning: unused variable 'counts' [-Wunused-variable]
- 3858 |  static uint16_t counts = 0;
+matrix.c:3919:18: warning: unused variable 'counts' [-Wunused-variable]
+ 3919 |  static uint16_t counts = 0;
       |                  ^~~~~~
 matrix.c: In function 'matrixAnalogScan':
-matrix.c:2815:1: warning: control reaches end of non-void function [-Wreturn-type]
- 2815 | }
+matrix.c:2884:1: warning: control reaches end of non-void function [-Wreturn-type]
+ 2884 | }
       | ^
 matrix.c: In function 'matrixAnalogFind':
-matrix.c:3172:5: warning: control reaches end of non-void function [-Wreturn-type]
- 3172 |     }
+matrix.c:3241:5: warning: control reaches end of non-void function [-Wreturn-type]
+ 3241 |     }
       |     ^
 At top level:
-matrix.c:3858:18: warning: 'counts' defined but not used [-Wunused-variable]
- 3858 |  static uint16_t counts = 0;
+matrix.c:3919:18: warning: 'counts' defined but not used [-Wunused-variable]
+ 3919 |  static uint16_t counts = 0;
       |                  ^~~~~~
-matrix.c:3641:8: warning: 'hatSwTest' defined but not used [-Wunused-variable]
- 3641 | static hatSwTest = 0;
+matrix.c:3702:8: warning: 'hatSwTest' defined but not used [-Wunused-variable]
+ 3702 | static hatSwTest = 0;
       |        ^~~~~~~~~
-matrix.c:3498:8: warning: 'counts' defined but not used [-Wunused-variable]
- 3498 | static counts = 0;
+matrix.c:3559:8: warning: 'counts' defined but not used [-Wunused-variable]
+ 3559 | static counts = 0;
       |        ^~~~~~
-matrix.c:1410:18: warning: 'toggleGpio' defined but not used [-Wunused-variable]
- 1410 |      static bool toggleGpio = 0;
+matrix.c:1479:18: warning: 'toggleGpio' defined but not used [-Wunused-variable]
+ 1479 |      static bool toggleGpio = 0;
       |                  ^~~~~~~~~~
-matrix.c:3934:7: warning: 'eeprom_write8_verify' defined but not used [-Wunused-function]
- 3934 |  void eeprom_write8_verify(uint16_t addr, uint8_t value)
+matrix.c:4003:7: warning: 'eeprom_write8_verify' defined but not used [-Wunused-function]
+ 4003 |  void eeprom_write8_verify(uint16_t addr, uint8_t value)
       |       ^~~~~~~~~~~~~~~~~~~~
-matrix.c:3911:7: warning: 'dump_eeprom' defined but not used [-Wunused-function]
- 3911 |  void dump_eeprom(void)
+matrix.c:3980:7: warning: 'dump_eeprom' defined but not used [-Wunused-function]
+ 3980 |  void dump_eeprom(void)
       |       ^~~~~~~~~~~
-matrix.c:1188:20: warning: 'samples1' defined but not used [-Wunused-variable]
- 1188 | static adcsample_t samples1[ADC_NUM_CHANNELS];
+matrix.c:1257:20: warning: 'samples1' defined but not used [-Wunused-variable]
+ 1257 | static adcsample_t samples1[ADC_NUM_CHANNELS];
       |                    ^~~~~~~~
-matrix.c:823:17: warning: 'debouncing_time' defined but not used [-Wunused-variable]
-  823 | static uint16_t debouncing_time = 0;
+matrix.c:885:17: warning: 'debouncing_time' defined but not used [-Wunused-variable]
+  885 | static uint16_t debouncing_time = 0;
       |                 ^~~~~~~~~~~~~~~
-matrix.c:822:13: warning: 'debouncing' defined but not used [-Wunused-variable]
-  822 | static bool debouncing = false;
+matrix.c:884:13: warning: 'debouncing' defined but not used [-Wunused-variable]
+  884 | static bool debouncing = false;
       |             ^~~~~~~~~~
-matrix.c:268:23: warning: 'socd_rt' defined but not used [-Wunused-variable]
-  268 | static socd_runtime_t socd_rt[SOCD_SLOT_COUNT];
+matrix.c:330:23: warning: 'socd_rt' defined but not used [-Wunused-variable]
+  330 | static socd_runtime_t socd_rt[SOCD_SLOT_COUNT];
       |                       ^~~~~~~
-matrix.c:230:16: warning: 'dly_times' defined but not used [-Wunused-variable]
-  230 | static uint8_t dly_times;
+matrix.c:292:16: warning: 'dly_times' defined but not used [-Wunused-variable]
+  292 | static uint8_t dly_times;
       |                ^~~~~~~~~
-matrix.c:224:31: warning: 'ADC_Wait' defined but not used [-Wunused-variable]
-  224 | static bool ADC_Check = false,ADC_Wait = false;
+matrix.c:286:31: warning: 'ADC_Wait' defined but not used [-Wunused-variable]
+  286 | static bool ADC_Check = false,ADC_Wait = false;
       |                               ^~~~~~~~
-matrix.c:224:13: warning: 'ADC_Check' defined but not used [-Wunused-variable]
-  224 | static bool ADC_Check = false,ADC_Wait = false;
+matrix.c:286:13: warning: 'ADC_Check' defined but not used [-Wunused-variable]
+  286 | static bool ADC_Check = false,ADC_Wait = false;
       |             ^~~~~~~~~
-matrix.c:161:13: warning: 'macro_engine_dump_eeprom_slot' defined but not used [-Wunused-function]
-  161 | static void macro_engine_dump_eeprom_slot(uint8_t index) {
+matrix.c:223:13: warning: 'macro_engine_dump_eeprom_slot' defined but not used [-Wunused-function]
+  223 | static void macro_engine_dump_eeprom_slot(uint8_t index) {
       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-matrix.c:137:13: warning: 'macro_engine_write_full_slot_api_style' defined but not used [-Wunused-function]
-  137 | static void macro_engine_write_full_slot_api_style(uint8_t macro_index) {
+matrix.c:199:13: warning: 'macro_engine_write_full_slot_api_style' defined but not used [-Wunused-function]
+  199 | static void macro_engine_write_full_slot_api_style(uint8_t macro_index) {
       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-matrix.c:122:13: warning: 'macro_engine_write_test_copy_paste_api_style' defined but not used [-Wunused-function]
-  122 | static void macro_engine_write_test_copy_paste_api_style(uint8_t macro_index) {
+matrix.c:184:13: warning: 'macro_engine_write_test_copy_paste_api_style' defined but not used [-Wunused-function]
+  184 | static void macro_engine_write_test_copy_paste_api_style(uint8_t macro_index) {
       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-matrix.c:70:13: warning: 'macro_engine_setup_test_copy_paste' defined but not used [-Wunused-function]
-   70 | static void macro_engine_setup_test_copy_paste(void) {
+matrix.c:132:13: warning: 'macro_engine_setup_test_copy_paste' defined but not used [-Wunused-function]
+  132 | static void macro_engine_setup_test_copy_paste(void) {
       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Linking build/M18.elf
 lto-wrapper.exe: warning: Options to Xassembler do not match: -alms=build/lst/crt1.lst, -alms=build/lst/chsys.lst, dropping all -Xassembler and -Wa options.
@@ -990,17 +987,8 @@ rappy_snappy.c:13:13: warning: type of 'unregister_code' does not match original
       |      ^
 ../../keyboard_core/common/action.c:454:6: note: type 'uint8_t' should match type 'uint16_t'
 ../../keyboard_core/common/action.c:454:6: note: 'unregister_code' was previously declared here
-led/led_function.c:742:5: warning: type of 'setRunMode' does not match original declaration [-Wlto-type-mismatch]
-  742 |     setRunMode(currentLED_RunMode);
-      |     ^
-led/led_effect.c:1737:6: note: return value type mismatch
- 1737 | bool setRunMode(led_runMode_t runMode){
-      |      ^
-led/led_effect.c:1737:6: note: type '_Bool' should match type 'int'
-led/led_effect.c:1737:6: note: 'setRunMode' was previously declared here
-led/led_effect.c:1737:6: note: code may be misoptimized unless '-fno-strict-aliasing' is used
-matrix.c:941:24: warning: type of 'eeconfig_read_Trigger' does not match original declaration [-Wlto-type-mismatch]
-  941 |         if (adcCalc > (eeconfig_read_Trigger(row, col) + draftValue)) return true;
+matrix.c:1003:24: warning: type of 'eeconfig_read_Trigger' does not match original declaration [-Wlto-type-mismatch]
+ 1003 |         if (adcCalc > (eeconfig_read_Trigger(row, col) + draftValue)) return true;
       |                        ^
 ../../keyboard_core/common/keymap_in_eeprom.c:165:10: note: return value type mismatch
   165 | uint16_t eeconfig_read_Trigger( uint8_t row, uint8_t col){
@@ -1026,14 +1014,23 @@ dynamic_macro.c:87:25: warning: type of 'timer_read' does not match original dec
 ../../keyboard_core/common/chibios/timer.c:9:10: note: type 'uint16_t' should match type 'int'
 ../../keyboard_core/common/chibios/timer.c:9:10: note: 'timer_read' was previously declared here
 ../../keyboard_core/common/chibios/timer.c:9:10: note: code may be misoptimized unless '-fno-strict-aliasing' is used
+led/led_function.c:742:5: warning: type of 'setRunMode' does not match original declaration [-Wlto-type-mismatch]
+  742 |     setRunMode(currentLED_RunMode);
+      |     ^
+led/led_effect.c:1737:6: note: return value type mismatch
+ 1737 | bool setRunMode(led_runMode_t runMode){
+      |      ^
+led/led_effect.c:1737:6: note: type '_Bool' should match type 'int'
+led/led_effect.c:1737:6: note: 'setRunMode' was previously declared here
+led/led_effect.c:1737:6: note: code may be misoptimized unless '-fno-strict-aliasing' is used
 led/led_function.c:85:13: warning: type of 'adcOffsetCalc' does not match original declaration [-Wlto-type-mismatch]
    85 | extern void adcOffsetCalc(bool findMax, bool update, uint8_t samples);
       |             ^
-matrix.c:1478:6: note: type mismatch in parameter 3
- 1478 | void adcOffsetCalc(bool findMax, bool update, uint16_t samples)
+matrix.c:1547:6: note: type mismatch in parameter 3
+ 1547 | void adcOffsetCalc(bool findMax, bool update, uint16_t samples)
       |      ^
-matrix.c:1478:6: note: type 'uint16_t' should match type 'uint8_t'
-matrix.c:1478:6: note: 'adcOffsetCalc' was previously declared here
+matrix.c:1547:6: note: type 'uint16_t' should match type 'uint8_t'
+matrix.c:1547:6: note: 'adcOffsetCalc' was previously declared here
 dynamic_macro.c:136:13: warning: type of 'keymap_key_to_keycode' does not match original declaration [-Wlto-type-mismatch]
   136 |   keycode = keymap_key_to_keycode(biton32(layer_state),record.event.key);
       |             ^
@@ -1079,10 +1076,10 @@ Creating build/M18.bin
 Creating build/M18.dmp
 
    text	   data	    bss	    dec	    hex	filename
-  93528	   1152	  97152	 191832	  2ed58	build/M18.elf
+  93940	   1152	  97152	 192244	  2eef4	build/M18.elf
 Creating build/M18.list
 
 Done
 
-16:58:53 Build Finished. 0 errors, 170 warnings. (took 11s.177ms)
+16:38:06 Build Finished. 0 errors, 164 warnings. (took 10s.634ms)
 

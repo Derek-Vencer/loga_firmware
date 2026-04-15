@@ -13,8 +13,8 @@ KEYCODE for RGB
 * FN + CTRL + 9
 
 USB Polling rate change
-* get usb polling rate(0x0110)
-* set usb polling rate(0x0190)
+* get usb polling rate(0x0190)
+* set usb polling rate(0x0110)
 
 Command payload
 

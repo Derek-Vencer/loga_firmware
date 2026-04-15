@@ -6,8 +6,8 @@
 /* USB Device descriptor parameter */
 #define VENDOR_ID       0x195d
 #define PRODUCT_ID      0x2100//0x2092
-#define DEVICE_VER      0x000E//14//0x000E
-#define DEVICE_VER_FIX  0x13 // 19
+#define DEVICE_VER      0x000F//15//0x000E
+#define DEVICE_VER_FIX  0x00 // 00
 /* in python2: list(u"whatever".encode('utf-16-le')) */
 /*   at most 32 characters or the ugly hack in usb_main.c borks */
 #define MANUFACTURER "iOne Innovation"

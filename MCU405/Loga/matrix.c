@@ -10,6 +10,7 @@
 # include "print.h"
 # include "debug.h"
 # include "util.h"
+# include "timer.h"
 # include "matrix.h"
 # include "wait.h"
 # include "keycode.h"
@@ -47,9 +48,70 @@ bool isCtrl = true;
 static bool eeclr_pressed = false; //EECLR
 static bool eeclr_fired = false;
 static uint32_t eeclr_timer = 0;
-// enum custom_keycodes{ //define in keymap_common.h
-// 	KC_M1 = SAFE_RANGE,
-// };
+// Test timeout for LED idle-off. Change back to 30 * 60 * 1000UL after validation.
+#define LED_IDLE_OFF_TIMEOUT_MS (30UL * 60UL * 1000UL)
+static uint32_t idle_led_last_activity_ms = 0;
+static bool idle_led_timeout_reported = false;
+static bool idle_led_is_sleeping = false;
+static led_runMode_t idle_led_restore_mode;
+
+static led_runMode_t idle_led_build_mode(led_runMode_t base, uint8_t type, uint8_t mode) {
+    led_runMode_t run_mode = base;
+
+    run_mode.type = type;
+    run_mode.mode = mode;
+
+    if (run_mode.brightness < 1 || run_mode.brightness > 10) {
+        run_mode.brightness = 3;
+    }
+
+    if (run_mode.speed < 1 || run_mode.speed > 5) {
+        run_mode.speed = 1;
+    }
+
+    return run_mode;
+}
+
+static void idle_led_note_activity(void) {
+    idle_led_last_activity_ms = timer_read32();
+    idle_led_timeout_reported = false;
+
+    if (idle_led_is_sleeping) {
+        led_runMode_t wake_mode = idle_led_build_mode(lastLED_RunMode, normalMode, eeprom_read_byte(KB_COLOR_MODE_ADDR));
+        idle_led_is_sleeping = false;
+        idle_led_restore_mode = wake_mode;
+        currentLED_RunMode = wake_mode;
+        setRunMode(wake_mode);
+    }
+
+    uprintf("[IDLE] activity reset\r\n");
+    uprintf("1\r\n");
+}
+
+static void idle_led_maybe_report_timeout(void) {
+    if (idle_led_timeout_reported) {
+        return;
+    }
+
+    if (timer_elapsed32(idle_led_last_activity_ms) < LED_IDLE_OFF_TIMEOUT_MS) {
+        return;
+    }
+
+    idle_led_timeout_reported = true;
+    idle_led_is_sleeping = true;
+    idle_led_restore_mode = idle_led_build_mode(lastLED_RunMode, normalMode, eeprom_read_byte(KB_COLOR_MODE_ADDR));
+    currentLED_RunMode = idle_led_build_mode(lastLED_RunMode, normalMode, 0x00);
+    setRunMode(currentLED_RunMode);
+    uprintf("[IDLE] timeout\r\n");
+    uprintf("0\r\n");
+}
+
+void hook_keyboard_loop(void)
+{
+    idle_led_maybe_report_timeout();
+}
+
+// sleeping mode
 
 void send_string(const char *str) {
     while (*str) {
@@ -1074,6 +1136,13 @@ void hook_late_init()
 {
     palSetPad(GPIOB, 3);
     palSetPad(GPIOB, 4);
+ 
+	// sleep mode
+    idle_led_last_activity_ms = timer_read32();
+    idle_led_timeout_reported = false;
+    idle_led_is_sleeping = false;
+    idle_led_restore_mode = idle_led_build_mode(currentLED_RunMode, normalMode, eeprom_read_byte(KB_COLOR_MODE_ADDR));
+	// end sleep mode
 
     macro_engine_init();
     // macro_engine_setup_test_copy_paste();
@@ -3440,14 +3509,6 @@ void matrix_init(void)//
 
     //Reade Iniit/Travel postion calibration data
 
-	#ifdef saocd_void
-	void keyboard_post_init_user(void){
-		socd_init();
-		socd_set_priority(SOCD_PRIORITY_LAST_INPUT);
-	}
-	#endif
-
-
     if (!eepromInitCheck){
     	uprintf("Factory Reset start\r\n");
     	write_keymap_to_eeprom();
@@ -3498,9 +3559,9 @@ uint8_t matrix_scan(void)
 static counts = 0;
 	//chThdSleepMilliseconds(1);
 //	chBSemWait(&matrixScanSem);
-	uprintf ("Matrix scan\r\n");
 	keyboard_taskTMR();
 	macro_engine_task();
+	idle_led_maybe_report_timeout();
 //	if (counts++<5000){ss
 //		chThdSleepMilliseconds(1);
 //	}
@@ -3866,6 +3927,14 @@ bool hook_matrix_change(keyrecord_t record)
 
     if (record.event.pressed && (currentLED_RunMode.mode == 5 )) { //|| currentLED_RunMode.mode == 7
         reactive_level[record.event.key.row][record.event.key.col] = REACTIVE_MAX;
+    }
+
+    if (record.event.pressed) {
+        uprintf("[IDLE] pressed row=%u col=%u kc=%04X\r\n",
+                record.event.key.row,
+                record.event.key.col,
+                keycode);
+        idle_led_note_activity();
     }
 
 	if (record.event.pressed && currentLED_RunMode.mode == 7) {
