@@ -3007,3 +3007,216 @@ user global configuration and to define the default location to store repositori
 not correct please set the HOME environment variable and restart Eclipse. Otherwise Git for Windows and
 EGit might behave differently since they see different configuration options.
 This warning can be switched off on the Team > Git > Confirmations and Warnings preference page.
+!SESSION 2026-04-23 09:03:56.134 -----------------------------------------------
+eclipse.buildId=4.23.0.I20220308-0310
+java.version=17.0.2
+java.vendor=Eclipse Adoptium
+BootLoader constants: OS=win32, ARCH=x86_64, WS=win32, NL=en_us_GB
+Framework arguments:  -product org.eclipse.epp.package.cpp.product
+Command-line arguments:  -os win32 -ws win32 -arch x86_64 -product org.eclipse.epp.package.cpp.product
+
+!ENTRY org.eclipse.core.resources 2 10035 2026-04-23 09:04:13.572
+!MESSAGE The workspace exited with unsaved changes in the previous session; refreshing workspace to recover changes.
+
+!ENTRY org.eclipse.jface 2 0 2026-04-23 09:04:48.957
+!MESSAGE Keybinding conflicts occurred.  They may interfere with normal accelerator operation.
+!SUBENTRY 1 org.eclipse.jface 2 0 2026-04-23 09:04:48.957
+!MESSAGE A conflict occurred for CTRL+6:
+Binding(CTRL+6,
+	ParameterizedCommand(Command(com.atk.at32ide.application.commands.umCommand,Open UM,
+		,
+		Category(com.atk.at32ide.application.commands.category,application Category,null,true),
+		org.eclipse.ui.internal.WorkbenchHandlerServiceHandler@6761f75b,
+		,,true),null),
+	org.eclipse.ui.defaultAcceleratorConfiguration,
+	org.eclipse.ui.contexts.window,,,system)
+Binding(CTRL+6,
+	ParameterizedCommand(Command(com.atk.at32ide.application.commands.clCommand,Change Language,
+		,
+		Category(com.atk.at32ide.application.commands.category,application Category,null,true),
+		org.eclipse.ui.internal.WorkbenchHandlerServiceHandler@7c8a91e2,
+		,,true),null),
+	org.eclipse.ui.defaultAcceleratorConfiguration,
+	org.eclipse.ui.contexts.window,,,system)
+Binding(CTRL+6,
+	ParameterizedCommand(Command(com.atk.at32ide.flash.commands.downloadCommand,Flash Download,
+		,
+		Category(com.atk.at32ide.flash.commands.category,Flash Category,null,true),
+		org.eclipse.ui.internal.WorkbenchHandlerServiceHandler@c7443f,
+		,,true),null),
+	org.eclipse.ui.defaultAcceleratorConfiguration,
+	org.eclipse.ui.contexts.window,,,system)
+Binding(CTRL+6,
+	ParameterizedCommand(Command(com.atk.at32ide.flash.commands.eraseCommand,Flash Erase,
+		,
+		Category(com.atk.at32ide.flash.commands.category,Flash Category,null,true),
+		org.eclipse.ui.internal.WorkbenchHandlerServiceHandler@74e175c7,
+		,,true),null),
+	org.eclipse.ui.defaultAcceleratorConfiguration,
+	org.eclipse.ui.contexts.window,,,system)
+
+!ENTRY org.eclipse.egit.ui 2 0 2026-04-23 09:05:01.653
+!MESSAGE Warning: The environment variable HOME is not set. The following directory will be used to store the Git
+user global configuration and to define the default location to store repositories: 'C:\Users\I0469'. If this is
+not correct please set the HOME environment variable and restart Eclipse. Otherwise Git for Windows and
+EGit might behave differently since they see different configuration options.
+This warning can be switched off on the Team > Git > Confirmations and Warnings preference page.
+!SESSION 2026-04-27 17:16:52.831 -----------------------------------------------
+eclipse.buildId=4.23.0.I20220308-0310
+java.version=17.0.2
+java.vendor=Eclipse Adoptium
+BootLoader constants: OS=win32, ARCH=x86_64, WS=win32, NL=en_us_GB
+Framework arguments:  -product org.eclipse.epp.package.cpp.product
+Command-line arguments:  -os win32 -ws win32 -arch x86_64 -product org.eclipse.epp.package.cpp.product
+
+!ENTRY org.eclipse.core.resources 2 10035 2026-04-27 17:17:14.233
+!MESSAGE The workspace exited with unsaved changes in the previous session; refreshing workspace to recover changes.
+
+!ENTRY org.eclipse.jface 2 0 2026-04-27 17:17:51.881
+!MESSAGE Keybinding conflicts occurred.  They may interfere with normal accelerator operation.
+!SUBENTRY 1 org.eclipse.jface 2 0 2026-04-27 17:17:51.881
+!MESSAGE A conflict occurred for CTRL+6:
+Binding(CTRL+6,
+	ParameterizedCommand(Command(com.atk.at32ide.application.commands.umCommand,Open UM,
+		,
+		Category(com.atk.at32ide.application.commands.category,application Category,null,true),
+		org.eclipse.ui.internal.WorkbenchHandlerServiceHandler@7c8a91e2,
+		,,true),null),
+	org.eclipse.ui.defaultAcceleratorConfiguration,
+	org.eclipse.ui.contexts.window,,,system)
+Binding(CTRL+6,
+	ParameterizedCommand(Command(com.atk.at32ide.application.commands.clCommand,Change Language,
+		,
+		Category(com.atk.at32ide.application.commands.category,application Category,null,true),
+		org.eclipse.ui.internal.WorkbenchHandlerServiceHandler@c7443f,
+		,,true),null),
+	org.eclipse.ui.defaultAcceleratorConfiguration,
+	org.eclipse.ui.contexts.window,,,system)
+Binding(CTRL+6,
+	ParameterizedCommand(Command(com.atk.at32ide.flash.commands.downloadCommand,Flash Download,
+		,
+		Category(com.atk.at32ide.flash.commands.category,Flash Category,null,true),
+		org.eclipse.ui.internal.WorkbenchHandlerServiceHandler@74e175c7,
+		,,true),null),
+	org.eclipse.ui.defaultAcceleratorConfiguration,
+	org.eclipse.ui.contexts.window,,,system)
+Binding(CTRL+6,
+	ParameterizedCommand(Command(com.atk.at32ide.flash.commands.eraseCommand,Flash Erase,
+		,
+		Category(com.atk.at32ide.flash.commands.category,Flash Category,null,true),
+		org.eclipse.ui.internal.WorkbenchHandlerServiceHandler@1c528f2f,
+		,,true),null),
+	org.eclipse.ui.defaultAcceleratorConfiguration,
+	org.eclipse.ui.contexts.window,,,system)
+
+!ENTRY org.eclipse.egit.ui 2 0 2026-04-27 17:18:03.988
+!MESSAGE Warning: The environment variable HOME is not set. The following directory will be used to store the Git
+user global configuration and to define the default location to store repositories: 'C:\Users\I0469'. If this is
+not correct please set the HOME environment variable and restart Eclipse. Otherwise Git for Windows and
+EGit might behave differently since they see different configuration options.
+This warning can be switched off on the Team > Git > Confirmations and Warnings preference page.
+!SESSION 2026-05-11 11:15:04.465 -----------------------------------------------
+eclipse.buildId=4.23.0.I20220308-0310
+java.version=17.0.2
+java.vendor=Eclipse Adoptium
+BootLoader constants: OS=win32, ARCH=x86_64, WS=win32, NL=en_us_GB
+Framework arguments:  -product org.eclipse.epp.package.cpp.product
+Command-line arguments:  -os win32 -ws win32 -arch x86_64 -product org.eclipse.epp.package.cpp.product
+
+!ENTRY org.eclipse.core.resources 2 10035 2026-05-11 11:15:19.832
+!MESSAGE The workspace exited with unsaved changes in the previous session; refreshing workspace to recover changes.
+
+!ENTRY org.eclipse.jface 2 0 2026-05-11 11:15:47.447
+!MESSAGE Keybinding conflicts occurred.  They may interfere with normal accelerator operation.
+!SUBENTRY 1 org.eclipse.jface 2 0 2026-05-11 11:15:47.447
+!MESSAGE A conflict occurred for CTRL+6:
+Binding(CTRL+6,
+	ParameterizedCommand(Command(com.atk.at32ide.application.commands.umCommand,Open UM,
+		,
+		Category(com.atk.at32ide.application.commands.category,application Category,null,true),
+		org.eclipse.ui.internal.WorkbenchHandlerServiceHandler@78e7b83,
+		,,true),null),
+	org.eclipse.ui.defaultAcceleratorConfiguration,
+	org.eclipse.ui.contexts.window,,,system)
+Binding(CTRL+6,
+	ParameterizedCommand(Command(com.atk.at32ide.application.commands.clCommand,Change Language,
+		,
+		Category(com.atk.at32ide.application.commands.category,application Category,null,true),
+		org.eclipse.ui.internal.WorkbenchHandlerServiceHandler@6761f75b,
+		,,true),null),
+	org.eclipse.ui.defaultAcceleratorConfiguration,
+	org.eclipse.ui.contexts.window,,,system)
+Binding(CTRL+6,
+	ParameterizedCommand(Command(com.atk.at32ide.flash.commands.downloadCommand,Flash Download,
+		,
+		Category(com.atk.at32ide.flash.commands.category,Flash Category,null,true),
+		org.eclipse.ui.internal.WorkbenchHandlerServiceHandler@7c8a91e2,
+		,,true),null),
+	org.eclipse.ui.defaultAcceleratorConfiguration,
+	org.eclipse.ui.contexts.window,,,system)
+Binding(CTRL+6,
+	ParameterizedCommand(Command(com.atk.at32ide.flash.commands.eraseCommand,Flash Erase,
+		,
+		Category(com.atk.at32ide.flash.commands.category,Flash Category,null,true),
+		org.eclipse.ui.internal.WorkbenchHandlerServiceHandler@c7443f,
+		,,true),null),
+	org.eclipse.ui.defaultAcceleratorConfiguration,
+	org.eclipse.ui.contexts.window,,,system)
+
+!ENTRY org.eclipse.egit.ui 2 0 2026-05-11 11:15:57.009
+!MESSAGE Warning: The environment variable HOME is not set. The following directory will be used to store the Git
+user global configuration and to define the default location to store repositories: 'C:\Users\I0469'. If this is
+not correct please set the HOME environment variable and restart Eclipse. Otherwise Git for Windows and
+EGit might behave differently since they see different configuration options.
+This warning can be switched off on the Team > Git > Confirmations and Warnings preference page.
+!SESSION 2026-05-11 16:30:52.994 -----------------------------------------------
+eclipse.buildId=4.23.0.I20220308-0310
+java.version=17.0.2
+java.vendor=Eclipse Adoptium
+BootLoader constants: OS=win32, ARCH=x86_64, WS=win32, NL=en_us_GB
+Framework arguments:  -product org.eclipse.epp.package.cpp.product
+Command-line arguments:  -os win32 -ws win32 -arch x86_64 -product org.eclipse.epp.package.cpp.product
+
+!ENTRY org.eclipse.jface 2 0 2026-05-11 16:30:58.949
+!MESSAGE Keybinding conflicts occurred.  They may interfere with normal accelerator operation.
+!SUBENTRY 1 org.eclipse.jface 2 0 2026-05-11 16:30:58.949
+!MESSAGE A conflict occurred for CTRL+6:
+Binding(CTRL+6,
+	ParameterizedCommand(Command(com.atk.at32ide.application.commands.umCommand,Open UM,
+		,
+		Category(com.atk.at32ide.application.commands.category,application Category,null,true),
+		org.eclipse.ui.internal.WorkbenchHandlerServiceHandler@7de43652,
+		,,true),null),
+	org.eclipse.ui.defaultAcceleratorConfiguration,
+	org.eclipse.ui.contexts.window,,,system)
+Binding(CTRL+6,
+	ParameterizedCommand(Command(com.atk.at32ide.application.commands.clCommand,Change Language,
+		,
+		Category(com.atk.at32ide.application.commands.category,application Category,null,true),
+		org.eclipse.ui.internal.WorkbenchHandlerServiceHandler@7fe0ca60,
+		,,true),null),
+	org.eclipse.ui.defaultAcceleratorConfiguration,
+	org.eclipse.ui.contexts.window,,,system)
+Binding(CTRL+6,
+	ParameterizedCommand(Command(com.atk.at32ide.flash.commands.downloadCommand,Flash Download,
+		,
+		Category(com.atk.at32ide.flash.commands.category,Flash Category,null,true),
+		org.eclipse.ui.internal.WorkbenchHandlerServiceHandler@fdf029a,
+		,,true),null),
+	org.eclipse.ui.defaultAcceleratorConfiguration,
+	org.eclipse.ui.contexts.window,,,system)
+Binding(CTRL+6,
+	ParameterizedCommand(Command(com.atk.at32ide.flash.commands.eraseCommand,Flash Erase,
+		,
+		Category(com.atk.at32ide.flash.commands.category,Flash Category,null,true),
+		org.eclipse.ui.internal.WorkbenchHandlerServiceHandler@63896cf7,
+		,,true),null),
+	org.eclipse.ui.defaultAcceleratorConfiguration,
+	org.eclipse.ui.contexts.window,,,system)
+
+!ENTRY org.eclipse.egit.ui 2 0 2026-05-11 16:31:02.961
+!MESSAGE Warning: The environment variable HOME is not set. The following directory will be used to store the Git
+user global configuration and to define the default location to store repositories: 'C:\Users\I0469'. If this is
+not correct please set the HOME environment variable and restart Eclipse. Otherwise Git for Windows and
+EGit might behave differently since they see different configuration options.
+This warning can be switched off on the Team > Git > Confirmations and Warnings preference page.

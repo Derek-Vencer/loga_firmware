@@ -230,6 +230,7 @@ uint8_t socd_fill_report(uint8_t *buf) {
     // buf[4] = c->kc_b >> 8;
     // buf[5] = c->mode;
     return 6;
+    // return 8;
 }
 
 void socd_apply_report(const uint8_t *buf) {

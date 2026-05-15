@@ -16,6 +16,7 @@
 # include "keycode.h"
 # include "report.h"
 # include "math.h"
+# include <string.h>
 # include "action_layer.h"
 # include "dynamic_macro.h"
 # include "macro_engine.h"
@@ -35,6 +36,9 @@ extern socd_policy_t g_policy;
 #include "feature.h"
 #include "../../keyboard_core/protocol/chibios/usb_main.h"
 #define TRAVEL_STEPS 350
+#define ADC_OFFSET_CALIBRATION_SAMPLE_COUNT 10
+#define ADC_OFFSET_CALIBRATION_TRIM_COUNT 2
+#define ADC_OFFSET_CALIBRATION_INTERVAL_MS 100
 
 //
 extern led_runMode_t currentLED_RunMode, lastLED_RunMode;
@@ -84,8 +88,8 @@ static void idle_led_note_activity(void) {
         setRunMode(wake_mode);
     }
 
-    uprintf("[IDLE] activity reset\r\n");
-    uprintf("1\r\n");
+    // uprintf("[IDLE] activity reset\r\n");
+    // uprintf("1\r\n");
 }
 
 static void idle_led_maybe_report_timeout(void) {
@@ -102,8 +106,8 @@ static void idle_led_maybe_report_timeout(void) {
     idle_led_restore_mode = idle_led_build_mode(lastLED_RunMode, normalMode, eeprom_read_byte(KB_COLOR_MODE_ADDR));
     currentLED_RunMode = idle_led_build_mode(lastLED_RunMode, normalMode, 0x00);
     setRunMode(currentLED_RunMode);
-    uprintf("[IDLE] timeout\r\n");
-    uprintf("0\r\n");
+    // uprintf("[IDLE] timeout\r\n");
+    // uprintf("0\r\n");
 }
 
 void hook_keyboard_loop(void)
@@ -965,7 +969,7 @@ void led_ctrl(bool sw){
 #ifdef socd
 // extern socd_keyrecord_t firstSnap; // no need?
 // extern SOCDPair_t; old dont need ?
-bool isSOCD = true; // for toggle key
+static bool isSOCD = true; // for toggle key
 
 
 
@@ -1155,14 +1159,14 @@ void hook_late_init()
 
 
 
-	uint8_t FACTORY_INIT_MAGIC = 0xF2;
+	uint8_t FACTORY_INIT_MAGIC = 0xE1;
     uint8_t flag = eeprom_read_byte((uint8_t *)EEPROM_FACTORY_INIT_FLAG_ADDR);
 	usb_set_polling_rate(eeprom_read_byte(EECONFIG_POLLING_RATE));
 
     // uprintf("=============factory init flag = %u\n", flag);
 
     if (flag != FACTORY_INIT_MAGIC) {
-		eeprom_write_word(EEPROM_FACTORY_INIT_FLAG_ADDR, 0xF2);
+		eeprom_write_word(EEPROM_FACTORY_INIT_FLAG_ADDR, FACTORY_INIT_MAGIC);
 		eeprom_write_word(EECONFIG_KEYMAP_TRIGGER_LEVEL, 0x00C8);
 	    eeprom_write_word(EECONFIG_KEYMAP_RELEASE_LEVEL, 0x0000);
 		// eeprom_write_word(EECONFIG_KEYMAP_TRIGGER_LEVEL, keyMatrixTriggerLevel);
@@ -1257,6 +1261,7 @@ const GPTConfig gpt9cfg1 = {
 static adcsample_t samples1[ADC_NUM_CHANNELS];
 adcsample_t samples2[ADC_BUF_DEPTH][ADC_NUM_CHANNELS], initPostionLevel[ADC_BUF_DEPTH][ADC_NUM_CHANNELS], travelPostionLevel[ADC_BUF_DEPTH][ADC_NUM_CHANNELS]; ;
 adcsample_t keyDepth[MATRIX_ROWS][MATRIX_COLS];
+static adcsample_t adcOffsetSnapshots[ADC_OFFSET_CALIBRATION_SAMPLE_COUNT][ADC_BUF_DEPTH][ADC_NUM_CHANNELS];
 // adcsample_t adc2mmLevel[ADC_BUF_DEPTH][ADC_NUM_CHANNELS];
 static int32_t adcsampleIndex = 0, adcUpdateIndex = 0;
 static void adccallback(ADCDriver* adcp);
@@ -1477,6 +1482,7 @@ void irq_storm_gpt9_cb(GPTDriver* gptp)
 					// chThdSleep(TIME_US2I(40));
 					// chThdSleepMicroseconds(10); 
 					static bool toggleGpio = 0;
+					// palSetPad(GPIOB, 12);
 					////////////////palSetPad(GPIOC, 12); 
 					// if(toggleGpio){
 					// 	palSetPad(GPIOC, 12); 
@@ -1489,6 +1495,7 @@ void irq_storm_gpt9_cb(GPTDriver* gptp)
 					// }
 					adcStartConversion(&ADCD1, &adcgrpcfg2, &samples2[adcsampleIndex][0], 1);
 					//adcStartConversion_Start(&ADCD1, ADC_CTRL2_OCSWTRG);
+					// palClearPad(GPIOB, 12);
 
 				return;
 				} else {
@@ -1544,60 +1551,91 @@ void adcOffsetGet(bool findMax)
     }
 }
 
-void adcOffsetCalc(bool findMax, bool update, uint16_t samples)
+static void adc_offset_sort_values(adcsample_t *values, uint8_t count)
 {
-    uint16_t k = 0;
-    uint32_t SampleTimer;
+    for (uint8_t i = 1; i < count; i++) {
+        adcsample_t key = values[i];
+        int8_t j = (int8_t)i - 1;
+
+        while (j >= 0 && values[j] > key) {
+            values[j + 1] = values[j];
+            j--;
+        }
+
+        values[j + 1] = key;
+    }
+}
+
+static adcsample_t adc_offset_apply_margin(adcsample_t value)
+{
+#ifdef nonOP
+    return value + 5;
+#else
+#ifdef minTriggerCheck
+    return value + 2;
+#else
+    return value + 5;
+#endif
+#endif
+}
+
+void adcOffsetCalc(bool findMax, bool update, uint16_t samples) //
+{
+    uint8_t sample_count = (uint8_t)samples;
+
+    (void)findMax;
+
+    if (sample_count != ADC_OFFSET_CALIBRATION_SAMPLE_COUNT) {
+        sample_count = ADC_OFFSET_CALIBRATION_SAMPLE_COUNT;
+    }
+
     memset(initPostionLevel, 0, sizeof(initPostionLevel));
 
     adcUpdateIndex = 0;
-    SampleTimer = timer_read();
     currentKeyMatrixMode = keyMatrixMode_InitialPostionCalc;
     lastKeyScanEffect = keyScanEffect;
     lastRapidKeyEnable = rapidKeyEnable;
     lastkeycodeOutput = keycodeOutput;
-//    currentLED_RunMode.type = offMode;
-//    setRunMode(currentLED_RunMode);
-//    ledAllOff(true);
     keyScanEffect = true;
     rapidKeyEnable = false;
     keycodeOutput = false;
-    while (timer_read() < (SampleTimer + samples*10))
-    {
-        for (uint8_t i = 0; i < ADC_NUM_CHANNELS; i++)
-        {
-            for (uint8_t j = 0; j < ADC_BUF_DEPTH; j++)
-            {
-#ifdef nonOP
-                if (samples2[j][i] > initPostionLevel[j][i])
-                {
-                	if (k++<500){
-                    initPostionLevel[j][i] 	= samples2[j][i]+3;
-                	} else {
-                		initPostionLevel[j][i] 	= samples2[j][i] + 5;
-                	}
-                }
-#else
-                if (samples2[j][i] > initPostionLevel[j][i])
-                {
-//                	if (k++<500){
-//                    initPostionLevel[j][i] 	= samples2[j][i]+6;
-//                	} else {
-//                		initPostionLevel[j][i] 	= samples2[j][i] + 9;
-//                	}
-#ifdef minTriggerCheck
-                	initPostionLevel[j][i] 	= samples2[j][i]+2;
-#else
-                	initPostionLevel[j][i] 	= samples2[j][i]+5;
-#endif
-                }
-#endif
+
+    for (uint8_t sample_idx = 0; sample_idx < sample_count; sample_idx++) {
+        chThdSleepMilliseconds(ADC_OFFSET_CALIBRATION_INTERVAL_MS);
+
+        for (uint8_t i = 0; i < ADC_NUM_CHANNELS; i++) {
+            for (uint8_t j = 0; j < ADC_BUF_DEPTH; j++) {
+                adcOffsetSnapshots[sample_idx][j][i] = samples2[j][i];
             }
         }
     }
+
+    for (uint8_t i = 0; i < ADC_NUM_CHANNELS; i++) {
+        for (uint8_t j = 0; j < ADC_BUF_DEPTH; j++) {
+            adcsample_t values[ADC_OFFSET_CALIBRATION_SAMPLE_COUNT];
+            uint32_t sum = 0;
+
+            for (uint8_t sample_idx = 0; sample_idx < sample_count; sample_idx++) {
+                values[sample_idx] = adcOffsetSnapshots[sample_idx][j][i];
+            }
+
+            adc_offset_sort_values(values, sample_count);
+
+            for (uint8_t sample_idx = ADC_OFFSET_CALIBRATION_TRIM_COUNT;
+                 sample_idx < (sample_count - ADC_OFFSET_CALIBRATION_TRIM_COUNT);
+                 sample_idx++) {
+                sum += values[sample_idx];
+            }
+
+            initPostionLevel[j][i] = adc_offset_apply_margin(
+                (adcsample_t)(sum / (sample_count - (ADC_OFFSET_CALIBRATION_TRIM_COUNT * 2)))
+            );
+        }
+    }
+
     if (update)
     {
-    	keyScanEffect = false;
+        keyScanEffect = false;
         uprintf("offset calc \r\n");
         for (uint16_t i = 0; i < (ADC_NUM_CHANNELS * ADC_BUF_DEPTH); i++)
         {
@@ -1608,14 +1646,11 @@ void adcOffsetCalc(bool findMax, bool update, uint16_t samples)
     keyScanEffect = false;
     rapidKeyEnable = lastRapidKeyEnable;
     keycodeOutput = lastkeycodeOutput;
-//    if (!globleTrigger){
-//		currentLED_RunMode.type = normalMode;
-//		setRunMode(currentLED_RunMode);
-//    }
 }
 
-void adcTravelCalc(uint8_t mode)
+void adcTravelCalc(uint8_t mode) // travel max adc value
 {
+	// uprintf("adcTravelCalc =========== %d ====\r\n", mode);
     uint16_t i;
     uint32_t SampleTimer;
     switch (mode)
@@ -1632,7 +1667,7 @@ void adcTravelCalc(uint8_t mode)
             rapidKeyEnable = false;
             keycodeOutput = false;
             memset(travelPostionLevel, 0, sizeof(travelPostionLevel));
-            uprintf("enter travel postion calibration modes\r\n");
+            uprintf("enter travel postion calibration modes\r\n"); //here
             currentKeyMatrixMode = keyMatrixMode_TravelPostionCalc;
             break;
         case 1:
@@ -3519,7 +3554,7 @@ void matrix_init(void)//
     	write_trigger_to_eeprom();
     	write_Release_to_eeprom();
     	eeconfig_rapidTrigger_init();
-    	adcOffsetCalc(true, true, 1500);
+    	adcOffsetCalc(true, true, ADC_OFFSET_CALIBRATION_SAMPLE_COUNT);
 		eeconfig_socd_clear();
     	uprintf("Factory Reset end\r\n");
 //    	NVIC_SystemReset();
@@ -3930,10 +3965,10 @@ bool hook_matrix_change(keyrecord_t record)
     }
 
     if (record.event.pressed) {
-        uprintf("[IDLE] pressed row=%u col=%u kc=%04X\r\n",
-                record.event.key.row,
-                record.event.key.col,
-                keycode);
+        // uprintf("[IDLE] pressed row=%u col=%u kc=%04X\r\n",
+        //         record.event.key.row,
+        //         record.event.key.col,
+        //         keycode);
         idle_led_note_activity();
     }
 
@@ -4277,6 +4312,16 @@ bool hook_matrix_change(keyrecord_t record)
 					} else {
 						isSOCD = true;
 					}
+					// if (record.event.pressed) {
+					// 	if(isSOCD){//IS_SOCD_ON_ADD == 0x01){
+					// 		uprintf("socd close\r\n");
+					// 		isSOCD = false;
+					// 	} else {
+					// 		uprintf("socd on\r\n");
+					// 		isSOCD = true;
+					// 	}
+					// }
+					
 				break;
 				case KC_EECLR:
 					if (record.event.pressed) {

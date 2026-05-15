@@ -82,7 +82,7 @@ extern const analogKey_Config_t matrixAnalogRelocate[6][15];
 //uint32_t spi_timer,spi_timer_last;
 
 extern uint32_t get_system_time_ticks();
-extern void adcOffsetCalc(bool findMax, bool update, uint8_t samples);
+extern void adcOffsetCalc(bool findMax, bool update, uint16_t samples);
 extern void adcTravelCalc(uint8_t mode);
 extern uint8_t dynamaticReciveBuff[LAMP_ARRAY_EPSIZE];
 
@@ -1057,7 +1057,7 @@ static THD_FUNCTION(LED_DynamaticLighting, arg)
                             {
                                 case 0x00:								//All
                                     //uprintf("Factory Reset All\r\n");
-                                    adcOffsetCalc(false, true, 1500);
+                                    adcOffsetCalc(false, true, 10);
                                     break;
                                 case 0x01:
                                     //uprintf("Factory Reset but calc\r\n");	//All but offset calc

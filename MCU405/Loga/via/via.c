@@ -616,7 +616,7 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length) {
 		break;
 		case ione_api_cmd_get_snap_tap_SOCD_Binding:
             uprintf ("API=>Get Snap Tap SOCD Binding:\r\n");
-			if (*payload_length == 0){
+            if (*payload_length == 0){
 			*send_status = ione_api_status_success;
             *send_data = socd_fill_report(send_data);
             } else {
@@ -624,6 +624,25 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length) {
 				uprintf ("Fail\r\n");
 			}
 			*payload_length = 10;
+			// if (*payload_length == 0 || *payload_length == 1){
+            //     uint8_t report_len;
+
+            //     send_data[0] = (*payload_length == 1) ? recive_payload[0] : 0;
+            //     report_len = socd_fill_report(send_data);
+
+            //     if (report_len > 0) {
+			//         *send_status = ione_api_status_success;
+            //         *payload_length = (uint8_t)(1 + report_len);
+            //     } else {
+            //         *send_status = ione_api_status_fail;
+            //         *payload_length = 1;
+            //         uprintf ("Fail: invalid SOCD slot\r\n");
+            //     }
+            // } else {
+			// 	*send_status = ione_api_status_fail;
+            //     *payload_length = 1;
+			// 	uprintf ("Fail\r\n");
+			// }
             
 		break;
         case ione_api_test:
