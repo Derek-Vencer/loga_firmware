@@ -61,12 +61,12 @@ static led_runMode_t idle_led_build_mode(led_runMode_t base, uint8_t type, uint8
     run_mode.type = type;
     run_mode.mode = mode;
 
-    if (run_mode.brightness < 1 || run_mode.brightness > 10) {
-        run_mode.brightness = 3;
+    if (run_mode.brightness < 1 || run_mode.brightness > 100) {
+        run_mode.brightness = 30;
     }
 
-    if (run_mode.speed < 1 || run_mode.speed > 5) {
-        run_mode.speed = 1;
+    if (run_mode.speed > 100) {
+        run_mode.speed = 100;
     }
 
     return run_mode;
@@ -84,8 +84,8 @@ static void idle_led_note_activity(void) {
         setRunMode(wake_mode);
     }
 
-    uprintf("[IDLE] activity reset\r\n");
-    uprintf("1\r\n");
+    // uprintf("[IDLE] activity reset\r\n");
+    // uprintf("1\r\n");
 }
 
 static void idle_led_maybe_report_timeout(void) {
@@ -102,8 +102,8 @@ static void idle_led_maybe_report_timeout(void) {
     idle_led_restore_mode = idle_led_build_mode(lastLED_RunMode, normalMode, eeprom_read_byte(KB_COLOR_MODE_ADDR));
     currentLED_RunMode = idle_led_build_mode(lastLED_RunMode, normalMode, 0x00);
     setRunMode(currentLED_RunMode);
-    uprintf("[IDLE] timeout\r\n");
-    uprintf("0\r\n");
+    // uprintf("[IDLE] timeout\r\n");
+    // uprintf("0\r\n");
 }
 
 void hook_keyboard_loop(void)
@@ -965,7 +965,24 @@ void led_ctrl(bool sw){
 #ifdef socd
 // extern socd_keyrecord_t firstSnap; // no need?
 // extern SOCDPair_t; old dont need ?
-bool isSOCD = true; // for toggle key
+static bool isSOCD = true; // for toggle key
+
+static inline void socd_setting_write(bool enabled) {
+	eeprom_update_byte((uint8_t *)IS_SOCD_ON_ADD, enabled ? 0x01 : 0x00);
+	eeprom_update_byte((uint8_t *)SOCD_SETTING_MAGIC_ADDR, SOCD_SETTING_MAGIC);
+}
+
+static bool socd_setting_read(void) {
+	uint8_t magic = eeprom_read_byte((uint8_t *)SOCD_SETTING_MAGIC_ADDR);
+	uint8_t value = eeprom_read_byte((uint8_t *)IS_SOCD_ON_ADD);
+
+	if (magic != SOCD_SETTING_MAGIC) {
+		socd_setting_write(true);
+		return true;
+	}
+
+	return value == 0x01;
+}
 
 
 
@@ -1155,33 +1172,52 @@ void hook_late_init()
 
 
 
-	uint8_t FACTORY_INIT_MAGIC = 0xF2;
+	uint8_t FACTORY_INIT_MAGIC = 0xA5;
     uint8_t flag = eeprom_read_byte((uint8_t *)EEPROM_FACTORY_INIT_FLAG_ADDR);
-	usb_set_polling_rate(eeprom_read_byte(EECONFIG_POLLING_RATE));
+	usb_set_polling_rate(eeprom_read_byte((uint8_t *)EECONFIG_POLLING_RATE));
 
     // uprintf("=============factory init flag = %u\n", flag);
 
     if (flag != FACTORY_INIT_MAGIC) {
-		eeprom_write_word(EEPROM_FACTORY_INIT_FLAG_ADDR, 0xF2);
-		eeprom_write_word(EECONFIG_KEYMAP_TRIGGER_LEVEL, 0x00C8);
-	    eeprom_write_word(EECONFIG_KEYMAP_RELEASE_LEVEL, 0x0000);
-		// eeprom_write_word(EECONFIG_KEYMAP_TRIGGER_LEVEL, keyMatrixTriggerLevel);
-	    // eeprom_write_word(EECONFIG_KEYMAP_RELEASE_LEVEL, keyMatrixReleaseLevel);
+		eeprom_update_byte((uint8_t *)EEPROM_FACTORY_INIT_FLAG_ADDR, FACTORY_INIT_MAGIC);
+		// eeprom_write_word(EECONFIG_KEYMAP_TRIGGER_LEVEL, 0x00C8);
+	    // eeprom_write_word(EECONFIG_KEYMAP_RELEASE_LEVEL, 0x0000);
+		eeprom_write_word(EECONFIG_KEYMAP_TRIGGER_LEVEL, keyMatrixTriggerLevel);
+	    eeprom_write_word(EECONFIG_KEYMAP_RELEASE_LEVEL, keyMatrixReleaseLevel);
 		rapidKeyEnable = eeprom_read_byte(RAPID_KEY_ENABLE_ADDR);
 		eeprom_update_byte(KB_COLOR_MODE_ADDR, 8);
-		eeprom_write_word(EECONFIG_POLLING_RATE, 0x00);
-		eeprom_write_word(EECONFIG_MAC_MODE, 0x00);
+		eeprom_update_byte((uint8_t *)EECONFIG_POLLING_RATE, 0x00);
+		eeprom_update_byte((uint8_t *)EECONFIG_MAC_MODE, 0x00);
+		socd_setting_write(true);
 		eeconfig_clear_all_toggle_entry();
+
+		knobState = 0;
+		eeprom_update_byte(KB_ENCODER_MODE_ADDR, knobState);
+		eeconfig_socd_clear();
+		eeconfig_rappy_snappy_clear();
+		eeconfig_modtap_clear();
+		currentLED_RunMode.mode = 8;
+		currentLED_RunMode.type = offMode;
+		setRunMode(currentLED_RunMode);
+		eeprom_update_byte(KB_COLOR_MODE_ADDR, currentLED_RunMode.mode);
+		eeprom_update_byte((uint8_t *)EECONFIG_POLLING_RATE, 0x00);
+		eeconfig_rapidTrigger_init();
+		keyMatrixTriggerLevel = DEFAULT_TRIGGER_LEVEL;
+		keyMatrixReleaseLevel = DEFAULT_RELEASE_LEVEL;
+		write_trigger_to_eeprom();
+		write_Release_to_eeprom();
+		write_keymap_to_eeprom();
+		dynamic_macro_reset_eeprom();
+
+		eeprom_update_byte((uint8_t *)EEPROM_FACTORY_INIT_FLAG_ADDR, 0xFA);
+		chThdSleepMilliseconds(100);
+		NVIC_SystemReset();
 		
 	}
 	load_all_rappy_snappy();
 	modtap_load_form_eeprom();
-	if(eeprom_read_word(IS_SOCD_ON_ADD) == 0x01){
-		isSOCD = true;
-	} else {
-		isSOCD = false;
-	}
-	isMac = eeprom_read_word(EECONFIG_MAC_MODE);
+	isSOCD = socd_setting_read();
+	isMac = eeprom_read_byte((uint8_t *)EECONFIG_MAC_MODE);
 
 	void toggle_key_load_from_eeprom(void)//toggle_key_pair_count
 	{
@@ -1256,7 +1292,9 @@ const GPTConfig gpt9cfg1 = {
 
 static adcsample_t samples1[ADC_NUM_CHANNELS];
 adcsample_t samples2[ADC_BUF_DEPTH][ADC_NUM_CHANNELS], initPostionLevel[ADC_BUF_DEPTH][ADC_NUM_CHANNELS], travelPostionLevel[ADC_BUF_DEPTH][ADC_NUM_CHANNELS]; ;
-adcsample_t keyDepth[MATRIX_ROWS][MATRIX_COLS];
+// volatile adcsample_t keyRawDepth[MATRIX_ROWS][MATRIX_COLS];
+// volatile adcsample_t keyDepth[MATRIX_ROWS][MATRIX_COLS];
+adcsample_t keyDepth[MATRIX_ROWS][MATRIX_COLS]; // CHANGE BACK
 // adcsample_t adc2mmLevel[ADC_BUF_DEPTH][ADC_NUM_CHANNELS];
 static int32_t adcsampleIndex = 0, adcUpdateIndex = 0;
 static void adccallback(ADCDriver* adcp);
@@ -1477,6 +1515,7 @@ void irq_storm_gpt9_cb(GPTDriver* gptp)
 					// chThdSleep(TIME_US2I(40));
 					// chThdSleepMicroseconds(10); 
 					static bool toggleGpio = 0;
+					// palSetPad(GPIOB, 12);
 					////////////////palSetPad(GPIOC, 12); 
 					// if(toggleGpio){
 					// 	palSetPad(GPIOC, 12); 
@@ -1489,6 +1528,7 @@ void irq_storm_gpt9_cb(GPTDriver* gptp)
 					// }
 					adcStartConversion(&ADCD1, &adcgrpcfg2, &samples2[adcsampleIndex][0], 1);
 					//adcStartConversion_Start(&ADCD1, ADC_CTRL2_OCSWTRG);
+					// palClearPad(GPIOB, 12);
 
 				return;
 				} else {
@@ -1614,8 +1654,9 @@ void adcOffsetCalc(bool findMax, bool update, uint16_t samples)
 //    }
 }
 
-void adcTravelCalc(uint8_t mode)
+void adcTravelCalc(uint8_t mode) // travel max adc value
 {
+	// uprintf("adcTravelCalc =========== %d ====\r\n", mode);
     uint16_t i;
     uint32_t SampleTimer;
     switch (mode)
@@ -1632,7 +1673,7 @@ void adcTravelCalc(uint8_t mode)
             rapidKeyEnable = false;
             keycodeOutput = false;
             memset(travelPostionLevel, 0, sizeof(travelPostionLevel));
-            uprintf("enter travel postion calibration modes\r\n");
+            uprintf("enter travel postion calibration modes\r\n"); //here
             currentKeyMatrixMode = keyMatrixMode_TravelPostionCalc;
             break;
         case 1:
@@ -1893,7 +1934,7 @@ static void adccallback(ADCDriver* adcp)
 	sensorPowerCtrl(false);
 	muxSelect(++adcsampleIndex);
 #ifndef ADC_Oversample
-	gptStartOneShot(&GPTD9, 14); // lyon 更改這個數值至3看看adc數值是否正常//original is 7 // 9問題改8測試8可以，為什麼13可以，改10吧(為了8k)會有問題
+	gptStartOneShot(&GPTD9, 14); //lyon 更改這個數值至3看看adc數值是否正常//original is 7 // 9問題改8測試8可以，為什麼13可以，改10吧(為了8k)會有問題
 	// maybe change to higher value give it more time to process ex: 01-9, 02-8,02會有點狀況改成刪除狀態?no
 	// 7 / 60000 秒 ＝ 約 116.7 µs
 	// 8 / 140000sec = 57usec, 7/140000=50
@@ -2340,6 +2381,14 @@ if (!reset_checked) {
 				adcCalc = 0;
 			}
 			keyLocation = analogKeyRelocate[group][channel];
+
+			/* Make ADC visible as early as possible in keyscan before extra feature logic runs. */
+			// if (keyLocation.rowA >= 0 && keyLocation.colA >= 0 &&
+			// 	keyLocation.rowA < MATRIX_ROWS && keyLocation.colA < MATRIX_COLS)
+			// {
+			// 	keyRawDepth[keyLocation.rowA][keyLocation.colA] = now;
+			// 	keyDepth[keyLocation.rowA][keyLocation.colA] = (adcsample_t)adcCalc;
+			// }
 
 			// Dynamic Keystroke - lyon
 			rapidKeyStatus = false;
@@ -2853,7 +2902,7 @@ if (!reset_checked) {
 			currentLED_RunMode.type = offMode;
 			setRunMode(currentLED_RunMode);
 			eeprom_update_byte(KB_COLOR_MODE_ADDR, currentLED_RunMode.mode);
-			eeprom_write_word(EECONFIG_POLLING_RATE, 0x00);
+			eeprom_update_byte((uint8_t *)EECONFIG_POLLING_RATE, 0x00);
 			uprintf (".");
 			eeconfig_rapidTrigger_init();
 			keyMatrixTriggerLevel = DEFAULT_TRIGGER_LEVEL;
@@ -2873,7 +2922,7 @@ if (!reset_checked) {
 			dynamic_macro_reset_eeprom();
 			uprintf (".");
 			uprintf (".");
-			eeprom_write_word(EEPROM_FACTORY_INIT_FLAG_ADDR, 0xFA);
+			eeprom_update_byte((uint8_t *)EEPROM_FACTORY_INIT_FLAG_ADDR, 0xFA);
 			uprintf("\r\nEnd\r\n");
 			chThdSleepMilliseconds(500);
 			NVIC_SystemReset();
@@ -3579,6 +3628,24 @@ matrix_row_t matrix_get_row(uint8_t row)
     return matrix[row];
 }
 
+// uint16_t matrix_get_key_raw_adc(uint8_t row, uint8_t col)
+// {
+//     if (row >= MATRIX_ROWS || col >= MATRIX_COLS) {
+//         return 0;
+//     }
+
+//     return keyRawDepth[row][col];
+// }
+
+// uint16_t matrix_get_key_depth(uint8_t row, uint8_t col)
+// {
+//     if (row >= MATRIX_ROWS || col >= MATRIX_COLS) {
+//         return 0;
+//     }
+
+//     return keyDepth[row][col];
+// }
+
 //matrix_row_t matrix_get_row(uint8_t row) {
 //static bool speedTest = false;
 //static uint16_t key;
@@ -3930,10 +3997,10 @@ bool hook_matrix_change(keyrecord_t record)
     }
 
     if (record.event.pressed) {
-        uprintf("[IDLE] pressed row=%u col=%u kc=%04X\r\n",
-                record.event.key.row,
-                record.event.key.col,
-                keycode);
+        // uprintf("[IDLE] pressed row=%u col=%u kc=%04X\r\n",
+        //         record.event.key.row,
+        //         record.event.key.col,
+        //         keycode);
         idle_led_note_activity();
     }
 
@@ -4277,6 +4344,17 @@ bool hook_matrix_change(keyrecord_t record)
 					} else {
 						isSOCD = true;
 					}
+					socd_setting_write(isSOCD);
+					// if (record.event.pressed) {
+					// 	if(isSOCD){//IS_SOCD_ON_ADD == 0x01){
+					// 		uprintf("socd close\r\n");
+					// 		isSOCD = false;
+					// 	} else {
+					// 		uprintf("socd on\r\n");
+					// 		isSOCD = true;
+					// 	}
+					// }
+					
 				break;
 				case KC_EECLR:
 					if (record.event.pressed) {
@@ -4430,11 +4508,11 @@ bool hook_matrix_change(keyrecord_t record)
 			break;
 			case KC_MAC:
 				isMac = 1;
-				eeprom_write_word(EECONFIG_MAC_MODE, isMac);
+				eeprom_update_byte((uint8_t *)EECONFIG_MAC_MODE, isMac);
 			break;
 			case KC_WINDOW:
 				isMac = 0;
-				eeprom_write_word(EECONFIG_MAC_MODE, isMac);
+				eeprom_update_byte((uint8_t *)EECONFIG_MAC_MODE, isMac);
 			break;
 //			case KC_BRIU:
 //				send_consumer(0x00BD);
@@ -4521,8 +4599,8 @@ bool hook_matrix_change(keyrecord_t record)
 					break;
 				case KC_RGB_MODE_RAINBOWFLOW ... KC_RGB_MODE_RGBTEST:
 					if (currentLED_RunMode.type != dynamticLightingMode){
-					    currentLED_RunMode.brightness = 8;
-					    currentLED_RunMode.speed = 1;
+					    currentLED_RunMode.brightness = 80;
+					    currentLED_RunMode.speed = 100;
 					    switch (keycode){
 							case KC_RGB_MODE_RAINBOWFLOW:
 								if (currentLED_RunMode.type != dynamticLightingMode && lastLED_RunMode.mode!= 8 ){
@@ -4652,33 +4730,35 @@ bool hook_matrix_change(keyrecord_t record)
 				if (!rapidKeyEnable){
 					switch (keycode){
 						case KC_RGB_VAI:
-							++currentLED_RunMode.brightness;
+							if (currentLED_RunMode.brightness < 100) {
+								++currentLED_RunMode.brightness;
+							}
 							uprintf ("RGB Bright ++:%d\r\n",currentLED_RunMode.brightness);
 							break;
 						case KC_RGB_VAD:
-							--currentLED_RunMode.brightness;
+							if (currentLED_RunMode.brightness > 0) {
+								--currentLED_RunMode.brightness;
+							}
 							uprintf ("RGB Bright --:%d\r\n",currentLED_RunMode.brightness);
 							break;
 						case KC_RGB_SPI:
 						case KC_RAPID_LVI:
-							--currentLED_RunMode.speed;
+							if (currentLED_RunMode.speed > 0) {
+								--currentLED_RunMode.speed;
+							}
 							break;
 						case KC_RGB_SPD:
 						case KC_RAPID_LVD:
-							++currentLED_RunMode.speed;
+							if (currentLED_RunMode.speed < 100) {
+								++currentLED_RunMode.speed;
+							}
 							break;
 					}
-						if (currentLED_RunMode.brightness > 9){
-							currentLED_RunMode.brightness = 9;
+						if (currentLED_RunMode.brightness > 100){
+							currentLED_RunMode.brightness = 100;
 						}
-						if (currentLED_RunMode.brightness < 1){
-							currentLED_RunMode.brightness = 1;
-						}
-						if (currentLED_RunMode.speed < 1){
-							currentLED_RunMode.speed = 1;
-						}
-						if (currentLED_RunMode.speed > 4){
-							currentLED_RunMode.speed = 4;
+						if (currentLED_RunMode.speed > 100){
+							currentLED_RunMode.speed = 100;
 						}
 						LED_SpeedChange(currentLED_RunMode.brightness, currentLED_RunMode.speed);
 						//setRunMode(currentLED_RunMode);

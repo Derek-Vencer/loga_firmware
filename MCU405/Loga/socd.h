@@ -121,7 +121,7 @@ void socd_load_all_from_eeprom(void)
 #include <stdbool.h>
 
 #ifndef SOCD_SLOT_COUNT
-#define SOCD_SLOT_COUNT 2
+#define SOCD_SLOT_COUNT 10
 #endif
 
 typedef enum {

@@ -7,7 +7,7 @@
 #define VENDOR_ID       0x195d
 #define PRODUCT_ID      0x2100//0x2092
 #define DEVICE_VER      0x000F//15//0x000E
-#define DEVICE_VER_FIX  0x00 // 00
+#define DEVICE_VER_FIX  0x02 // 01
 /* in python2: list(u"whatever".encode('utf-16-le')) */
 /*   at most 32 characters or the ugly hack in usb_main.c borks */
 #define MANUFACTURER "iOne Innovation"
@@ -64,6 +64,8 @@
 #define RAPID_KEY_ENABLE_ADDR         0x0073
 #define EEPROM_FACTORY_INIT_FLAG_ADDR 0x0074
 #define KB_ENCODER_MODE_ADDR          0x0075
+#define SOCD_SETTING_MAGIC_ADDR       0x0076
+#define SOCD_SETTING_MAGIC            0xA5
 #define KB_COLOR_RED_ADDR             0x007B
 #define KB_COLOR_GREEN_ADDR           0x007C
 #define KB_COLOR_BLUE_ADDR            0x007D

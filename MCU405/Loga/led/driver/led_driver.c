@@ -237,10 +237,21 @@ const uint8_t tabLED_Vaf[36] = { //Reference LED Driver Datasheet  Map
 	};
 
 void LED_CurrentAdjuest(uint8_t current){
-const brightPresetLevel [] = {1, 17, 33, 49, 59}; //{1, 17, 33, 49, 59}; //change to 59 original is 63 lyon
-	if (current>5){return;}
+	if (current > 100) {
+		current = 100;
+	}
+
 	uprintf ("current:%d\t",current);
-	current = brightPresetLevel[current-1];
+
+	if (current == 0) {
+		current = 0;
+	} else {
+		current = (uint8_t)(((uint16_t)current * 63u + 99u) / 100u);
+		if (current == 0) {
+			current = 1;
+		}
+	}
+
 	current &= 0x3F;
 	for (uint8_t i=0;i<LED_DriverCount;i++){
 	SPI_W_3BYTE(i, SPI_FRAME_FUNCTION_PAGE, CURRENT_CTL_REG,(mskCURRENT_CTL_EN | current));

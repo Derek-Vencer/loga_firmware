@@ -4,6 +4,7 @@
 #include "hal.h"
 #include "keycode.h"
 #include "keymap_common.h"
+#include "keymap_in_eeprom.h"
 
 // extern void register_code(uint16_t kc);
 // extern void unregister_code(uint16_t kc);
@@ -29,8 +30,34 @@ typedef struct {
 
 static socd_slot_rt_t socd_rt[SOCD_SLOT_COUNT];
 
+static inline bool socd_slot_enabled(const socd_config_t *cfg)
+{
+    return cfg->enable == 1u;
+}
+
+static uint16_t socd_resolve_keycode(uint8_t layer, uint8_t row, uint8_t col)
+{
+    if (layer >= KEYMAPS_COUNT || row >= MATRIX_ROWS || col >= MATRIX_COLS) {
+        return 0;
+    }
+
+#ifdef KEYMAP_IN_EEPROM_ENABLE
+    return eeconfig_read_keymapBuffer_key(layer, row, col);
+#else
+    return keymaps[layer][row][col];
+#endif
+}
+
 void socd_apply_config(uint8_t idx, const socd_config_t *c)
 {
+    if (idx >= SOCD_SLOT_COUNT) {
+        return;
+    }
+
+    if (socd_rt[idx].activeKC) {
+        unregister_code(socd_rt[idx].activeKC);
+    }
+
     socd_slots[idx] = *c;
 
     // ★ 關鍵：清 runtime 狀態
@@ -60,8 +87,12 @@ void socd_load_all_from_eeprom(void)
         // if (!socd_slots[i].enable) {
         //     socd_slots[i].mode = SOCD_DISABLE;
         // }
-        if (!tmp.enable) {
+        if (!socd_slot_enabled(&tmp)) {
+            memset(&tmp, 0, sizeof(tmp));
             tmp.mode = SOCD_DISABLE;
+        } else {
+            tmp.kc_a = socd_resolve_keycode(tmp.a_layer, tmp.a_row, tmp.a_col);
+            tmp.kc_b = socd_resolve_keycode(tmp.b_layer, tmp.b_row, tmp.b_col);
         }
 
         socd_apply_config(i, &tmp);
@@ -98,7 +129,7 @@ static inline bool q_pop(socd_evt_t* out){
 int8_t socd_find_slot_by_keycode(uint16_t kc) {
     for (uint8_t i = 0; i < SOCD_SLOT_COUNT; i++) {
         socd_config_t *c = &socd_slots[i];
-        if (!c->enable) continue;
+        if (!socd_slot_enabled(c)) continue;
         if (kc == c->kc_a || kc == c->kc_b)
             return i;
     }
@@ -159,7 +190,7 @@ static THD_FUNCTION(SOCDThread, arg) {
 
         socd_config_t  *cfg = &socd_slots[ev.slot];
         socd_slot_rt_t *rt  = &socd_rt[ev.slot];
-        if (!cfg->enable) continue;
+        if (!socd_slot_enabled(cfg)) continue;
 
         if (ev.keycode == cfg->kc_a) {
             if (rt->A.down != ev.pressed) {
@@ -229,7 +260,8 @@ uint8_t socd_fill_report(uint8_t *buf) {
     // buf[3] = c->kc_b & 0xFF;
     // buf[4] = c->kc_b >> 8;
     // buf[5] = c->mode;
-    return 6;
+    // return 6;
+    return 8;
 }
 
 void socd_apply_report(const uint8_t *buf) {
@@ -256,8 +288,8 @@ void socd_apply_report(const uint8_t *buf) {
     uint8_t sec_col   = buf[5];
     uint8_t mode      = buf[6];
 
-    uint16_t kc_a = keymaps[pri_layer][pri_row][pri_col];//keymap_get_keycode(pri_layer, pri_row, pri_col);
-    uint16_t kc_b = keymaps[sec_layer][sec_row][sec_col];//keymap_get_keycode(sec_layer, sec_row, sec_col);
+    uint16_t kc_a = socd_resolve_keycode(pri_layer, pri_row, pri_col);
+    uint16_t kc_b = socd_resolve_keycode(sec_layer, sec_row, sec_col);
 
     socd_config_t c = {
         .enable = 1,
@@ -318,7 +350,8 @@ void socd_test_write_eeprom_once(void)
 
 void eeconfig_socd_clear(void) {
     socd_config_t empty;
-    memset(&empty, 0xFF, sizeof(empty));
+    memset(&empty, 0, sizeof(empty));
+    empty.mode = SOCD_DISABLE;
 
     for (uint8_t i = 0; i < SOCD_SLOT_COUNT; i++) {
         eeconfig_write_socd(i, &empty);
@@ -326,7 +359,7 @@ void eeconfig_socd_clear(void) {
         if (socd_rt[i].activeKC) {
             unregister_code(socd_rt[i].activeKC);
         }
-        memset(&socd_rt[i], 0xFF, sizeof(socd_rt[i]));
+        memset(&socd_rt[i], 0, sizeof(socd_rt[i]));
         socd_slots[i] = empty;
     }
 }

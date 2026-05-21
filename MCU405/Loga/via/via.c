@@ -31,6 +31,30 @@ extern uint8_t knobState; // lyon for encoder in matrix.c
 
 extern uint8_t rapidKeyEnable; // test for rapid trigger state
 
+static uint8_t clamp_percent_u8(uint8_t value) {
+    return (value > 100u) ? 100u : value;
+}
+
+static uint8_t brightness_percent_to_internal(uint8_t percent) {
+    return clamp_percent_u8(percent);
+}
+
+static uint8_t brightness_internal_to_percent(uint8_t brightness, bool is_off) {
+    if (is_off || brightness == 0u) {
+        return 0u;
+    }
+
+    return clamp_percent_u8(brightness);
+}
+
+static uint8_t speed_percent_to_internal(uint8_t percent) {
+    return clamp_percent_u8(percent);
+}
+
+static uint8_t speed_internal_to_percent(uint8_t speed) {
+    return clamp_percent_u8(speed);
+}
+
 // extern layer_keypos_t snappy_key1;
 // extern layer_keypos_t snappy_key2;
 #ifdef rappySnappy
@@ -616,14 +640,53 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length) {
 		break;
 		case ione_api_cmd_get_snap_tap_SOCD_Binding:
             uprintf ("API=>Get Snap Tap SOCD Binding:\r\n");
-			if (*payload_length == 0){
-			*send_status = ione_api_status_success;
-            *send_data = socd_fill_report(send_data);
+            if (*payload_length == 0){
+                const size_t EP = LAMP_ARRAY_EPSIZE;
+                bool sent = false;
+
+                for (uint8_t i = 0; i < SOCD_SLOT_COUNT; i++) {
+                    uint8_t report_len;
+
+                    send_data[0] = i;
+                    report_len = socd_fill_report(send_data);
+                    if (report_len == 0) {
+                        continue;
+                    }
+
+                    *(data_start + 3) |= 0x80;
+                    *send_status = ione_api_status_sending;
+                    *payload_length = (uint8_t)(1 + report_len);
+                    raw_hid_send(data_start, EP);
+                    sent = true;
+                }
+
+                if (sent) {
+                    *send_status = ione_api_status_success;
+                    *payload_length = 1;
+                } else {
+                    *send_status = ione_api_status_fail;
+                    *payload_length = 1;
+                    uprintf ("Fail: no SOCD slots\r\n");
+                }
+            } else if (*payload_length == 1){
+                uint8_t report_len;
+
+                send_data[0] = recive_payload[0];
+                report_len = socd_fill_report(send_data);
+
+                if (report_len > 0) {
+			        *send_status = ione_api_status_success;
+                    *payload_length = (uint8_t)(1 + report_len);
+                } else {
+                    *send_status = ione_api_status_fail;
+                    *payload_length = 1;
+                    uprintf ("Fail: invalid SOCD slot\r\n");
+                }
             } else {
 				*send_status = ione_api_status_fail;
+                *payload_length = 1;
 				uprintf ("Fail\r\n");
 			}
-			*payload_length = 10;
             
 		break;
         case ione_api_test:
@@ -980,7 +1043,7 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length) {
 				currentLED_RunMode.type = offMode;
 				setRunMode(currentLED_RunMode);
                 eeprom_update_byte(KB_COLOR_MODE_ADDR, currentLED_RunMode.mode);
-                eeprom_write_word(EECONFIG_POLLING_RATE, 0x00);
+                eeprom_update_byte((uint8_t *)EECONFIG_POLLING_RATE, 0x00);
 				uprintf (".");
 				*send_status = ione_api_status_success;
 				eeconfig_rapidTrigger_init();
@@ -1003,7 +1066,7 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length) {
 				*(data_start+3) |= 0x80;
 				raw_hid_send(data_start, length);
 				uprintf (".");
-                eeprom_write_word(EEPROM_FACTORY_INIT_FLAG_ADDR, 0xFA);
+                eeprom_update_byte((uint8_t *)EEPROM_FACTORY_INIT_FLAG_ADDR, 0xFA);
 				uprintf("\r\nEnd\r\n");
 				chThdSleepMilliseconds(1000);
 				NVIC_SystemReset();
@@ -1019,7 +1082,7 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length) {
             if(*payload_length == 1 && (recive_payload[0] < 4)){
                 *send_status = ione_api_status_success;
                 usb_set_polling_rate(recive_payload[0]);
-                eeprom_write_word(EECONFIG_POLLING_RATE, recive_payload[0]);
+                eeprom_update_byte((uint8_t *)EECONFIG_POLLING_RATE, recive_payload[0]);
             }else{
                 *send_status = ione_api_status_fail;
 				uprintf ("Fail\r\n");
@@ -1303,11 +1366,14 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length) {
                 switch(recive_payload[0]){
                     case 1:
                         uprintf("API=>Bright:\r\n");
-                        // currentLED_RunMode.brightness = recive_payload[1]; // 1-9
-                        // setRunMode(currentLED_RunMode);
-                        // LED_SpeedChange(recive_payload[1], currentLED_RunMode.speed);
-                        currentLED_RunMode.brightness = recive_payload[1];
-                        // normalBrightness = currentLED_RunMode.brightness;   // 如果你現在是 normalMode
+                        currentLED_RunMode.brightness = brightness_percent_to_internal(recive_payload[1]);
+
+                        if (currentLED_RunMode.brightness == 0) {
+                            currentLED_RunMode.type = offMode;
+                        } else if (currentLED_RunMode.type == offMode) {
+                            currentLED_RunMode.type = normalMode;
+                        }
+
                         LED_SpeedChange(currentLED_RunMode.brightness, currentLED_RunMode.speed);
                         setRunMode(currentLED_RunMode);
                     break;
@@ -1319,7 +1385,7 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length) {
                     break;
                     case 3:
                         uprintf("API=>Speed:\r\n");
-                        currentLED_RunMode.speed = recive_payload[1]; // 0-4?
+                        currentLED_RunMode.speed = speed_percent_to_internal(recive_payload[1]);
                         setRunMode(currentLED_RunMode);
                     break;
                     case 4:
@@ -1350,7 +1416,10 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length) {
                 switch(recive_payload[0]){
                     case 1:
                         uprintf("API=>Bright:\r\n");
-                        *send_data = currentLED_RunMode.brightness;
+                        *send_data = brightness_internal_to_percent(
+                            currentLED_RunMode.brightness,
+                            currentLED_RunMode.type == offMode
+                        );
                     break;
                     case 2:
                         uprintf("API=>Effect:\r\n");
@@ -1358,7 +1427,7 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length) {
                     break;
                     case 3:
                         uprintf("API=>Speed:\r\n");
-                        *send_data = currentLED_RunMode.speed;
+                        *send_data = speed_internal_to_percent(currentLED_RunMode.speed);
                     break;
                     case 4:
                         uprintf("API=>Color:\r\n");

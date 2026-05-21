@@ -83,14 +83,14 @@ static effect_wheel_t wheel_fx;
 typedef struct {
     uint8_t active;
     uint8_t phase;      // 0~255
-    uint8_t speed;      // 每次增加多少
+    uint8_t speed;      // 每次增�?多�?
     led_config_t color;
 } starlight_led_t;
 
 typedef struct {
     bool enable;
-    uint8_t density;    // 每幀新增星星數量
-    uint8_t base_dim;   // 背景微亮，可設 0
+    uint8_t density;    // 每�??��??��??��?
+    uint8_t base_dim;   // ?�景微亮，可�?0
 } EffectStarlight_t;
 
 static EffectStarlight_t starlight;
@@ -115,38 +115,38 @@ static led_config_t starlight_pick_color(void)
 
     switch (r) {
         default:
-        case 0: // 暖黃星
+        case 0: // ?��???
             c.red = 255; c.green = 210; c.blue = 120;
             break;
-        case 1: // 暖白星
+        case 1: // ?�白??
             c.red = 255; c.green = 235; c.blue = 190;
             break;
-        case 2: // 純白星
+        case 2: // 純白??
             c.red = 255; c.green = 255; c.blue = 255;
             break;
-        case 3: // 冷白星
+        case 3: // ?�白??
             c.red = 200; c.green = 230; c.blue = 255;
             break;
-        case 4: // 淡藍星
+        case 4: // 淡�???
             c.red = 150; c.green = 200; c.blue = 255;
             //c.red = 120; c.green = 180; c.blue = 255;
             break;
-        // case 0: // 暖白
+        // case 0: // ?�白
         //     c.red = 255; c.green = 220; c.blue = 180;
         //     break;
         // case 1: // 中性白
         //     c.red = 255; c.green = 245; c.blue = 230;
         //     break;
-        // case 2: // 冷白
+        // case 2: // ?�白
         //     c.red = 220; c.green = 235; c.blue = 255;
         //     break;
-        // case 3: // 淡藍白
+        // case 3: // 淡�???
         //     c.red = 190; c.green = 215; c.blue = 255;
         //     break;
-        // case 4: // 微暖星光
+        // case 4: // 微�??��?
         //     c.red = 255; c.green = 235; c.blue = 210;
         //     break;
-        // case 5: // 偏冷星光
+        // case 5: // ?�冷?��?
         //     c.red = 210; c.green = 225; c.blue = 255;
         //     break;
     }
@@ -287,7 +287,7 @@ void ripple_add_event(uint8_t row, uint8_t col, led_config_t color)
 //         }
 //     }
 
-//     /* 滿了就覆蓋最舊的 0 號 */
+//     /* 滿�?就�??��??��? 0 ??*/
 //     ripple_events[0].active = true;
 //     ripple_events[0].row = row;
 //     ripple_events[0].col = col;
@@ -305,10 +305,10 @@ static uint8_t ripple_abs_u8(int16_t v)
 
 static uint16_t ripple_dist_approx(int16_t dx, int16_t dy)
 {
-    /* 不用 sqrt，避免太重 */
+    /* 不用 sqrt，避?�太??*/
     uint16_t ax = (dx < 0) ? -dx : dx;
     uint16_t ay = (dy < 0) ? -dy : dy;
-    return ax + ay;   /* Manhattan distance，夠用了 */
+    return ax + ay;   /* Manhattan distance，�??��? */
 }
 
 static led_config_t ripple_scale_color(led_config_t in, uint8_t bright)
@@ -492,7 +492,7 @@ led_config_t LED_NULL;
 led_config_t c;
 
 int8_t normalEffect;
-uint8_t normalBrightness = 3, normalSpeed = 2;
+uint8_t normalBrightness = 30, normalSpeed = 100;
 
 binary_semaphore_t ledEffetSem;
 
@@ -504,7 +504,7 @@ extern uint16_t rainbowBase;
 extern bool gameModeEnable;
 
 // #ifdef reboot
-// extern volatile bool g_usb_configured_flag;   // ★ extern 宣告（不要 = false）lyon
+// extern volatile bool g_usb_configured_flag;   // ??extern �??（�?�?= false）lyon
 // #endif
 
 // wheel
@@ -532,7 +532,7 @@ extern bool gameModeEnable;
 //     center_x = ((26.0f - 1.0f) * pitch_x) * 0.5f;
 //     center_y = ((LED_MATRIX_ROWS - 1.0f) * pitch_y) * 0.5f;
 
-//     /* 先全部清掉，避免短列未使用位置有垃圾值 */
+//     /* ?�全?��??��??��??��??�使?��?置�??�圾??*/
 //     for (row = 0; row < LED_MATRIX_ROWS; row++) {
 //         for (column = 0; column < LED_MATRIX_COLS; column++) {
 //             wheel_base_hue[row][column] = 0;
@@ -577,7 +577,7 @@ static void wheel_init_table(void)
             float norm = (angle + (float)M_PI) / (2.0f * (float)M_PI);
             uint8_t hue = (uint8_t)(norm * 255.0f);
 
-            /* 反查回 ledRemap 對應位置，存進 wheel_base_hue[row][col] */
+            /* ?�查??ledRemap 對�?位置，�???wheel_base_hue[row][col] */
             for (uint8_t row = 0; row < LED_MATRIX_ROWS; row++) {
                 for (uint8_t col = 0; col < LED_MATRIX_COLS; col++) {
                     if (ledRemap[row][col] == i) {
@@ -631,17 +631,55 @@ static led_config_t wheel_hue_to_rgb(uint8_t hue)
     return c;
 }
 
-/* 亮度縮放，brightness 建議 1~10 */
+/* 亮度縮放，brightness 使用 0~100 ?��?�?*/
+static uint8_t led_clamp_percent(uint8_t value)
+{
+    return (value > 100u) ? 100u : value;
+}
+
+static uint8_t led_speed_percent_to_interval(uint8_t speed)
+{
+    speed = led_clamp_percent(speed);
+    return (uint8_t)(175u - (((uint16_t)speed * 140u) / 100u));
+}
+
+static uint32_t led_speed_scale_timebase(uint32_t timebase, uint8_t speed)
+{
+    uint16_t scale = 16u + (((uint16_t)led_clamp_percent(speed) * 112u) / 100u);
+    return (timebase * scale) / 16u;
+}
+
+static uint8_t mosart_effective_speed(uint8_t mode, uint8_t speed)
+{
+    speed = led_clamp_percent(speed);
+
+    if (mode == mosArtBreath || mode == mosArtWave) {
+        speed = (uint8_t)(((uint16_t)speed * 50u) / 100u);
+        if (speed == 0u) {
+            speed = 1u;
+        }
+    }
+
+    return speed;
+}
+
+static uint8_t mosart_update_interval(uint8_t mode)
+{
+    if (mode == mosArtBreath || mode == mosArtWave) {
+        return 50u;
+    }
+
+    return 33u;
+}
+
 static led_config_t wheel_apply_brightness(led_config_t in, uint8_t brightness)
 {
     led_config_t out;
-    if (brightness > 10) {
-        brightness = 10;
-    }
+    brightness = led_clamp_percent(brightness);
 
-    out.red   = ((uint16_t)in.red   * brightness) / 10;
-    out.green = ((uint16_t)in.green * brightness) / 10;
-    out.blue  = ((uint16_t)in.blue  * brightness) / 10;
+    out.red   = ((uint16_t)in.red   * brightness) / 100u;
+    out.green = ((uint16_t)in.green * brightness) / 100u;
+    out.blue  = ((uint16_t)in.blue  * brightness) / 100u;
     return out;
 }
 // end wheel
@@ -703,18 +741,8 @@ static THD_FUNCTION(LED_EffectThread, arg)
 }
 
 void LED_SpeedChange(int8_t brightness, uint8_t speed){
-	if (currentLED_RunMode.brightness > 5){
-		currentLED_RunMode.brightness = 5;
-	}
-	if (currentLED_RunMode.brightness < 0){
-		currentLED_RunMode.brightness = 0;
-	}
-	if (currentLED_RunMode.speed < 1){
-		currentLED_RunMode.speed = 1;
-	}
-	if (currentLED_RunMode.speed > 4){
-		currentLED_RunMode.speed = 4;
-	}
+	currentLED_RunMode.brightness = led_clamp_percent((uint8_t)brightness);
+	currentLED_RunMode.speed = led_clamp_percent(speed);
 	LED_CurrentAdjuest(currentLED_RunMode.brightness);
 	switch (effectStatus.runMode)
 	{
@@ -757,7 +785,7 @@ void LED_SpeedChange(int8_t brightness, uint8_t speed){
                     currentLED_RunMode.speed = speed;
                     break;
 			}
-            effectStatus.speed = speed * (ledUpdateInterval);
+            effectStatus.speed = led_speed_percent_to_interval(speed);
 			break;
 		case demoMode:
 			break;
@@ -772,7 +800,7 @@ bool LED_Effect(uint8_t effect, bool enable, uint32_t interval, uint8_t colorMod
         case EffectTypeRandColor:
             if (enable)
             {
-                if (speed <= 0 || speed > 5 || (brightness < 1 || brightness > 10))
+                if (speed > 100 || brightness > 100)
                 {
                     return false;
                 }
@@ -789,7 +817,7 @@ bool LED_Effect(uint8_t effect, bool enable, uint32_t interval, uint8_t colorMod
                 randColor.bright = 0;
                 randColor.direction = true;
 //                randColor.brightness = brightness;
-                effectStatus.speed = speed * ledUpdateInterval;
+                effectStatus.speed = led_speed_percent_to_interval(speed);
                 randColor.enable = true;
                 chVTSet(&randColor_vt, TIME_MS2I(effectStatus.speed), (vtfunc_t)led_cb, NULL);
             }
@@ -801,15 +829,16 @@ bool LED_Effect(uint8_t effect, bool enable, uint32_t interval, uint8_t colorMod
         case EffectTypeMosArt:
             if (enable)
             {
-                if (speed > 5 || (brightness < 1 || brightness > 10) || mode > mosArtWave || colorMode > ranbow)
+                if (speed > 100 || brightness > 100 || mode > mosArtWave || colorMode > ranbow)
                 {
                     return false;
                 }
                 mosArt.Mode = mode;
                 mosArt.Rainbow = colorMode;
-                mosArt.Speed = --speed;
+                mosArt.Speed = speed; //problem
+                // mosArt.Speed = --speed;
 //                mosArt.Brightness = brightness;
-                effectStatus.speed = 33;
+                effectStatus.speed = mosart_update_interval(mode);
                 mosArt.TimerBase = 0;
                 mosArt.enable = true;
                 switch (colorMode)
@@ -831,12 +860,12 @@ bool LED_Effect(uint8_t effect, bool enable, uint32_t interval, uint8_t colorMod
         case EffectTypeRainbowFlow:
             if (enable)
             {
-                if (speed > 5 || (brightness < 1 || brightness > 10))
+                if (speed > 100 || brightness > 100)
                 {
                     return false;
                 }
                 ranbowFlow.Brightness = brightness;
-                effectStatus.speed = speed * (ledUpdateInterval);
+                effectStatus.speed = led_speed_percent_to_interval(speed);
                 ranbowFlow.timebase = rainbowBase;
                 ranbowFlow.enable = true;
                 ranbowFlow.direction = direction;
@@ -852,20 +881,20 @@ bool LED_Effect(uint8_t effect, bool enable, uint32_t interval, uint8_t colorMod
             break;
 
         case EffectTypeChangeProfile:
-        	effectStatus.speed = speed * 1000;
+        	effectStatus.speed = led_speed_percent_to_interval(speed);
         	chVTSet(&randColor_vt, TIME_MS2I(effectStatus.speed), (vtfunc_t)led_cb, NULL);
         	break;
         case EffectTypeColorBrith:
             break;
         case EffectTypeWheel:
             if (enable) {
-                if (speed > 5 || (brightness < 1 || brightness > 10)) {
+                if (speed > 100 || brightness > 100) {
                     return false;
                 }
                 wheel_fx.enable = true;
                 wheel_fx.offset = 0;
 
-                effectStatus.speed = speed * ledUpdateInterval;
+                effectStatus.speed = led_speed_percent_to_interval(speed);
 
                 chBSemSignal(&ledEffetSem);
 
@@ -875,7 +904,7 @@ bool LED_Effect(uint8_t effect, bool enable, uint32_t interval, uint8_t colorMod
 
         case EffectTypeReactive:
             if (enable) {
-                effectStatus.speed = speed * ledUpdateInterval;
+                effectStatus.speed = led_speed_percent_to_interval(speed);
 
                 chBSemSignal(&ledEffetSem);
 
@@ -885,18 +914,18 @@ bool LED_Effect(uint8_t effect, bool enable, uint32_t interval, uint8_t colorMod
         case EffectTypeStarlight:
             if (enable)
             {
-                if (speed > 5 || (brightness < 1 || brightness > 10)) {
+                if (speed > 100 || brightness > 100) {
                     return false;
                 }
 
                 starlight.enable = true;
 
-                starlight.density = 8 + speed;   // 12 + speed * 2;
+                starlight.density = 2u + (((uint16_t)speed * 18u) / 100u);
                 starlight.base_dim = 0;
 
                 starlight_reset_all();
 
-                effectStatus.speed = 35;
+                effectStatus.speed = led_speed_percent_to_interval(speed);
                 chVTSet(&randColor_vt, TIME_MS2I(effectStatus.speed), (vtfunc_t)led_cb, NULL);
             }
             else
@@ -907,13 +936,13 @@ bool LED_Effect(uint8_t effect, bool enable, uint32_t interval, uint8_t colorMod
         case EffectTypeRipple:
             if (enable)
             {
-                if (speed > 5 || (brightness < 1 || brightness > 10)) {
+                if (speed > 100 || brightness > 100) {
                     return false;
                 }
 
                 ripple_clear_events();
 
-                effectStatus.speed = speed * ledUpdateInterval;
+                effectStatus.speed = led_speed_percent_to_interval(speed);
                 chVTSet(&randColor_vt, TIME_MS2I(effectStatus.speed), (vtfunc_t)led_cb, NULL);
             }
             break;
@@ -1070,9 +1099,11 @@ bool effectMosArtProcess(void)
 {
     float tempmBright;
     uint8_t bright;
+    uint8_t effect_speed;
     led_config_t ledTemp;
     if (mosArt.enable)
     {
+        effect_speed = mosart_effective_speed(mosArt.Mode, mosArt.Speed);
     	if (effectStatus.interval!=0 && (get_system_time_ticks()-effectStatus.timeStamp>effectStatus.interval)){
             chVTReset(&randColor_vt);
             mosArt.enable = false;
@@ -1091,34 +1122,34 @@ bool effectMosArtProcess(void)
                 bright = 255;
                 break;
             case 1:
-                calculate_breath_volume(mosArt.Speed, mosArt.TimerBase, &bright);
+                calculate_breath_volume(effect_speed, mosArt.TimerBase, &bright);
                 break;
 
             case 2:
                 Calculate_Flashing_Volume(mosArt.Speed, mosArt.TimerBase, &bright);
                 break;
             case 3:{//WAVE
-                // === 參數 ===
-                const uint8_t  WAVE_WAVELENGTH_COLS = 12;   // 幾欄一個亮暗週期
-                const uint8_t  WAVE_WAVELENGTH_ROWS = 0;    // 0=不做列向；>0 可做斜向
-                const uint16_t TIMEBASE_STEP        = 10;   // 與你原本 Mos Art 同步
+                // === ?�數 ===
+                const uint8_t  WAVE_WAVELENGTH_COLS = 12;   // 幾�?一?�亮?�週�?
+                const uint8_t  WAVE_WAVELENGTH_ROWS = 0;    // 0=不�??��?�?0 ?��??��?
+                const uint16_t TIMEBASE_STEP        = 3;
                 uint16_t phase_step_col = WAVE_WAVELENGTH_COLS ? (256u / WAVE_WAVELENGTH_COLS) : 0;
                 uint16_t phase_step_row = WAVE_WAVELENGTH_ROWS ? (256u / WAVE_WAVELENGTH_ROWS) : 0;
 
-                // 單色：用 mosArt.LED（把 mosArt.Rainbow 設 0 即單色）
+                // ?�色：用 mosArt.LED（�? mosArt.Rainbow �?0 ?�單?��?
                 led_config_t base = mosArt.LED;
 
-                uint16_t t0 = mosArt.TimerBase;  // 本幀時間基準
+                uint16_t t0 = mosArt.TimerBase;  // ?��??��??��?
                 for (uint8_t col = 0; col < LED_MATRIX_COLS; col++) {
                     for (uint8_t row = 0; row < LED_MATRIX_ROWS; row++) {
                         uint16_t local_tb = t0;
                         if (phase_step_col) local_tb += (uint16_t)col * phase_step_col;
                         if (phase_step_row) local_tb += (uint16_t)row * phase_step_row;
 
-                        uint8_t b;                                 // 0..255 三角波亮度
-                        calculate_breath_volume(mosArt.Speed, local_tb, &b);  //:contentReference[oaicite:3]{index=3}
+                        uint8_t b;                                 // 0..255 三�?波亮�?
+                        calculate_breath_volume(effect_speed, local_tb, &b);  //:contentReference[oaicite:3]{index=3}
 
-                        // 依 b 套到單色
+                        // �?b 套到?�色
                         led_config_t px;
                         px.red   = (uint8_t)(((uint16_t)base.red   * b) / 255);
                         px.green = (uint8_t)(((uint16_t)base.green * b) / 255);
@@ -1128,9 +1159,9 @@ bool effectMosArtProcess(void)
                     }
                 }
 
-                chBSemSignal(&ledUpdateSem);                      // 送畫面:contentReference[oaicite:5]{index=5}
-                mosArt.TimerBase = t0 + TIMEBASE_STEP;            // 時間推進
-                return true;                                      // <== 提早結束，避免被共用結尾覆蓋
+                chBSemSignal(&ledUpdateSem);                      // ?�畫??contentReference[oaicite:5]{index=5}
+                mosArt.TimerBase = t0 + 3u;
+                return true;                                      // <== ?�早結�?，避?�被?�用結尾覆�?
                 // Calculate_Waving_Volumn(mosArt.Speed, mosArt.TimerBase, &bright); // lyon this is old one
                 // break;
             }
@@ -1138,14 +1169,14 @@ bool effectMosArtProcess(void)
         tempmBright = (float)bright / 255;
         if (mosArt.Rainbow != 0)
         {
-            Calculate_Colorful_Color(mosArt.Speed, mosArt.TimerBase, &mosArt.LED);
+            Calculate_Colorful_Color(effect_speed, mosArt.TimerBase, &mosArt.LED);
         }
 
         ledTemp.red = mosArt.LED.red * tempmBright;
         ledTemp.green = mosArt.LED.green * tempmBright;
         ledTemp.blue = mosArt.LED.blue * tempmBright;
         led_updateFrameBufferSingle(0, LedNumbers, &ledTemp);
-        mosArt.TimerBase += 10;
+        mosArt.TimerBase += (mosArt.Mode == mosArtBreath || mosArt.Mode == mosArtWave) ? 3 : 10;
         return true;
     }
     else
@@ -1271,7 +1302,7 @@ bool EffectTypeWheelProcess(void)
         }
     }
 
-    wheel_fx.offset += effectStatus.speed / 10;
+    wheel_fx.offset += (uint8_t)(1u + (((uint16_t)led_clamp_percent(currentLED_RunMode.speed) * 7u) / 100u));
 
     chBSemSignal(&ledUpdateSem);
     return true;
@@ -1297,10 +1328,10 @@ bool EffectTypeReactiveProcess(void)
                     reactive_level[row][col] -= 20;
                 } else {
                     reactive_level[row][col] = 0;
-                    setKeymapLED(row, col, LED_NULL);   // 關鍵
+                    setKeymapLED(row, col, LED_NULL);   // ?�鍵
                 }
             } else {
-                setKeymapLED(row, col, LED_NULL);       // 保險，確保真的清掉
+                setKeymapLED(row, col, LED_NULL);       // 保險，確保�??��???
             }
         }
     }
@@ -1334,10 +1365,10 @@ bool EffectTypeStarlightProcess(void)
         return false;
     }
 
-    /* 先清空整體畫面 */
+    /* ?��?空整體畫??*/
     ledAllOff(false);
 
-    /* 每幀生成更多星星，密度高一點 */
+    /* 每�??��??��??��?，�?度�?一�?*/
     spawn_count = starlight.density;
 
     for (i = 0; i < spawn_count; i++) {
@@ -1351,7 +1382,7 @@ bool EffectTypeStarlightProcess(void)
         }
     }
 
-    /* 更新所有星星 */
+    /* ?�新?�?��???*/
     for (i = 0; i < LedNumbers; i++) {
         if (starlight_leds[i].active) {
             uint8_t bright;
@@ -1359,18 +1390,15 @@ bool EffectTypeStarlightProcess(void)
 
             bright = starlight_triangle_wave(starlight_leds[i].phase);
 
-            /* 讓星星整體不要太刺眼，但仍明顯 */
-            bright = (uint8_t)(((uint16_t)bright * (120 + effectStatus.brightness * 12)) / 255);
-            if (bright > 180) {
-                bright = 180;
-            }
+            /* 讓�??�整體�?要太?�眼，�?仍�?�?*/
+            bright = (uint8_t)(((uint16_t)bright * led_clamp_percent(effectStatus.brightness)) / 100u);
 
             c = starlight_scale_color(starlight_leds[i].color, bright);
             LED_Datas[i] = c;
 
             starlight_leds[i].phase += starlight_leds[i].speed;
 
-            /* 閃完就消失，之後重新隨機生成 */
+            /* ?��?就�?失�?之�??�新?��??��? */
             if (starlight_leds[i].phase >= 250 || starlight_leds[i].phase <= starlight_leds[i].speed) {
                 if ((starlight_rand8() & 0x03) == 0) {
                     starlight_leds[i].active = 0;
@@ -1388,13 +1416,8 @@ bool EffectTypeStarlightProcess(void)
 //Mos Art effect
 void Calculate_Colorful_Color(uint8_t speed, uint32_t timebase, led_config_t* LED)
 {
-    uint8_t i;
     uint8_t color, colorInv;
-    timebase >>= 1;
-    for (i = 0; i < speed; i++)
-    {
-        timebase >>= 1;
-    }
+    timebase = led_speed_scale_timebase(timebase, speed);
     color = (uint8_t)(timebase & 0xFF);
     colorInv = ~color;
     switch (((uint8_t)((timebase >> 8) & 0xFF)) & 0x03)
@@ -1424,13 +1447,8 @@ void Calculate_Colorful_Color(uint8_t speed, uint32_t timebase, led_config_t* LE
 
 void calculate_breath_volume(uint8_t speed, uint16_t timebase, uint8_t* bright)
 {
-    uint8_t i;
     uint16_t wtemp;
-    timebase >>= 1;
-    for (i = 0; i < speed; i++)
-    {
-        timebase >>= 1;
-    }
+    timebase = (uint16_t)led_speed_scale_timebase(timebase, speed);
     if (((uint8_t)((timebase >> 8) & 0xff) & 0x01) == 0x00)
     {
         *bright = (uint8_t)(timebase & 0xff);
@@ -1458,14 +1476,8 @@ void calculate_breath_volume(uint8_t speed, uint16_t timebase, uint8_t* bright)
 
 void Calculate_Flashing_Volume(uint8_t speed, uint16_t timebase, uint8_t* bright)
 {
-    uint16_t blinkOnBit;
-    timebase >>= 1;
-    blinkOnBit = 0x0040;
-    do
-    {
-        blinkOnBit <<= 1;
-    } while (speed--);
-    if (!(timebase & blinkOnBit))
+    timebase = (uint16_t)led_speed_scale_timebase(timebase, speed);
+    if (((timebase >> 8) & 0x01u) == 0u)
     {
         *bright = 255;
     }
@@ -1477,50 +1489,50 @@ void Calculate_Flashing_Volume(uint8_t speed, uint16_t timebase, uint8_t* bright
 
 void Calculate_Waving_Volumn(uint8_t speed, uint16_t timebase, uint8_t* bright){
     // case mosArtWave: 
-    // === 可調參數 ===
-    // 幾「欄」形成一個完整亮暗週期（越小越密）
+    // === ?�調?�數 ===
+    // 幾「�??�形?��??��??�亮?�週�?（�?小�?密�?
     const uint8_t  WAVE_WAVELENGTH_COLS = 12;
-    // 幾「列」形成一個週期；0=不沿列做，>0 可做斜向/棋盤式起伏
-    const uint8_t  WAVE_WAVELENGTH_ROWS = 0;    // 例如想斜向可設 8
-    // 每幀時間推進量（維持與你其他 Mos Art 效果一致）
+    // 幾「�??�形?��??�週�?�?=不沿?��?�?0 ?��??��?/棋盤式起�?
+    const uint8_t  WAVE_WAVELENGTH_ROWS = 0;    // 例�??��??�可�?8
+    // 每�??��??�進�?（維?��?你其�?Mos Art ?��?一?��?
     const uint16_t TIMEBASE_STEP        = 10;
 
     uint16_t phase_step_col = WAVE_WAVELENGTH_COLS ? (256u / WAVE_WAVELENGTH_COLS) : 0;
     uint16_t phase_step_row = WAVE_WAVELENGTH_ROWS ? (256u / WAVE_WAVELENGTH_ROWS) : 0;
 
-    // 單色或彩虹：跟原架構一致
+    // ?�色?�彩?��?跟�??��?一??
     led_config_t baseColor = mosArt.LED;
     if (mosArt.Rainbow != 0) {
-        // 若要保留彩虹底色可開這行（但你要單色，mosArt.Rainbow=0 即可）
-        Calculate_Colorful_Color(0, mosArt.TimerBase, &baseColor);  // 現成函式
+        // ?��?保�?彩虹底色?��??��?（�?你�??�色，mosArt.Rainbow=0 ?�可�?
+        Calculate_Colorful_Color(0, mosArt.TimerBase, &baseColor);  // ?��??��?
     }
 
     for (uint8_t col = 0; col < LED_MATRIX_COLS; col++) {
         for (uint8_t row = 0; row < LED_MATRIX_ROWS; row++) {
-            // 空間相位：以欄/列位置偏移 timebase，形成波面
+            // 空�??��?：以�??��?置�?�?timebase，形?�波??
             uint16_t local_tb = mosArt.TimerBase;
             if (phase_step_col) local_tb += (uint16_t)col * phase_step_col;
             if (phase_step_row) local_tb += (uint16_t)row * phase_step_row;
 
-            // 亮度三角波（含死區/縮放），沿用你現成的函式
+            // 亮度三�?波�??�死?�/縮放）�?沿用你現?��??��?
             uint8_t b;
             calculate_breath_volume(mosArt.Speed, local_tb, &b);        // 0..255
             float m = (float)b / 255.0f;
 
-            // 套用亮度到顏色
+            // 套用亮度?��???
             led_config_t px;
             px.red   = (uint8_t)((float)baseColor.red   * m);
             px.green = (uint8_t)((float)baseColor.green * m);
             px.blue  = (uint8_t)((float)baseColor.blue  * m);
 
-            setRemapLED(row, col, px); // 寫入 frame buffer（逐點） :contentReference[oaicite:1]{index=1}
+            setRemapLED(row, col, px); // 寫入 frame buffer（逐�?�?:contentReference[oaicite:1]{index=1}
         }
     }
 
-    // 這種逐點寫法「不會」自動送出，需要手動喚醒更新緒
-    chBSemSignal(&ledUpdateSem);  // 送畫面到驅動執行緒傳輸 :contentReference[oaicite:2]{index=2}
+    // ?�種?��?寫�??��??�」自?�送出，�?要�??��??�更?��?
+    chBSemSignal(&ledUpdateSem);  // ?�畫?�到驅�??��?緒傳�?:contentReference[oaicite:2]{index=2}
 
-    mosArt.TimerBase += TIMEBASE_STEP; // 與原本 Mos Art 同樣的逐幀推進
+    mosArt.TimerBase += TIMEBASE_STEP; // ?��???Mos Art ?�樣?�逐�??��?
     // return true;
 
 }
@@ -1585,8 +1597,8 @@ bool LED_ModesBuilder(uint8_t action,bool start,uint8_t effect, bool enable, uin
 
 
 void buildDemoModes(void){
-uint8_t currentBrightness = 5;
-uint16_t currentSpeed = 4;
+uint8_t currentBrightness = 50;
+uint16_t currentSpeed = 100;
 	    LED_ModesBuilder(newDemo , false,EffectTypeRainbowFlow, true, 5000, 0, 0,  LED_NULL, currentBrightness, currentSpeed, false);
 	    LED_ModesBuilder(addDemoEffect , false,EffectTypeRainbowFlow, true, 5000, 0, 0,  LED_NULL, currentBrightness, currentSpeed, true);
 	    LED_ModesBuilder(addDemoEffect , false,EffectTypeMosArt, true, 5000, ranbow, mosArtStatic,  rainbowColor[green], currentBrightness, currentSpeed, 0);
@@ -1669,11 +1681,11 @@ hsv_t rgb_to_hsv(led_config_t rgb)
 
     // H
     if (delta == 0) {
-        hsv.h = 0;   // 無彩色：h 無意義，給 0
+        hsv.h = 0;   // ?�彩?��?h ?��?義�?�?0
         return hsv;
     }
 
-    int16_t h; // 暫存允許負數
+    int16_t h; // ?��??�許負數
     if (max == r) {
         // h = 60 * (g-b)/delta  (mod 360)
         h = (int16_t)(60 * (int16_t)(g - b) / delta);
@@ -1701,7 +1713,7 @@ led_config_t hsv_to_rgb(hsv_t hsv)
     uint8_t v = hsv.v;
 
     if (s == 0) {
-        // 灰階
+        // ?��?
         rgb.red = v;
         rgb.green = v;
         rgb.blue = v;
@@ -1715,7 +1727,7 @@ led_config_t hsv_to_rgb(hsv_t hsv)
     uint8_t region = h / 60;
     uint16_t f_deg = h - (uint16_t)region * 60; // 0..59
 
-    // 用 0..255 的 fraction 近似
+    // ??0..255 ??fraction 近似
     uint16_t f = (f_deg * 255) / 60; // 0..250(左右)
 
     uint8_t p = (uint16_t)v * (255 - s) / 255;
@@ -1754,21 +1766,11 @@ bool setRunMode(led_runMode_t runMode){
 			if (runMode.mode<0){
 				runMode.mode = LED_PresetModeIndex;
 			}
-			if (runMode.brightness>10){
-				runMode.brightness = 10;
-			}
-            // if (runMode.brightness>5){ //lyon cut in half
-			// 	runMode.brightness = 5;
-			// }
+			runMode.brightness = led_clamp_percent(runMode.brightness);
 			if (runMode.brightness < 1){
 				runMode.brightness = 1;
 			}
-			if (runMode.speed>5){
-				runMode.speed = 5;
-			}
-			if (runMode.speed < 1){
-				runMode.speed = 1;
-			}
+			runMode.speed = led_clamp_percent(runMode.speed);
 			normalEffect = runMode.mode;
 			normalBrightness = runMode.brightness;
 			normalSpeed = runMode.speed;
@@ -1823,9 +1825,10 @@ void LED_init(void){//
     led_pos_init_from_remap(); //
     wheel_init_table();   //
     wheel_inited = true;  //
-	chThdCreateStatic(waLED_EffectThread, sizeof(waLED_EffectThread), NORMALPRIO - 3, LED_EffectThread, NULL); //original -3 test +７
+	chThdCreateStatic(waLED_EffectThread, sizeof(waLED_EffectThread), NORMALPRIO - 3, LED_EffectThread, NULL); //original -3 test +�?
     currentLED_RunMode.mode = eeprom_read_byte(KB_COLOR_MODE_ADDR);//8;//
-    
+    currentLED_RunMode.brightness = normalBrightness;
+    currentLED_RunMode.speed = normalSpeed;
 	currentLED_RunMode.type = normalMode;
     setRunMode(currentLED_RunMode);
 	//leRemapLocationTest(500);
