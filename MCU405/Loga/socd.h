@@ -159,6 +159,7 @@ void socd_post_event(uint8_t slot, uint16_t keycode, bool pressed);
 /* EEPROM */
 void socd_load_all_from_eeprom(void);
 void eeconfig_socd_clear(void);
+void eeconfig_socd_clear_slot(uint8_t idx);
 
 /* VIA / RawHID
  * buf = [idx, kc_a_L, kc_a_H, kc_b_L, kc_b_H, mode]

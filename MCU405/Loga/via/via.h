@@ -203,6 +203,7 @@ enum ione_api_command {
 	ione_api_cmd_tachyon_mode			= 0x018A,
 	ione_api_cmd_set_snap_tap_SOCD_Binding 	= 0x010B,
 	ione_api_cmd_get_snap_tap_SOCD_Binding	= 0x018B,
+	ione_api_cmd_delete_snap_tap_SOCD_Binding = 0x019B,
 	ione_api_test                           = 0x012B,
 	ione_api_set_polling_rate           = 0x0110,
 	ione_api_get_polling_rate           = 0x0190,

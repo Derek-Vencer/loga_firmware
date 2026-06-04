@@ -119,88 +119,44 @@ Each returned packet payload is:
 
 ## DELETE
 
-## Current Status
+### API
 
-There is currently **no dedicated single-slot delete API** for SOCD.
+- Command: `ione_api_cmd_delete_snap_tap_SOCD_Binding`
+- Command id: `0x019B`
 
-### What really exists now
+### Supported Modes
 
-#### A. Clear all SOCD slots
+#### 1. Delete all SOCD slots
 
-This is the only real delete path in current firmware.
-
-- Function: `eeconfig_socd_clear()`
+- Request:
+  - `payload_length == 0`, or
+  - `payload_length == 1` with payload `[0xFF]`
 - Behavior:
-  - clear all SOCD EEPROM slots
-  - clear all SOCD runtime state
-  - unregister active SOCD output key if needed
+  - calls `eeconfig_socd_clear()`
+  - clears all SOCD EEPROM slots
+  - clears all SOCD runtime state
+  - unregisters active SOCD output key if needed
 
-### Where `eeconfig_socd_clear()` is used
+#### 2. Delete one SOCD slot
 
-- Factory reset API:
-  - `ione_api_cmd_set_factory_reset` (`0x0201`)
-  - `ione_api_cmd_factory_reset_and_system_reset` (`0x020A`)
-- Keyboard side long-hold reset:
-  - `EECLR` hold for 3 seconds
+- Request: `payload_length == 1`
+- Request payload:
 
-### Result
+```text
+[slot_index]
+```
 
-- All SOCD slots are deleted together
-- Not per-slot
+- Behavior:
+  - calls `eeconfig_socd_clear_slot(slot_index)`
+  - clears only that slot in EEPROM and RAM
+  - unregisters the slot's active SOCD output key if needed
 
-#### B. Set mode to `SOCD_DISABLE`
+### Notes
 
-This is **not a true delete**.
-
-Reason:
-
-- `socd_apply_report()` always writes:
-  - `enable = 1`
-- `socd_find_slot_by_keycode()` only checks:
-  - `enable == 1`
-- So a slot with `mode = SOCD_DISABLE` is still considered an active slot match
-
-### Side effect
-
-If a slot is written with:
-
-- same key pair
-- `mode = SOCD_DISABLE`
-
-then those keys may still be claimed by SOCD, but output becomes `0`.
-
-This means:
-
-- it behaves like "matched but no output"
-- not "slot removed"
-
-So:
-
-- `SOCD_DISABLE` can be treated as logical off for output
-- but it is **not** a safe replacement for delete
-
-## Recommended Delete Rule
-
-### If you want to delete all SOCD
-
-Use:
-
-- factory reset API, or
-- `eeconfig_socd_clear()`
-
-### If you want to delete one SOCD slot
-
-Current firmware does **not** have a proper per-slot delete command.
-
-If single-slot delete is needed, a correct implementation should do one of these:
-
-1. Write the slot as:
-   - `enable = 0`
-   - clear keycode / layer / row / col
-   - `mode = SOCD_DISABLE`
-2. Add a dedicated SOCD delete API:
-   - input: `slot_index`
-   - action: clear only that slot in EEPROM and RAM
+- Writing `mode = SOCD_DISABLE` is still not the same as delete
+- Real delete now uses:
+  - `eeconfig_socd_clear()`
+  - `eeconfig_socd_clear_slot()`
 
 ## Global SOCD Enable/Disable
 
@@ -227,9 +183,9 @@ This global switch controls whether matrix processing will hand key events to SO
 - `GET` exists and now supports:
   - one slot
   - all slots
-- Real `DELETE` currently exists only for:
+- `DELETE` now supports:
   - clear all slots
-- Per-slot delete does not exist yet
+  - clear one slot
 - `mode = SOCD_DISABLE` is not the same as deleting a slot
 
 ## Simplest Test Steps
@@ -326,13 +282,24 @@ Expected:
 - firmware sends one packet per slot
 - current firmware should return `10` packets because `SOCD_SLOT_COUNT = 10`
 
-### Step 7: Simplest delete test
+### Step 7: Delete test
 
-Current firmware has no true single-slot delete.
+Delete slot 0:
 
-If you want to verify delete behavior, use:
+- Command id: `0x019B`
+- Payload:
 
-- factory reset API, or
-- hold `EECLR` for 3 seconds
+```text
+[0]
+```
 
-Then run `GET SOCD` again and confirm all slots are cleared.
+Delete all slots:
+
+- Command id: `0x019B`
+- Payload:
+
+```text
+[0xFF]
+```
+
+Then run `GET SOCD` again and confirm the target slot, or all slots, are cleared.

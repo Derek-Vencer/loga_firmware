@@ -20,9 +20,18 @@ travelPostion_t xTravelPostionLevelMinus,yTravelPostionLevelMinus,rxTravelPostio
 int16_t getCurrentKeyPostion(uint8_t col, uint8_t row,travelPostion_t *padTravelPostion){
 	//uprintf ("row:%d col:%d\r\n",row,col);
 	analogKey_Config_t keyLocation = matrixAnalogRelocate[row][col];
+	if (keyLocation.rowA < 0 || keyLocation.colA < 0 ||
+		keyLocation.rowA >= ADC_NUM_CHANNELS || keyLocation.colA >= ADC_BUF_DEPTH) {
+		return 0;
+	}
 	if (padTravelPostion->travelPostion != travelPostionLevel [keyLocation.colA][keyLocation.rowA]){
-
-		padTravelPostion->postioMutl = 600 / ((float)(travelPostionLevel [keyLocation.colA][keyLocation.rowA]) - (float)initPostionLevel[keyLocation.colA][keyLocation.rowA]) *1.05;
+		float range = (float)travelPostionLevel[keyLocation.colA][keyLocation.rowA] -
+				      (float)initPostionLevel[keyLocation.colA][keyLocation.rowA];
+		if (range <= 0.0f) {
+			padTravelPostion->postioMutl = 0.0f;
+		} else {
+			padTravelPostion->postioMutl = 600.0f / range * 1.05f;
+		}
 		padTravelPostion->travelPostion = travelPostionLevel [keyLocation.colA][keyLocation.rowA];
 		uint16_t multInt = padTravelPostion->postioMutl*1000;
 ////		uprintf ("Travel:%d init:%d multi:%d.%d\r\n",travelPostionLevel [keyLocation.colA][keyLocation.rowA],initPostionLevel[keyLocation.colA][keyLocation.rowA],multInt/1000,multInt%1000);
@@ -199,7 +208,6 @@ void gamePad_init(void){
 	chThdCreateStatic(waGamepadAnalog_ProcessThread, sizeof(waGamepadAnalog_ProcessThread), NORMALPRIO -10 , GamepadAnalog_ProcessThread, NULL);
 
 }
-
 
 
 

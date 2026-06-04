@@ -348,6 +348,27 @@ void socd_test_write_eeprom_once(void)
             test.kc_a, test.kc_b, test.mode);
 }
 
+void eeconfig_socd_clear_slot(uint8_t idx)
+{
+    socd_config_t empty;
+
+    if (idx >= SOCD_SLOT_COUNT) {
+        return;
+    }
+
+    memset(&empty, 0, sizeof(empty));
+    empty.mode = SOCD_DISABLE;
+
+    eeconfig_write_socd(idx, &empty);
+
+    if (socd_rt[idx].activeKC) {
+        unregister_code(socd_rt[idx].activeKC);
+    }
+
+    memset(&socd_rt[idx], 0, sizeof(socd_rt[idx]));
+    socd_slots[idx] = empty;
+}
+
 void eeconfig_socd_clear(void) {
     socd_config_t empty;
     memset(&empty, 0, sizeof(empty));

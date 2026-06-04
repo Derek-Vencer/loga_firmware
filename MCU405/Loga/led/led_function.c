@@ -1701,7 +1701,7 @@ bool raw_hid_receive_kb(uint8_t *data, uint8_t length){
 							for (col=0; col<ledsPerRow[row];col++){
 								keyLocation = matrixAnalogRelocate[row][col];
 								switch (command_data[1])
-								{
+								{//
 									case id_key_levels:				//key
 										keycode = samples2[keyLocation.colA][keyLocation.rowA] - initPostionLevel[keyLocation.colA][keyLocation.rowA];
 										if ((int16_t)keycode < 0) { keycode = 0; }

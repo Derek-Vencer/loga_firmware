@@ -689,6 +689,33 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length) {
 			}
             
 		break;
+		case ione_api_cmd_delete_snap_tap_SOCD_Binding:
+            uprintf ("API=>Delete Snap Tap SOCD Binding:\r\n");
+            if (*payload_length == 0) {
+                eeconfig_socd_clear();
+                *send_status = ione_api_status_success;
+                *payload_length = 1;
+                uprintf ("[SOCD] CLEAR all\r\n");
+            } else if (*payload_length == 1) {
+                if (recive_payload[0] == 0xFF) {
+                    eeconfig_socd_clear();
+                    *send_status = ione_api_status_success;
+                    uprintf ("[SOCD] CLEAR all\r\n");
+                } else if (recive_payload[0] < SOCD_SLOT_COUNT) {
+                    eeconfig_socd_clear_slot(recive_payload[0]);
+                    *send_status = ione_api_status_success;
+                    uprintf ("[SOCD] CLEAR slot=%u\r\n", recive_payload[0]);
+                } else {
+                    *send_status = ione_api_status_fail;
+                    uprintf ("[SOCD] CLEAR invalid slot=%u\r\n", recive_payload[0]);
+                }
+                *payload_length = 1;
+            } else {
+                *send_status = ione_api_status_fail;
+                *payload_length = 1;
+                uprintf ("[SOCD] CLEAR invalid payload length\r\n");
+            }
+		break;
         case ione_api_test:
             // eeconfig_write_socd(0, &cfg);
             // socd_test_eeprom();
