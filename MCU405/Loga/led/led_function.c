@@ -17,6 +17,8 @@
 #include "../via/via.h"
 #include "pin_defs.h"
 #include "driver/LED_Driver.h"
+#include <string.h>
+#include "timer.h"
 //#include "driver/led_RGBTable.h"
 
 
@@ -82,7 +84,7 @@ extern const analogKey_Config_t matrixAnalogRelocate[6][15];
 //uint32_t spi_timer,spi_timer_last;
 
 extern uint32_t get_system_time_ticks();
-extern void adcOffsetCalc(bool findMax, bool update, uint8_t samples);
+extern void adcOffsetCalc(bool findMax,bool update,uint16_t samples);
 extern void adcTravelCalc(uint8_t mode);
 extern uint8_t dynamaticReciveBuff[LAMP_ARRAY_EPSIZE];
 
@@ -100,9 +102,20 @@ extern bool keycodeOutput, rapidKeyEnable, keyScanEffect, globleTrigger, ledUpda
 //static CC_ALIGN_DATA(32) uint8_t patternBuffer[(LedNumbers - 1) * 12];
 static CC_ALIGN_DATA(32) uint8_t ledDriverData[LED_DriverCount][PWM_FRAME_LENGTH+2];
 
-void spi_end1(void);
-void spi_end2(void);
-void spi_end3(void);
+static void spi_end1(SPIDriver *spip)
+{
+    (void)spip;
+}
+
+static void spi_end2(SPIDriver *spip)
+{
+    (void)spip;
+}
+
+static void spi_end3(SPIDriver *spip)
+{
+    (void)spip;
+}
 
 bool autonomousMode = true;
 
@@ -503,7 +516,7 @@ void ledDriver_PatternConvert(uint8_t* data)
 {
 uint8_t postion = 0;
 uint16_t dataPostion = 0;
-const uint8_t brightness_limit = 120; // 亮度上限（你可以改成 160 或其他值）
+const uint8_t brightness_limit = 120; // 鈭桀漲銝���隞交��� 160 ��隞�潘��
 
 	for (uint8_t i=0; i< sizeof(ledRows); i++){
 		for (uint8_t j=0; j<ledRows[i]; j++){
@@ -512,7 +525,7 @@ const uint8_t brightness_limit = 120; // 亮度上限（你可以改成 160 或�
             uint8_t g = data[dataPostion++];
             uint8_t b = data[dataPostion++];
 
-			// 限制亮度
+			// ��鈭桀漲
             if (r > brightness_limit) r = brightness_limit;
             if (g > brightness_limit) g = brightness_limit;
             if (b > brightness_limit) b = brightness_limit;
@@ -726,39 +739,44 @@ led_init(0);
 //}
 
 
-void setLightRunMode (uint8_t mode){
-    mode = lamp_array_data_report.data[0];
-//    uprintf ("\r\nAutonomousMode:%x ==>",mode);
-    if (gameModeEnable){return false;}
+void setLightRunMode(uint8_t mode)
+{
+    if (gameModeEnable)
+    {
+        return;
+    }
+
     switch (mode)
     {
-        case 0:
-            // uprintf ("\nOff\r\n");
-				autonomousMode = false;
-				ledUpdateFilter = true;
-				currentLED_RunMode.type = dynamticLightingMode;
-				lampArrayDisable = false;
-				lampArrayEffect = true;
-				setRunMode(currentLED_RunMode);
-				ledAllOff(true);
+        case 0U:
+            autonomousMode = false;
+            ledUpdateFilter = true;
+            currentLED_RunMode.type = dynamticLightingMode;
+            lampArrayDisable = false;
+            lampArrayEffect = true;
+            (void)setRunMode(currentLED_RunMode);
+            ledAllOff(true);
             break;
-        case 1:
-            // uprintf ("\nOn\r\n");//
-        	if (timer_read() > 3000 && !keyScanEffect){
-				autonomousMode = true;
-				currentLED_RunMode.type = normalMode;
-				ledUpdateFilter = true;
-				setRunMode(currentLED_RunMode);
-				lampArrayEffect = false;
-				// uprintf("read<3000\r\n");
-        	}
+
+        case 1U:
+            if ((timer_read() > 3000U) && !keyScanEffect)
+            {
+                autonomousMode = true;
+                currentLED_RunMode.type = normalMode;
+                ledUpdateFilter = true;
+                (void)setRunMode(currentLED_RunMode);
+                lampArrayEffect = false;
+            }
             break;
-        case 2:
-            // uprintf ("\nOff2\r\n");
+
+        case 2U:
             autonomousMode = false;
             currentLED_RunMode.type = dynamticLightingMode;
-            setRunMode(currentLED_RunMode);
+            (void)setRunMode(currentLED_RunMode);
             ledAllOff(true);
+            break;
+
+        default:
             break;
     }
 }
@@ -1077,8 +1095,9 @@ static THD_FUNCTION(LED_DynamaticLighting, arg)
                             keyMatrixTriggerLevel = DEFAULT_TRIGGER_LEVEL;
 							keyMatrixReleaseLevel = DEFAULT_RELEASE_LEVEL;
 #endif
-                    		eeprom_write_byte(EECONFIG_KEYMAP_TRIGGER_LEVEL, keyMatrixTriggerLevel);
-                    		eeprom_write_byte(EECONFIG_KEYMAP_RELEASE_LEVEL, keyMatrixReleaseLevel);
+							eeprom_write_word(EECONFIG_KEYMAP_TRIGGER_LEVEL,(uint16_t)keyMatrixTriggerLevel);
+
+							eeprom_write_word(EECONFIG_KEYMAP_RELEASE_LEVEL,(uint16_t)keyMatrixReleaseLevel);
 
         		            write_keymap_to_eeprom();
         		            write_trigger_to_eeprom();
@@ -1390,14 +1409,14 @@ static THD_FUNCTION(LED_DynamaticLighting, arg)
                                         switch (lamp_array_data_report.data[3])
                                         {
 											case 0:
-												// uprintf("read all release"); //  沒用?
+												// uprintf("read all release"); //  瘝?
 												keyMatrixReleaseLevel = eeprom_read_word(EECONFIG_KEYMAP_RELEASE_LEVEL);
 												dynamaticReciveBuff[4] = (keyMatrixReleaseLevel >> 8) & 0xFF;
 												dynamaticReciveBuff[5] = keyMatrixReleaseLevel & 0xff;
 												uprintf("Read Release Level:%d\r\n", keyMatrixReleaseLevel);
 												break;
 											case 1:
-												// uprintf("write all release"); //  會寫到read all trigger 的 less two bit
+												// uprintf("write all release"); //  ��神�read all trigger ��� less two bit
 												data = lamp_array_data_report.data[4] << 8 | lamp_array_data_report.data[5];
 												uprintf("Write Release Level:%0x\r\n", data);
 												eeprom_write_word(EECONFIG_KEYMAP_RELEASE_LEVEL, data);
@@ -1797,8 +1816,15 @@ void dynamaticLightingRangeUpdate(uint8_t* lamp_array_data)
     float intensity;
     uint8_t location;
     location = 1;
-    ledRangeUpdate.start = lamp_array_data[location++] | lamp_array_data[location++] << 8;
-    ledRangeUpdate.end = lamp_array_data[location++] | lamp_array_data[location++] << 8;
+    ledRangeUpdate.start =
+        (uint16_t)lamp_array_data[location] |
+        ((uint16_t)lamp_array_data[location + 1U] << 8);
+    location += 2U;
+
+    ledRangeUpdate.end =
+        (uint16_t)lamp_array_data[location] |
+        ((uint16_t)lamp_array_data[location + 1U] << 8);
+    location += 2U;
     intensity = (float)lamp_array_data[8] / 0xff;
     rangeLED.red = intensity * lamp_array_data[location++];
     rangeLED.green = intensity * lamp_array_data[location++];
@@ -1826,7 +1852,13 @@ void dynamaticLightingMultiUpdate(uint8_t* lamp_array_data)
             LED.green = intensity * lamp_array_data_report.data[location--];
             LED.red = intensity * lamp_array_data_report.data[location];
             location = (i << 1) + 2;
-            lampID = keyID_Remap[lamp_array_data_report.data[location++] | lamp_array_data_report.data[location] << 8];
+            uint16_t key_id =
+                (uint16_t)lamp_array_data_report.data[location] |
+                ((uint16_t)lamp_array_data_report.data[location + 1U] << 8);
+
+            location += 2U;
+
+            lampID = keyID_Remap[key_id];
             LED_Datas[lampID] = LED;
         }
     }
@@ -2000,7 +2032,7 @@ uint8_t analogBtnFill(uint8_t group, uint8_t location, led_config_t color, uint1
 //    EffectranbowColor.green *= mult;
 //    EffectranbowColor.blue *= mult;
 //    setKeyMatrixLED(keyLocation.rowA, keyLocation.colA, EffectranbowColor);
-//    return 0;
+	return 0U;
 }
 
 void leRemapLocationTest(uint16_t count)

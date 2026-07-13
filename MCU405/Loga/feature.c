@@ -1,5 +1,6 @@
 #include "feature.h"
 #include <string.h>
+#include <stdlib.h>
 
 feature_slot_t g_features[FEATURE_MAX];
 uint8_t g_feature_count = 0;

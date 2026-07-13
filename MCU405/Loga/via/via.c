@@ -8,7 +8,7 @@
 # include "../led/led_function.h"
 # include "loga_function.h" // lyon for layer_keypos_t
 # include "socd.h" 
-
+#include <string.h>
 #include "via.h"
 #include "rappy_snappy.h"
 
@@ -136,35 +136,42 @@ void via_init(void){
 //    }
 //}
 
-void dynamic_keymap_get_buffer(uint16_t offset, uint16_t size, uint8_t *data) {
-    uint16_t * source = (uint16_t *)(&eepromKeyBuffer[0][0][0] + offset);
-    uint16_t *target = data;
-    for (uint16_t i = 0; i < size; i++) {
-        if (offset + i < sizeof(eepromKeyBuffer)) {
-        	*target = *source<<8;
-        	*target |= (*source&0xff00)>>8;
-        } else {
-            *target = 0x00;
-        }
-        target++;
-        source++;
+void dynamic_keymap_get_buffer(
+    uint16_t offset,
+    uint16_t size,
+    uint8_t *data
+)
+{
+    const uint16_t *source =
+        &eepromKeyBuffer[0][0][0] + offset;
 
+    for (uint16_t i = 0U; i < size; i++)
+    {
+        uint16_t value = source[i];
+
+        data[(i * 2U) + 0U] =
+            (uint8_t)(value >> 8);
+
+        data[(i * 2U) + 1U] =
+            (uint8_t)(value & 0xFFU);
     }
 }
 
-void dynamic_keymap_set_buffer(uint16_t offset, uint16_t size, uint8_t *data) {
-    uint16_t * source = (uint16_t *)(&eepromKeyBuffer[0][0][0] + offset);
-    uint16_t *target = data;
-    for (uint16_t i = 0; i < size; i++) {
-        if (offset + i < sizeof(eepromKeyBuffer)) {
-//            eeprom_update_byte(target, *source);
-        	*target = *source<<8;
-        	*target |= (*source&0xff00)>>8;
-        }
-        source++;
-        target++;
-    }
+void dynamic_keymap_set_buffer(
+    uint16_t offset,
+    uint16_t size,
+    const uint8_t *data
+)
+{
+    uint16_t *target =
+        &eepromKeyBuffer[0][0][0] + offset;
 
+    for (uint16_t i = 0U; i < size; i++)
+    {
+        target[i] =
+            ((uint16_t)data[(i * 2U) + 0U] << 8) |
+            (uint16_t)data[(i * 2U) + 1U];
+    }
 }
 
 void dynamic_keymap_macro_get_buffer(uint16_t offset, uint16_t size, uint8_t *data) {
@@ -205,48 +212,130 @@ void dynamic_keymap_macro_reset(void) {
 // Keyboard level code can override this to handle custom messages from VIA.
 // See raw_hid_receive() implementation.
 // DO NOT call raw_hid_send() in the override function.
-__attribute__((weak)) bool raw_hid_receive_kb(uint8_t *data, uint8_t length) {
-    uint8_t *command_id = &(data[0]);
-    *command_id         = id_unhandled;
-    // uprintf("kb\r\n");
+__attribute__((weak))
+bool raw_hid_receive_kb(uint8_t *data, uint8_t length)
+{
+    (void)length;
+
+    if (data == NULL)
+    {
+        return false;
+    }
+
+    data[0] = id_unhandled;
+
+    return true;
 }
+bool raw_hid_receive_ione(uint8_t *data, uint8_t length)
+{
+    uint8_t *data_start;
+    uint8_t recive_payload[32U - 6U];
 
-bool raw_hid_receive_ione(uint8_t *data, uint8_t length) {
-	uint8_t *data_start = &(data[0]);
-	uint8_t recive_payload[32-6];
-	uint16_t hid_vid = *data++ <<8 | *data++;
-	uint8_t *payload_length = &(data[0]);
-	data++;
-	//*data |= 0x80;
-    uint16_t command_id = *data++ <<8 | *data++;
-    uint8_t *send_payload = data;
-    uint8_t *send_status = &(data[0]);
-    uint8_t *send_data = &(data[1]);
-	// uprintf ("iOne API Receive:\r\nvid:0x%04X\r\nlength:%d\r\ncommand_id:0x%04X\r\npayload:",hid_vid,*payload_length,command_id);
-	memcpy (recive_payload,data,sizeof(recive_payload));
-//    for (uint8_t i=0;i<payload_length;i++){
-//    	uprintf ("%02X ",recive_payload[i]);
-//    }
-//    uprintf ("\r\n");
+    uint16_t hid_vid;
+    uint16_t command_id;
 
-	memset (send_payload,0,sizeof(recive_payload));
-	switch(command_id){
-		case ione_api_cmd_get_firmware_version:
-			uprintf ("API=>Get Firmware Version:\r\n");
-			if (*payload_length == 0){
-				*send_status = ione_api_status_success;
-				*send_data = DEVICE_VER>>8;
-				uprintf("Major Version:%02X ",*send_data++);
-				*send_data = DEVICE_VER & 0xFF;
-				uprintf ("Minor: Version:%02X ",*send_data++);
-				*send_data = DEVICE_VER_FIX;//0x00;
-				uprintf ("Build: Version:%02X\r\n",*send_data++);
-			} else {
-				*send_status = ione_api_status_fail;
-				uprintf ("Fail\r\n");
-			}
-			*payload_length = 4;
-		break;
+    uint8_t *payload_length;
+    uint8_t *send_payload;
+    uint8_t *send_status;
+    uint8_t *send_data;
+
+    if ((data == NULL) || (length < 32U))
+    {
+        return false;
+    }
+
+    data_start = data;
+
+    /*
+     * Byte 0~1: HID VID
+     */
+    hid_vid =
+        ((uint16_t)data[0] << 8) |
+        (uint16_t)data[1];
+    data += 2;
+
+    /*
+     * Byte 2: payload length
+     */
+    payload_length = data;
+    data++;
+
+    /*
+     * Byte 3~4: command ID
+     */
+    command_id =
+        ((uint16_t)data[0] << 8) |
+        (uint16_t)data[1];
+    data += 2;
+
+    /*
+     * Byte 5: status
+     * Byte 6~31: response data
+     */
+    send_payload = data;
+    send_status  = &data[0];
+    send_data    = &data[1];
+
+    /*
+     * Incoming payload cannot exceed bytes 5~31.
+     */
+    if (*payload_length > sizeof(recive_payload))
+    {
+        *payload_length = 1U;
+        *send_status = ione_api_status_fail;
+        return true;
+    }
+
+    /*
+     * Copy only the valid incoming payload.
+     * Clear the whole local buffer first.
+     */
+    memset(recive_payload, 0, sizeof(recive_payload));
+
+    if (*payload_length > 0U)
+    {
+        memcpy(recive_payload,
+               data,
+               *payload_length);
+    }
+
+    /*
+     * Clear response/status area, bytes 5~31.
+     */
+    memset(send_payload, 0, sizeof(recive_payload));
+
+    switch (command_id)
+    {
+        case ione_api_cmd_get_firmware_version:
+        {
+            uprintf("API=>Get Firmware Version:\r\n");
+
+            if (*payload_length == 0U)
+            {
+                *send_status = ione_api_status_success;
+
+                send_data[0] = (uint8_t)(DEVICE_VER >> 8);
+                send_data[1] = (uint8_t)(DEVICE_VER & 0xFFU);
+                send_data[2] = (uint8_t)DEVICE_VER_FIX;
+
+                uprintf("Major Version:%02X ", send_data[0]);
+                uprintf("Minor Version:%02X ", send_data[1]);
+                uprintf("Build Version:%02X\r\n", send_data[2]);
+
+                /*
+                 * status 1 byte + version 3 bytes
+                 */
+                *payload_length = 4U;
+            }
+            else
+            {
+                *send_status = ione_api_status_fail;
+                *payload_length = 1U;
+
+                uprintf("Fail\r\n");
+            }
+        }
+        break;
 		case ione_api_cmd_Set_Profil:
 			uprintf ("API=>Set Profile:\r\n");
 			if (*payload_length == 1 && (recive_payload[0]<PROFILE_COUNT)){
@@ -403,14 +492,15 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length) {
             if (*payload_length == 8) {
                 *send_status = ione_api_status_success;
 
-                recive_payload[0];
-                mosArt.LED.red = recive_payload[1];
+                /* Zone 1 */
+                mosArt.LED.red   = recive_payload[1];
                 mosArt.LED.green = recive_payload[2];
-                mosArt.LED.blue = recive_payload[3];
-                recive_payload[4];
-                mosArt.LED.red = recive_payload[5];
+                mosArt.LED.blue  = recive_payload[3];
+
+                /* Zone 2，目前共用同一組 RGB */
+                mosArt.LED.red   = recive_payload[5];
                 mosArt.LED.green = recive_payload[6];
-                mosArt.LED.blue = recive_payload[7];
+                mosArt.LED.blue  = recive_payload[7];
 
                 eeprom_update_byte(KB_COLOR_RED_ADDR, recive_payload[1]);
                 eeprom_update_byte(KB_COLOR_GREEN_ADDR, recive_payload[2]);
@@ -462,7 +552,7 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length) {
             } else {
                 *send_status = ione_api_status_fail;
             }
-            payload_length = 1;
+            *payload_length = 1U;
         break;
 		case ione_api_cmd_konb_state:
             uprintf ("API=>Get Konb state:\r\n");
@@ -1143,72 +1233,152 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length) {
             *payload_length = 1;
         break;
         case ione_api_cmd_get_macro_playback:
+        {
+            /*
+             * RAW HID packet layout:
+             *
+             * byte 0~1 : VID
+             * byte 2   : payload length
+             * byte 3~4 : command ID
+             * byte 5   : status
+             * byte 6   : macro index
+             * byte 7   : start step
+             * byte 8   : returned step count
+             * byte 9~  : macro step data
+             *
+             * Each macro step uses 6 bytes:
+             *   [0] delay_type
+             *   [1] delay_ms low
+             *   [2] delay_ms high
+             *   [3] action
+             *   [4] keycode low
+             *   [5] keycode high
+             */
+
+            const uint8_t packet_size = 32U;
+            const uint8_t header_size = 9U;
+            const uint8_t step_size   = 6U;
+            const uint8_t max_steps_per_packet =
+                (packet_size - header_size) / step_size;
+
+            uint8_t macro_index;
+            uint8_t start;
+            uint8_t req_count;
+            uint8_t count;
+            uint8_t *write_ptr;
+            const macro_config_t *cfg;
+
             uprintf("API=>Get Macro Playback:\r\n");
 
-            uint8_t macro_index = recive_payload[0];
-            uint8_t start       = recive_payload[1];
-            uint8_t req_count   = recive_payload[2];
-
-            if (macro_index >= MACRO_GROUP_COUNT) {
+            if (*payload_length < 3U)
+            {
+                *send_status = ione_api_status_fail;
+                *payload_length = 1U;
+                uprintf("Fail: invalid payload length\r\n");
                 break;
             }
 
-            const macro_config_t *cfg = macro_engine_get_config(macro_index);
-            if (cfg == NULL) {
+            macro_index = recive_payload[0];
+            start       = recive_payload[1];
+            req_count   = recive_payload[2];
+
+            if (macro_index >= MACRO_GROUP_COUNT)
+            {
+                *send_status = ione_api_status_fail;
+                *payload_length = 1U;
+                uprintf("Fail: invalid macro index=%u\r\n", macro_index);
                 break;
             }
 
-            if (start >= cfg->step_count) {
-                *send_status = ione_api_status_sending;
-                *send_data++ = macro_index;
-                *send_data++ = start;
-                *send_data++ = 0;
+            cfg = macro_engine_get_config(macro_index);
 
-                for (uint8_t i = 5; i < 32; i++) {
-                    *send_data++ = 0;
-                }
-
-                raw_hid_send(send_data, 32);
+            if (cfg == NULL)
+            {
+                *send_status = ione_api_status_fail;
+                *payload_length = 1U;
+                uprintf("Fail: macro config is NULL\r\n");
                 break;
             }
 
-            uint8_t count = req_count;
-            if (count > 4) {
-                count = 4;
-            }
-            if ((uint16_t)start + count > cfg->step_count) {
-                count = cfg->step_count - start;
-            }
+            /*
+             * Clear only the response area:
+             * byte 5 ~ byte 31.
+             */
+            memset(&data_start[5], 0, packet_size - 5U);
+
+            send_status = &data_start[5];
+            send_data   = &data_start[6];
 
             *send_status = ione_api_status_sending;
-            *send_data++ = macro_index;
-            *send_data++ = start;
-            *send_data++ = count;
 
-            for (uint8_t i = 0; i < count; i++) {
-                const macro_step_t *s = &cfg->step[start + i];
-                uint8_t *p = &send_data[5 + (i * 6)];
+            send_data[0] = macro_index;
+            send_data[1] = start;
+            send_data[2] = 0U;
 
-                p[0] = s->delay_type;
-                p[1] = (uint8_t)(s->delay_ms & 0xFF);
-                p[2] = (uint8_t)(s->delay_ms >> 8);
-                p[3] = s->action;
-                p[4] = (uint8_t)(s->keycode & 0xFF);
-                p[5] = (uint8_t)(s->keycode >> 8);
+            /*
+             * No more steps available.
+             */
+            if (start >= cfg->step_count)
+            {
+                *payload_length = 4U;
+
+                raw_hid_send(data_start, packet_size);
+                break;
             }
 
-            for (uint8_t i = 5 + count * 6; i < 32; i++) {
-                *send_data++ = 0;
+            count = req_count;
+
+            /*
+             * 32-byte packet can contain at most 3 complete steps:
+             *
+             * bytes 0~8  : header/status/metadata
+             * bytes 9~26 : 3 steps x 6 bytes
+             */
+            if (count > max_steps_per_packet)
+            {
+                count = max_steps_per_packet;
             }
 
-            raw_hid_send(send_data, 32);
-        break;
+            if ((uint16_t)start + count > cfg->step_count)
+            {
+                count = (uint8_t)(cfg->step_count - start);
+            }
+
+            send_data[2] = count;
+            write_ptr = &data_start[9];
+
+            for (uint8_t i = 0U; i < count; i++)
+            {
+                const macro_step_t *step = &cfg->step[start + i];
+
+                *write_ptr++ = step->delay_type;
+                *write_ptr++ = (uint8_t)(step->delay_ms & 0xFFU);
+                *write_ptr++ = (uint8_t)((step->delay_ms >> 8) & 0xFFU);
+                *write_ptr++ = step->action;
+                *write_ptr++ = (uint8_t)(step->keycode & 0xFFU);
+                *write_ptr++ = (uint8_t)((step->keycode >> 8) & 0xFFU);
+            }
+
+            /*
+             * payload length includes:
+             * status + macro index + start + count + step data
+             */
+            *payload_length =
+                (uint8_t)(4U + ((uint8_t)count * step_size));
+
+            raw_hid_send(data_start, packet_size);
+
+            /*
+             * Prevent raw_hid_receive() from sending this packet again.
+             */
+            break;
+        }
         case ione_api_cmd_set_macro_data:
             uprintf("API=>Set Macro Data:\r\n");
             /*
              * payload:
              * [0] macro index
-             * [1] step index
+//             * [1] step index
              * [2] keycode low
              * [3] keycode high
              * [4] delay_type (0x00 fix)
@@ -1520,17 +1690,17 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length) {
             }
         break;
         
-		default:
-			return false;
-	}
-	//*payload_length = send_data-send_status;
+        default:
+        {
+            *send_status = ione_api_status_fail;
+            *payload_length = 1U;
+        }
+        break;
+    }
 
+    (void)data_start;
+    (void)hid_vid;
 
-//    for (uint8_t i=0;i<payload_length;i++){
-//    	uprintf ("%02X ",send_payload[i]);
-//    }
-//    uprintf ("\r\n");
-	*(data_start+3) |= 0x80;
     return true;
 }
 
@@ -1732,8 +1902,12 @@ void raw_hid_receive(uint8_t *data, uint8_t length) {
             uint16_t offset = (command_data[0] << 8) | command_data[1];
             uint16_t size   = command_data[2]; // size <= 28
             if (size <= 28)
-                dynamic_keymap_macro_set_buffer(offset, size, &command_data[3]);	//!!
-            	command_data[3] = 100;
+            {
+                dynamic_keymap_macro_set_buffer(offset,size,&command_data[3]
+                );
+
+                command_data[3] = 100;
+            }
             break;
         }
         case id_dynamic_keymap_macro_reset: {
@@ -1762,7 +1936,7 @@ void raw_hid_receive(uint8_t *data, uint8_t length) {
         case id_loga_api: //
             // uprintf("call ione\r\n");
         	if (!raw_hid_receive_ione(data, length)){
-        		return false;
+        		return;
         	}
         	break;
         /* As VIA removed bootloader jump entirely, we shall only keep it for secure builds */
@@ -1825,8 +1999,9 @@ void raw_hid_receive(uint8_t *data, uint8_t length) {
 //            break;
 //        }
         default:
-            // uprintf("call kb\r\n");
-            if (!raw_hid_receive_kb(data, length)){return;}
+            if (!raw_hid_receive_kb(data, length)){
+                return;
+            }
             break;
     }
 #ifdef VIAL_ENABLE

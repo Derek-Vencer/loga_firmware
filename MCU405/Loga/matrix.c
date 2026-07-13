@@ -1189,7 +1189,7 @@ void hook_late_init()
 		eeprom_write_word(EECONFIG_KEYMAP_TRIGGER_LEVEL, keyMatrixTriggerLevel);
 	    eeprom_write_word(EECONFIG_KEYMAP_RELEASE_LEVEL, keyMatrixReleaseLevel);
 		rapidKeyEnable = eeprom_read_byte(RAPID_KEY_ENABLE_ADDR);
-		eeprom_update_byte(KB_COLOR_MODE_ADDR, 8);
+		eeprom_update_byte((uint8_t *)KB_COLOR_MODE_ADDR, 8);
 		eeprom_update_byte((uint8_t *)EECONFIG_POLLING_RATE, 0x00);
 		eeprom_update_byte((uint8_t *)EECONFIG_MAC_MODE, 0x00);
 		socd_setting_write(true);
@@ -1203,7 +1203,7 @@ void hook_late_init()
 		currentLED_RunMode.mode = 8;
 		currentLED_RunMode.type = offMode;
 		setRunMode(currentLED_RunMode);
-		eeprom_update_byte(KB_COLOR_MODE_ADDR, currentLED_RunMode.mode);
+		eeprom_update_byte((uint8_t *)KB_COLOR_MODE_ADDR, currentLED_RunMode.mode);
 		eeprom_update_byte((uint8_t *)EECONFIG_POLLING_RATE, 0x00);
 		eeconfig_rapidTrigger_init();
 		keyMatrixTriggerLevel = DEFAULT_TRIGGER_LEVEL;
@@ -2912,7 +2912,7 @@ if (!reset_checked) {
 			currentLED_RunMode.mode = 8;
 			currentLED_RunMode.type = offMode;
 			setRunMode(currentLED_RunMode);
-			eeprom_update_byte(KB_COLOR_MODE_ADDR, currentLED_RunMode.mode);
+			eeprom_update_byte((uint8_t *)KB_COLOR_MODE_ADDR, currentLED_RunMode.mode);
 			eeprom_update_byte((uint8_t *)EECONFIG_POLLING_RATE, 0x00);
 			uprintf (".");
 			eeconfig_rapidTrigger_init();
@@ -4200,7 +4200,7 @@ bool hook_matrix_change(keyrecord_t record)
 						currentLED_RunMode.type = normalMode;
 						currentLED_RunMode.mode = 0x00;
 						setRunMode(currentLED_RunMode);
-						eeprom_update_byte(KB_COLOR_MODE_ADDR, 0);
+						eeprom_update_byte((uint8_t *)KB_COLOR_MODE_ADDR, 0);
 					}
 				break;
 				case KC_LM2:
@@ -4208,7 +4208,7 @@ bool hook_matrix_change(keyrecord_t record)
 						currentLED_RunMode.type = normalMode;
 						currentLED_RunMode.mode = 0x01;
 						setRunMode(currentLED_RunMode);
-						eeprom_update_byte(KB_COLOR_MODE_ADDR, 1);
+						eeprom_update_byte((uint8_t *)KB_COLOR_MODE_ADDR, 1);
 					}
 				break;
 				case KC_LM3:
@@ -4216,7 +4216,7 @@ bool hook_matrix_change(keyrecord_t record)
 						currentLED_RunMode.type = normalMode;
 						currentLED_RunMode.mode = 0x02;
 						setRunMode(currentLED_RunMode);
-						eeprom_update_byte(KB_COLOR_MODE_ADDR, 2);
+						eeprom_update_byte((uint8_t *)KB_COLOR_MODE_ADDR, 2);
 					}
 				break;
 				case KC_LM4:
@@ -4224,7 +4224,7 @@ bool hook_matrix_change(keyrecord_t record)
 						currentLED_RunMode.type = normalMode;
 						currentLED_RunMode.mode = 0x03;
 						setRunMode(currentLED_RunMode);
-						eeprom_update_byte(KB_COLOR_MODE_ADDR, 3);
+						eeprom_update_byte((uint8_t *)KB_COLOR_MODE_ADDR, 3);
 					}
 				break;
 				case KC_LM5:
@@ -4232,7 +4232,7 @@ bool hook_matrix_change(keyrecord_t record)
 						currentLED_RunMode.type = normalMode;
 						currentLED_RunMode.mode = 0x04;
 						setRunMode(currentLED_RunMode);
-						eeprom_update_byte(KB_COLOR_MODE_ADDR, 4);
+						eeprom_update_byte((uint8_t *)KB_COLOR_MODE_ADDR, 4);
 					}
 				break;
 				case KC_LM6:
@@ -4240,7 +4240,7 @@ bool hook_matrix_change(keyrecord_t record)
 						currentLED_RunMode.type = normalMode;
 						currentLED_RunMode.mode = 0x05;
 						setRunMode(currentLED_RunMode);
-						eeprom_update_byte(KB_COLOR_MODE_ADDR, 5);
+						eeprom_update_byte((uint8_t *)KB_COLOR_MODE_ADDR, 5);
 					}
 				break;
 				case KC_LM7:
@@ -4248,7 +4248,7 @@ bool hook_matrix_change(keyrecord_t record)
 						currentLED_RunMode.type = normalMode;
 						currentLED_RunMode.mode = 0x06;
 						setRunMode(currentLED_RunMode);
-						eeprom_update_byte(KB_COLOR_MODE_ADDR, 6);
+						eeprom_update_byte((uint8_t *)KB_COLOR_MODE_ADDR, 6);
 					}
 				break;
 				case KC_LM8:
@@ -4256,7 +4256,7 @@ bool hook_matrix_change(keyrecord_t record)
 						currentLED_RunMode.type = normalMode;
 						currentLED_RunMode.mode = 0x07;
 						setRunMode(currentLED_RunMode);
-						eeprom_update_byte(KB_COLOR_MODE_ADDR, 7);
+						eeprom_update_byte((uint8_t *)KB_COLOR_MODE_ADDR, 7);
 					}
 				break;
 				case KC_LM9:
@@ -4264,7 +4264,7 @@ bool hook_matrix_change(keyrecord_t record)
 						currentLED_RunMode.type = normalMode;
 						currentLED_RunMode.mode = 0x08;
 						setRunMode(currentLED_RunMode);
-						eeprom_update_byte(KB_COLOR_MODE_ADDR, 8);
+						eeprom_update_byte((uint8_t *)KB_COLOR_MODE_ADDR, 8);
 					}
 				break;
 				case KC_M1:

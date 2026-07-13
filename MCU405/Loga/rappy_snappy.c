@@ -2,15 +2,15 @@
 
 #include "rappy_snappy.h"
 #include "matrix.h"
-
-// 你專案既有
-// extern int adcCalc;  // 注意：這是「目前掃描到的鍵」用
+#include <string.h>
+#include "eeprom.h"
+#include "action.h"
+// 雿�����
+// extern int adcCalc;  // 瘜冽�����������
 extern int adcPre; 
 // extern int adc_value(uint8_t row, uint8_t col); 
-// ↑ 如果你沒有 function，下面會教你怎麼處理
+// ��� 憒����� function嚗������獐����
 
-extern void register_code(uint16_t kc);
-extern void unregister_code(uint16_t kc);
 
 rappy_snappy_pair_t g_rappy_pairs[RAPPY_SNAPPY_PAIR_COUNT];
 
@@ -28,7 +28,7 @@ bool rappy_snappy_is_key(uint8_t row, uint8_t col)
     return false;
 }
 
-// ===== 單組 pair 的 state machine =====
+// ===== �蝯� pair ��� state machine =====
 static void rappy_snappy_process_pair(rappy_snappy_pair_t *p,
                                       int16_t da, int16_t db)
 {
@@ -68,7 +68,7 @@ static void rappy_snappy_process_pair(rappy_snappy_pair_t *p,
     }
 }
 
-// ===== 多組處理 =====
+// ===== 憭���� =====
 void rappy_snappy_process_all(void)
 {
     for (int i = 0; i < RAPPY_SNAPPY_PAIR_COUNT; i++) {
@@ -76,8 +76,8 @@ void rappy_snappy_process_all(void)
         rappy_snappy_pair_t *p = &g_rappy_pairs[i];
         if (!p->enable) continue;
 
-        // ★ 這裡是關鍵：怎麼取得 depth
-        // 若你沒有 adc_value(row,col)，請看下面「補充」
+        // ��� �ㄐ���嚗�獐���� depth
+        // �雿��� adc_value(row,col)嚗��������
         int16_t da = adcPre_value[p->row_a][p->col_a];
         int16_t db = adcPre_value[p->row_b][p->col_b];
 
@@ -99,7 +99,7 @@ void rappy_snappy_apply_config(uint8_t index, const rappy_snappy_pair_t *in){
     //     g_rappy_pairs[index].row_b,
     //     g_rappy_pairs[index].col_b);
 
-    // 清 runtime 狀態
+    // 皜� runtime �����
     // memset(&g_rappy_pairs[index], 0, sizeof(g_rappy_pairs[index]));
 }
 
@@ -136,7 +136,7 @@ void eeconfig_rappy_snappy_clear(void) {
     for (uint8_t i = 0; i < RAPPY_SNAPPY_PAIR_COUNT; i++) {
         
         eeconfig_write_rappy_snappy(i, &empty);
-        // RAM 同步 + 解除可能卡住的輸出
+        // RAM ��郊 + 閫�����雿�撓�
         // if (socd_rt[i].activeKC) {
         //     unregister_code(socd_rt[i].activeKC);
         // }

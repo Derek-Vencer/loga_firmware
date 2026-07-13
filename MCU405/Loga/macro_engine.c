@@ -506,83 +506,148 @@ void macro_engine_task(void) {
     }
 }
 
-void macro_load_from_eeprom(uint8_t index) {
-    if (index >= MACRO_GROUP_COUNT) return;
+void macro_load_from_eeprom(uint8_t index)
+{
+    const uint8_t *slot_addr;
+
+    if (index >= MACRO_GROUP_COUNT)
+    {
+        return;
+    }
+
+    slot_addr = EEPROM_MACRO_SLOT_ADDR(index);
 
     eeprom_read_block(
         &g_macro_cfg,
-        (void *)EEPROM_MACRO_SLOT_ADDR(index),
-        sizeof(macro_config_t)
+        slot_addr,
+        sizeof(g_macro_cfg)
+    );
+
+    /*
+     * 防止 EEPROM 未初始化或內容損壞，
+     * 導致 step_count 超過陣列範圍。
+     */
+    if (g_macro_cfg.step_count > MACRO_MAX_STEPS)
+    {
+        memset(&g_macro_cfg, 0, sizeof(g_macro_cfg));
+    }
+
+    g_loaded_macro_index = index;
+}
+
+void macro_save_to_eeprom(uint8_t index)
+{
+    uint8_t *slot_addr;
+    uint8_t step_count;
+    size_t used_size;
+
+    if (index >= MACRO_GROUP_COUNT)
+    {
+        return;
+    }
+
+    slot_addr = EEPROM_MACRO_SLOT_ADDR(index);
+    step_count = g_macro_cfg.step_count;
+
+    /*
+     * 限制有效 macro step 數量，
+     * 避免寫出 macro_config_t 範圍。
+     */
+    if (step_count > MACRO_MAX_STEPS)
+    {
+        step_count = MACRO_MAX_STEPS;
+        g_macro_cfg.step_count = step_count;
+    }
+
+    /*
+     * macro_config_t 的第一個欄位是 step_count，
+     * 後面只寫入實際使用的 macro_step_t。
+     */
+    used_size =
+        sizeof(g_macro_cfg.step_count) +
+        ((size_t)step_count * sizeof(macro_step_t));
+
+    /*
+     * 最後再做一次 slot 大小保護。
+     */
+    if (used_size > EEPROM_MACRO_SINGLE_SLOT_SIZE)
+    {
+        used_size = EEPROM_MACRO_SINGLE_SLOT_SIZE;
+    }
+
+    eeprom_update_block(
+        &g_macro_cfg,
+        slot_addr,
+        used_size
     );
 
     g_loaded_macro_index = index;
 }
 
-void macro_save_to_eeprom(uint8_t index) {
-    if (index >= MACRO_GROUP_COUNT) return;
-    uint8_t step_count = g_macro_cfg.step_count;
-    size_t used_size = 1;
-
-    /*
-     * Save current RAM cache to the specified EEPROM slot.
-     * Caller should ensure the cache already belongs to this macro index.
-     */
-    if (g_loaded_macro_index != index) {
-        g_loaded_macro_index = index;
-    }
-
-    if (step_count > MACRO_MAX_STEPS) {
-        step_count = MACRO_MAX_STEPS;
-        g_macro_cfg.step_count = step_count;
-    }
-
-    used_size += (size_t)step_count * sizeof(macro_step_t);
-
-    eeprom_update_block(
-        &g_macro_cfg,
-        (void *)EEPROM_MACRO_SLOT_ADDR(index),
-        used_size
-    );
-}
-
-void macro_clear(uint8_t index) {
-    if (index >= MACRO_GROUP_COUNT) return;
-    uint16_t base_addr = EEPROM_MACRO_SLOT_ADDR(index);
-    uint8_t step_count = (g_loaded_macro_index == index)
-        ? g_macro_cfg.step_count
-        : eeprom_read_byte((uint8_t *)base_addr);
-    size_t used_size = 1;
+void macro_clear(uint8_t index)
+{
+    uint8_t *slot_addr;
     static const uint8_t zero_chunk[32] = {0};
 
-    if (step_count > MACRO_MAX_STEPS) {
-        step_count = MACRO_MAX_STEPS;
+    if (index >= MACRO_GROUP_COUNT)
+    {
+        return;
     }
 
-    used_size += (size_t)step_count * sizeof(macro_step_t);
+    slot_addr = EEPROM_MACRO_SLOT_ADDR(index);
 
-    for (size_t offset = 0; offset < used_size; offset += sizeof(zero_chunk)) {
-        size_t chunk_size = used_size - offset;
-        if (chunk_size > sizeof(zero_chunk)) {
+    /*
+     * 建議清除整個 macro slot，而不是只根據 EEPROM 中的
+     * step_count 清除部分內容。
+     *
+     * 原因：
+     * 1. EEPROM 內容可能損壞。
+     * 2. step_count 可能不正確。
+     * 3. 舊 macro 尾端資料可能殘留。
+     */
+    for (size_t offset = 0;
+         offset < EEPROM_MACRO_SINGLE_SLOT_SIZE;
+         offset += sizeof(zero_chunk))
+    {
+        size_t chunk_size =
+            EEPROM_MACRO_SINGLE_SLOT_SIZE - offset;
+
+        if (chunk_size > sizeof(zero_chunk))
+        {
             chunk_size = sizeof(zero_chunk);
         }
 
         eeprom_update_block(
             zero_chunk,
-            (void *)(base_addr + offset),
+            slot_addr + offset,
             chunk_size
         );
     }
 
-    if (g_loaded_macro_index == index) {
+    if (g_loaded_macro_index == index)
+    {
         memset(&g_macro_cfg, 0, sizeof(g_macro_cfg));
+
+        /*
+         * 如果有無效 index 定義，建議改成該值。
+         * 例如：
+         *
+         * g_loaded_macro_index = MACRO_INVALID_INDEX;
+         */
     }
 }
 
-void macro_delete(void) {
-    for (uint8_t i = 0; i < MACRO_GROUP_COUNT; i++) {
+void macro_delete(void)
+{
+    for (uint8_t i = 0U; i < MACRO_GROUP_COUNT; i++)
+    {
         macro_clear(i);
+
         wait_ms(2);
 
-        uprintf("[MACRO][DEL] macro %u cleared\n", i + 1);
+        uprintf(
+            "[MACRO][DEL] macro %u cleared\r\n",
+            (unsigned int)(i + 1U)
+        );
     }
 }

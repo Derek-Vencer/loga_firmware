@@ -20,16 +20,22 @@
 		<item value="org.eclipse.cdt.testsrunner.feature:10.6.0.202201122357"/>
 		<item value="org.eclipse.cdt:10.6.2.202205170638"/>
 		<item value="org.eclipse.egit:6.1.0.202203080745-r"/>
-		<item value="org.eclipse.embedcdt.codered:6.6.1.202408270735"/>
+		<item value="org.eclipse.embedcdt.codered.source:6.7.0.202602251544"/>
+		<item value="org.eclipse.embedcdt.codered:6.7.0.202602251544"/>
 		<item value="org.eclipse.embedcdt.debug.gdbjtag.atlink:6.2.6"/>
-		<item value="org.eclipse.embedcdt.debug.gdbjtag.jlink:6.6.1.202408270735"/>
-		<item value="org.eclipse.embedcdt.debug.gdbjtag:6.6.1.202408270735"/>
-		<item value="org.eclipse.embedcdt.doc.user:6.6.1.202408270735"/>
-		<item value="org.eclipse.embedcdt.managedbuild.cross.arm:6.6.1.202408270735"/>
-		<item value="org.eclipse.embedcdt.packs:6.6.1.202408270735"/>
+		<item value="org.eclipse.embedcdt.debug.gdbjtag.jlink.source:6.7.0.202602251544"/>
+		<item value="org.eclipse.embedcdt.debug.gdbjtag.jlink:6.7.0.202602251544"/>
+		<item value="org.eclipse.embedcdt.debug.gdbjtag.source:6.7.0.202602251544"/>
+		<item value="org.eclipse.embedcdt.debug.gdbjtag:6.7.0.202602251544"/>
+		<item value="org.eclipse.embedcdt.doc.user:6.7.0.202602251544"/>
+		<item value="org.eclipse.embedcdt.managedbuild.cross.arm.source:6.7.0.202602251544"/>
+		<item value="org.eclipse.embedcdt.managedbuild.cross.arm:6.7.0.202602251544"/>
+		<item value="org.eclipse.embedcdt.packs.source:6.7.0.202602251544"/>
+		<item value="org.eclipse.embedcdt.packs:6.7.0.202602251544"/>
 		<item value="org.eclipse.embedcdt.templates.atk:6.2.6"/>
-		<item value="org.eclipse.embedcdt.templates.cortexm:6.6.1.202408270735"/>
-		<item value="org.eclipse.embedcdt:6.6.1.202408270735"/>
+		<item value="org.eclipse.embedcdt.templates.cortexm.source:6.7.0.202602251544"/>
+		<item value="org.eclipse.embedcdt.templates.cortexm:6.7.0.202602251544"/>
+		<item value="org.eclipse.embedcdt:6.7.0.202602251544"/>
 		<item value="org.eclipse.emf.common:2.25.0.v20220123-0838"/>
 		<item value="org.eclipse.emf.ecore:2.27.0.v20220123-0838"/>
 		<item value="org.eclipse.epp.mpc:1.9.3.v20220121-1317"/>
@@ -63,5 +69,38 @@
 		<item key="DIALOG_WIDTH" value="500"/>
 		<item key="DIALOG_HEIGHT" value="467"/>
 		<item key="DIALOG_FONT_NAME" value="1|Microsoft JhengHei UI|9.0|0|WINDOWS|1|-12|0|0|0|400|0|0|0|1|0|0|0|0|Microsoft JhengHei UI"/>
+	</section>
+	<section name="SmartImportWizard">
+		<item key="SmartImportRootWizardPage.STORE_HIDE_ALREADY_OPEN" value="false"/>
+		<item key="SmartImportRootWizardPage.STORE_CLOSE_IMPORTED" value="false"/>
+		<item key="SmartImportRootWizardPage.STORE_NESTED_PROJECTS" value="true"/>
+		<item key="SmartImportRootWizardPage.STORE_CONFIGURE_NATURES" value="true"/>
+		<list key="org.eclipse.ui.internal.wizards.datatransfer.SmartImportRootWizardPage.knownSources">
+			<item value="C:\Project\loga_firmware\MCU405"/>
+		</list>
+	</section>
+	<section name="ExternalProjectImportWizard">
+		<item key="WizardProjectsImportPage.STORE_NESTED_PROJECTS" value="false"/>
+		<item key="WizardProjectsImportPage.STORE_COPY_PROJECT_ID" value="true"/>
+		<item key="WizardProjectsImportPage.STORE_ARCHIVE_SELECTED" value="false"/>
+		<item key="WizardProjectsImportPage.STORE_CLOSE_CREATED_PROJECTS_ID" value="false"/>
+		<item key="WizardProjectsImportPage.STORE_HIDE_CONFLICTING_PROJECTS_ID" value="false"/>
+		<list key="WizardProjectsImportPage.STORE_DIRECTORIES">
+			<item value="C:\Project\loga_firmware\MCU405"/>
+		</list>
+		<list key="WizardProjectsImportPage.STORE_ARCHIVES">
+			<item value=""/>
+		</list>
+	</section>
+	<section name="ChooseWorkspaceDialogSettings">
+		<item key="DIALOG_X_ORIGIN" value="412"/>
+		<item key="DIALOG_Y_ORIGIN" value="228"/>
+	</section>
+	<section name="WORKBENCH_SETTINGS">
+		<list key="ENABLED_TRANSFERS">
+			<item value="org.eclipse.ui.preferences"/>
+			<item value=""/>
+			<item value=""/>
+		</list>
 	</section>
 </section>

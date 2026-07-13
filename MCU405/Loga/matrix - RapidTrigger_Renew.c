@@ -17,8 +17,6 @@
 # include "math.h"
 # include "action_layer.h"
 
-
-
 //
 extern led_runMode_t currentLED_RunMode;
 extern binary_semaphore_t ledUpdateSem;

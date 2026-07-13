@@ -83,14 +83,14 @@ static effect_wheel_t wheel_fx;
 typedef struct {
     uint8_t active;
     uint8_t phase;      // 0~255
-    uint8_t speed;      // 每次增�?多�?
+    uint8_t speed;      // 瘥活憓?憭?
     led_config_t color;
 } starlight_led_t;
 
 typedef struct {
     bool enable;
-    uint8_t density;    // 每�??��??��??��?
-    uint8_t base_dim;   // ?�景微亮，可�?0
+    uint8_t density;    // 瘥??啣????賊?
+    uint8_t base_dim;   // ?敺桐漁嚗閮?0
 } EffectStarlight_t;
 
 static EffectStarlight_t starlight;
@@ -115,38 +115,38 @@ static led_config_t starlight_pick_color(void)
 
     switch (r) {
         default:
-        case 0: // ?��???
+        case 0: // ????
             c.red = 255; c.green = 210; c.blue = 120;
             break;
-        case 1: // ?�白??
+        case 1: // ???
             c.red = 255; c.green = 235; c.blue = 190;
             break;
-        case 2: // 純白??
+        case 2: // 蝝??
             c.red = 255; c.green = 255; c.blue = 255;
             break;
-        case 3: // ?�白??
+        case 3: // ?瑞??
             c.red = 200; c.green = 230; c.blue = 255;
             break;
-        case 4: // 淡�???
+        case 4: // 瘛∟???
             c.red = 150; c.green = 200; c.blue = 255;
             //c.red = 120; c.green = 180; c.blue = 255;
             break;
-        // case 0: // ?�白
+        // case 0: // ?
         //     c.red = 255; c.green = 220; c.blue = 180;
         //     break;
-        // case 1: // 中性白
+        // case 1: // 銝剜�抒
         //     c.red = 255; c.green = 245; c.blue = 230;
         //     break;
-        // case 2: // ?�白
+        // case 2: // ?瑞
         //     c.red = 220; c.green = 235; c.blue = 255;
         //     break;
-        // case 3: // 淡�???
+        // case 3: // 瘛∟???
         //     c.red = 190; c.green = 215; c.blue = 255;
         //     break;
-        // case 4: // 微�??��?
+        // case 4: // 敺格???
         //     c.red = 255; c.green = 235; c.blue = 210;
         //     break;
-        // case 5: // ?�冷?��?
+        // case 5: // ???
         //     c.red = 210; c.green = 225; c.blue = 255;
         //     break;
     }
@@ -287,7 +287,7 @@ void ripple_add_event(uint8_t row, uint8_t col, led_config_t color)
 //         }
 //     }
 
-//     /* 滿�?就�??��??��? 0 ??*/
+//     /* 皛蹂?撠梯????? 0 ??*/
 //     ripple_events[0].active = true;
 //     ripple_events[0].row = row;
 //     ripple_events[0].col = col;
@@ -305,10 +305,10 @@ static uint8_t ripple_abs_u8(int16_t v)
 
 static uint16_t ripple_dist_approx(int16_t dx, int16_t dy)
 {
-    /* 不用 sqrt，避?�太??*/
+    /* 銝 sqrt嚗?云??*/
     uint16_t ax = (dx < 0) ? -dx : dx;
     uint16_t ay = (dy < 0) ? -dy : dy;
-    return ax + ay;   /* Manhattan distance，�??��? */
+    return ax + ay;   /* Manhattan distance嚗??其? */
 }
 
 static led_config_t ripple_scale_color(led_config_t in, uint8_t bright)
@@ -504,7 +504,7 @@ extern uint16_t rainbowBase;
 extern bool gameModeEnable;
 
 // #ifdef reboot
-// extern volatile bool g_usb_configured_flag;   // ??extern �??（�?�?= false）lyon
+// extern volatile bool g_usb_configured_flag;   // ??extern 摰??嚗?閬?= false嚗yon
 // #endif
 
 // wheel
@@ -532,7 +532,7 @@ extern bool gameModeEnable;
 //     center_x = ((26.0f - 1.0f) * pitch_x) * 0.5f;
 //     center_y = ((LED_MATRIX_ROWS - 1.0f) * pitch_y) * 0.5f;
 
-//     /* ?�全?��??��??��??��??�使?��?置�??�圾??*/
+//     /* ??冽????踹??剖??芯蝙?其?蝵格????*/
 //     for (row = 0; row < LED_MATRIX_ROWS; row++) {
 //         for (column = 0; column < LED_MATRIX_COLS; column++) {
 //             wheel_base_hue[row][column] = 0;
@@ -577,7 +577,7 @@ static void wheel_init_table(void)
             float norm = (angle + (float)M_PI) / (2.0f * (float)M_PI);
             uint8_t hue = (uint8_t)(norm * 255.0f);
 
-            /* ?�查??ledRemap 對�?位置，�???wheel_base_hue[row][col] */
+            /* ???ledRemap 撠?雿蔭嚗???wheel_base_hue[row][col] */
             for (uint8_t row = 0; row < LED_MATRIX_ROWS; row++) {
                 for (uint8_t col = 0; col < LED_MATRIX_COLS; col++) {
                     if (ledRemap[row][col] == i) {
@@ -631,7 +631,7 @@ static led_config_t wheel_hue_to_rgb(uint8_t hue)
     return c;
 }
 
-/* 亮度縮放，brightness 使用 0~100 ?��?�?*/
+/* 鈭桀漲蝮格嚗rightness 雿輻 0~100 ?曉?瘥?*/
 static uint8_t led_clamp_percent(uint8_t value)
 {
     return (value > 100u) ? 100u : value;
@@ -1129,39 +1129,39 @@ bool effectMosArtProcess(void)
                 Calculate_Flashing_Volume(mosArt.Speed, mosArt.TimerBase, &bright);
                 break;
             case 3:{//WAVE
-                // === ?�數 ===
-                const uint8_t  WAVE_WAVELENGTH_COLS = 12;   // 幾�?一?�亮?�週�?
-                const uint8_t  WAVE_WAVELENGTH_ROWS = 0;    // 0=不�??��?�?0 ?��??��?
+                // === ? ===
+                const uint8_t  WAVE_WAVELENGTH_COLS = 12;   // 撟暹?銝�?漁?�望?
+                const uint8_t  WAVE_WAVELENGTH_ROWS = 0;    // 0=銝???嚗?0 ?臬???
                 const uint16_t TIMEBASE_STEP        = 3;
                 uint16_t phase_step_col = WAVE_WAVELENGTH_COLS ? (256u / WAVE_WAVELENGTH_COLS) : 0;
                 uint16_t phase_step_row = WAVE_WAVELENGTH_ROWS ? (256u / WAVE_WAVELENGTH_ROWS) : 0;
 
-                // ?�色：用 mosArt.LED（�? mosArt.Rainbow �?0 ?�單?��?
+                // ?株嚗 mosArt.LED嚗? mosArt.Rainbow 閮?0 ?喳?莎?
                 led_config_t base = mosArt.LED;
 
-                uint16_t t0 = mosArt.TimerBase;  // ?��??��??��?
+                uint16_t t0 = mosArt.TimerBase;  // ?砍????箸?
                 for (uint8_t col = 0; col < LED_MATRIX_COLS; col++) {
                     for (uint8_t row = 0; row < LED_MATRIX_ROWS; row++) {
                         uint16_t local_tb = t0;
                         if (phase_step_col) local_tb += (uint16_t)col * phase_step_col;
                         if (phase_step_row) local_tb += (uint16_t)row * phase_step_row;
 
-                        uint8_t b;                                 // 0..255 三�?波亮�?
+                        uint8_t b;                                 // 0..255 銝?瘜Ｖ漁摨?
                         calculate_breath_volume(effect_speed, local_tb, &b);  //:contentReference[oaicite:3]{index=3}
 
-                        // �?b 套到?�色
+                        // 靘?b 憟?株
                         led_config_t px;
                         px.red   = (uint8_t)(((uint16_t)base.red   * b) / 255);
                         px.green = (uint8_t)(((uint16_t)base.green * b) / 255);
                         px.blue  = (uint8_t)(((uint16_t)base.blue  * b) / 255);
 
-                        setRemapLED(row, col, px);                // per-pixel 寫入:contentReference[oaicite:4]{index=4}
+                        setRemapLED(row, col, px);                // per-pixel 撖怠:contentReference[oaicite:4]{index=4}
                     }
                 }
 
-                chBSemSignal(&ledUpdateSem);                      // ?�畫??contentReference[oaicite:5]{index=5}
+                chBSemSignal(&ledUpdateSem);                      // ???contentReference[oaicite:5]{index=5}
                 mosArt.TimerBase = t0 + 3u;
-                return true;                                      // <== ?�早結�?，避?�被?�用結尾覆�?
+                return true;                                      // <== ?蝯?嚗?◤?梁蝯偏閬?
                 // Calculate_Waving_Volumn(mosArt.Speed, mosArt.TimerBase, &bright); // lyon this is old one
                 // break;
             }
@@ -1328,10 +1328,10 @@ bool EffectTypeReactiveProcess(void)
                     reactive_level[row][col] -= 20;
                 } else {
                     reactive_level[row][col] = 0;
-                    setKeymapLED(row, col, LED_NULL);   // ?�鍵
+                    setKeymapLED(row, col, LED_NULL);   // ?
                 }
             } else {
-                setKeymapLED(row, col, LED_NULL);       // 保險，確保�??��???
+                setKeymapLED(row, col, LED_NULL);       // 靽嚗Ⅱ靽?????
             }
         }
     }
@@ -1365,10 +1365,10 @@ bool EffectTypeStarlightProcess(void)
         return false;
     }
 
-    /* ?��?空整體畫??*/
+    /* ??蝛箸擃??*/
     ledAllOff(false);
 
-    /* 每�??��??��??��?，�?度�?一�?*/
+    /* 瘥????游???嚗?摨阡?銝�暺?*/
     spawn_count = starlight.density;
 
     for (i = 0; i < spawn_count; i++) {
@@ -1382,7 +1382,7 @@ bool EffectTypeStarlightProcess(void)
         }
     }
 
-    /* ?�新?�?��???*/
+    /* ?湔?�????*/
     for (i = 0; i < LedNumbers; i++) {
         if (starlight_leds[i].active) {
             uint8_t bright;
@@ -1390,7 +1390,7 @@ bool EffectTypeStarlightProcess(void)
 
             bright = starlight_triangle_wave(starlight_leds[i].phase);
 
-            /* 讓�??�整體�?要太?�眼，�?仍�?�?*/
+            /* 霈??擃?閬云?箇嚗?隞?憿?*/
             bright = (uint8_t)(((uint16_t)bright * led_clamp_percent(effectStatus.brightness)) / 100u);
 
             c = starlight_scale_color(starlight_leds[i].color, bright);
@@ -1398,7 +1398,7 @@ bool EffectTypeStarlightProcess(void)
 
             starlight_leds[i].phase += starlight_leds[i].speed;
 
-            /* ?��?就�?失�?之�??�新?��??��? */
+            /* ??撠望?憭梧?銋???冽??? */
             if (starlight_leds[i].phase >= 250 || starlight_leds[i].phase <= starlight_leds[i].speed) {
                 if ((starlight_rand8() & 0x03) == 0) {
                     starlight_leds[i].active = 0;
@@ -1489,50 +1489,50 @@ void Calculate_Flashing_Volume(uint8_t speed, uint16_t timebase, uint8_t* bright
 
 void Calculate_Waving_Volumn(uint8_t speed, uint16_t timebase, uint8_t* bright){
     // case mosArtWave: 
-    // === ?�調?�數 ===
-    // 幾「�??�形?��??��??�亮?�週�?（�?小�?密�?
+    // === ?航矽? ===
+    // 撟整�??耦?????港漁?�望?嚗?撠?撖?
     const uint8_t  WAVE_WAVELENGTH_COLS = 12;
-    // 幾「�??�形?��??�週�?�?=不沿?��?�?0 ?��??��?/棋盤式起�?
-    const uint8_t  WAVE_WAVELENGTH_ROWS = 0;    // 例�??��??�可�?8
-    // 每�??��??�進�?（維?��?你其�?Mos Art ?��?一?��?
+    // 撟整�??耦???�望?嚗?=銝窒??嚗?0 ?臬???/璉撘絲隡?
+    const uint8_t  WAVE_WAVELENGTH_ROWS = 0;    // 靘??單??閮?8
+    // 瘥????券�脤?嚗雁??雿隞?Mos Art ??銝�?湛?
     const uint16_t TIMEBASE_STEP        = 10;
 
     uint16_t phase_step_col = WAVE_WAVELENGTH_COLS ? (256u / WAVE_WAVELENGTH_COLS) : 0;
     uint16_t phase_step_row = WAVE_WAVELENGTH_ROWS ? (256u / WAVE_WAVELENGTH_ROWS) : 0;
 
-    // ?�色?�彩?��?跟�??��?一??
+    // ?株?蔗?對?頝??嗆?銝�??
     led_config_t baseColor = mosArt.LED;
     if (mosArt.Rainbow != 0) {
-        // ?��?保�?彩虹底色?��??��?（�?你�??�色，mosArt.Rainbow=0 ?�可�?
-        Calculate_Colorful_Color(0, mosArt.TimerBase, &baseColor);  // ?��??��?
+        // ?亥?靽?敶抵摨?舫???嚗?雿??株嚗osArt.Rainbow=0 ?喳嚗?
+        Calculate_Colorful_Color(0, mosArt.TimerBase, &baseColor);  // ?暹??賢?
     }
 
     for (uint8_t col = 0; col < LED_MATRIX_COLS; col++) {
         for (uint8_t row = 0; row < LED_MATRIX_ROWS; row++) {
-            // 空�??��?：以�??��?置�?�?timebase，形?�波??
+            // 蝛粹??訾?嚗誑甈???蝵桀?蝘?timebase嚗耦?郭??
             uint16_t local_tb = mosArt.TimerBase;
             if (phase_step_col) local_tb += (uint16_t)col * phase_step_col;
             if (phase_step_row) local_tb += (uint16_t)row * phase_step_row;
 
-            // 亮度三�?波�??�死?�/縮放）�?沿用你現?��??��?
+            // 鈭桀漲銝?瘜ｇ??急香?�/蝮格嚗?瘝輻雿???賢?
             uint8_t b;
             calculate_breath_volume(mosArt.Speed, local_tb, &b);        // 0..255
             float m = (float)b / 255.0f;
 
-            // 套用亮度?��???
+            // 憟鈭桀漲?圈???
             led_config_t px;
             px.red   = (uint8_t)((float)baseColor.red   * m);
             px.green = (uint8_t)((float)baseColor.green * m);
             px.blue  = (uint8_t)((float)baseColor.blue  * m);
 
-            setRemapLED(row, col, px); // 寫入 frame buffer（逐�?�?:contentReference[oaicite:1]{index=1}
+            setRemapLED(row, col, px); // 撖怠 frame buffer嚗�?嚗?:contentReference[oaicite:1]{index=1}
         }
     }
 
-    // ?�種?��?寫�??��??�」自?�送出，�?要�??��??�更?��?
-    chBSemSignal(&ledUpdateSem);  // ?�畫?�到驅�??��?緒傳�?:contentReference[oaicite:2]{index=2}
+    // ?車??撖急????�?�嚗?閬?????啁?
+    chBSemSignal(&ledUpdateSem);  // ??Ｗ撽??瑁?蝺頛?:contentReference[oaicite:2]{index=2}
 
-    mosArt.TimerBase += TIMEBASE_STEP; // ?��???Mos Art ?�樣?�逐�??��?
+    mosArt.TimerBase += TIMEBASE_STEP; // ????Mos Art ?見?�??券�?
     // return true;
 
 }
@@ -1681,11 +1681,11 @@ hsv_t rgb_to_hsv(led_config_t rgb)
 
     // H
     if (delta == 0) {
-        hsv.h = 0;   // ?�彩?��?h ?��?義�?�?0
+        hsv.h = 0;   // ?∪蔗?莎?h ?⊥?蝢抬?蝯?0
         return hsv;
     }
 
-    int16_t h; // ?��??�許負數
+    int16_t h; // ?怠??迂鞎
     if (max == r) {
         // h = 60 * (g-b)/delta  (mod 360)
         h = (int16_t)(60 * (int16_t)(g - b) / delta);
@@ -1713,7 +1713,7 @@ led_config_t hsv_to_rgb(hsv_t hsv)
     uint8_t v = hsv.v;
 
     if (s == 0) {
-        // ?��?
+        // ?圈?
         rgb.red = v;
         rgb.green = v;
         rgb.blue = v;
@@ -1727,8 +1727,8 @@ led_config_t hsv_to_rgb(hsv_t hsv)
     uint8_t region = h / 60;
     uint16_t f_deg = h - (uint16_t)region * 60; // 0..59
 
-    // ??0..255 ??fraction 近似
-    uint16_t f = (f_deg * 255) / 60; // 0..250(左右)
+    // ??0..255 ??fraction 餈撮
+    uint16_t f = (f_deg * 255) / 60; // 0..250(撌血)
 
     uint8_t p = (uint16_t)v * (255 - s) / 255;
     uint8_t q = (uint16_t)v * (255 - ((uint16_t)s * f / 255)) / 255;
@@ -1745,7 +1745,6 @@ led_config_t hsv_to_rgb(hsv_t hsv)
     return rgb;
 }
 
-//bool setRunMode(uint8_t runMode, int8_t mode, uint8_t brightness, uint8_t speed){
 bool setRunMode(led_runMode_t runMode){
 	if (gameModeEnable){return false;}
 	else {
@@ -1825,7 +1824,7 @@ void LED_init(void){//
     led_pos_init_from_remap(); //
     wheel_init_table();   //
     wheel_inited = true;  //
-	chThdCreateStatic(waLED_EffectThread, sizeof(waLED_EffectThread), NORMALPRIO - 3, LED_EffectThread, NULL); //original -3 test +�?
+	chThdCreateStatic(waLED_EffectThread, sizeof(waLED_EffectThread), NORMALPRIO - 3, LED_EffectThread, NULL); //original -3 test +嚗?
     currentLED_RunMode.mode = eeprom_read_byte(KB_COLOR_MODE_ADDR);//8;//
     currentLED_RunMode.brightness = normalBrightness;
     currentLED_RunMode.speed = normalSpeed;

@@ -1,6 +1,7 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 #include "socd.h"
+#include <stdint.h>
 #define AT32F405RCT7
 
 /* USB Device descriptor parameter */
@@ -60,16 +61,23 @@
 #define EECONFIG_MAC_MODE             0x006F
 #define EECONFIG_POLLING_RATE         0x0070
 #define IS_SOCD_ON_ADD                0x0071
-#define TACHYON_MODE_ADD              0x0072
-#define RAPID_KEY_ENABLE_ADDR         0x0073
+#define TACHYON_MODE_ADD \
+    ((uint8_t *)0x0072)
+#define RAPID_KEY_ENABLE_ADDR \
+    ((uint8_t *)0x0073)
 #define EEPROM_FACTORY_INIT_FLAG_ADDR 0x0074
-#define KB_ENCODER_MODE_ADDR          0x0075
+#define KB_ENCODER_MODE_ADDR \
+    ((uint8_t *)0x0075)
 #define SOCD_SETTING_MAGIC_ADDR       0x0076
 #define SOCD_SETTING_MAGIC            0xA5
-#define KB_COLOR_RED_ADDR             0x007B
-#define KB_COLOR_GREEN_ADDR           0x007C
-#define KB_COLOR_BLUE_ADDR            0x007D
-#define KB_COLOR_MODE_ADDR            0x007E
+#define KB_COLOR_RED_ADDR \
+    ((uint8_t *)0x007B)
+#define KB_COLOR_GREEN_ADDR \
+    ((uint8_t *)0x007C)
+#define KB_COLOR_BLUE_ADDR \
+    ((uint8_t *)0x007D)
+#define KB_COLOR_MODE_ADDR \
+    ((uint8_t *)0x007E)
 #define KB_COLOR_MAGIC_ADDR  0x007F
 #define KB_COLOR_MAGIC    0x7F
 
@@ -117,10 +125,15 @@
 #define EECONFIG_TOGGLE_KEY_SIZE             (sizeof(toggle_key_slot_t) * toggle_key_pair_count)
 #define EECONFIG_TOGGLE_KEY_ADDR_END         (EECONFIG_TOGGLE_KEY_ADDR + EECONFIG_TOGGLE_KEY_SIZE)
 
-// new macro
-#define EEPROM_MACRO_SLOT_ADDR             (EECONFIG_TOGGLE_KEY_ADDR + EECONFIG_TOGGLE_KEY_SIZE)
-#define EEPROM_MACRO_SLOT_SIZE             (sizeof(macro_config_t) * MACRO_GROUP_COUNT)
-#define EEPROM_MACRO_SLOT_ADDR_END         (EEPROM_MACRO_SLOT_ADDR + EEPROM_MACRO_SLOT_SIZE)
+/*
+ * New macro EEPROM region.
+ *
+ * config.h only defines the start address.
+ * Slot size and total region size are defined in macro_engine.h,
+ * after macro_config_t has been declared.
+ */
+#define EEPROM_MACRO_REGION_ADDR \
+    ((uint8_t *)(uintptr_t)(EECONFIG_TOGGLE_KEY_ADDR_END))
 
 // #define EECONFIG_KEYMAP_TRAVEL_2MM 	        (uint16_t*)(DYNAMIC_MACRO_EEPROM_BLOCK0_ADDR+2)
 
@@ -179,7 +192,7 @@
 #define I2C1_SCL_PAL_MODE 4
 #define I2C1_SDA_PAL_MODE 4
 #define I2C_START_RETRY_COUNT 10
-#define I2C_TIMEOUT 1000 // milliseconds
+#define I2C_TRANSFER_TIMEOUT_MS 1000U
 #define I2C1_CLOCK_SPEED 400000 /* 400000 */ //
 
 //#define CRC_USE_DMA	TRUE
@@ -309,7 +322,7 @@
 #define SPI_LED_MISO_PAL_MODE	5
 
 //tapMod
-#define TAPPING_TERM 200  // ms，依手感調
+#define TAPPING_TERM 200  // ms嚗���矽
 
 #define PREVENT_STUCK_MODIFIERS
 // #define MATRIX_HAS_GHOST

@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "host.h"
 #include "util.h"
 #include "debug.h"
-
+#include <string.h>
 
 #ifdef NKRO_ENABLE
 bool keyboard_nkro = true;
