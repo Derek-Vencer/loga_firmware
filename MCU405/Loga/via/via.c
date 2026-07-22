@@ -1555,92 +1555,534 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length)
                 *payload_length = 1;
             }
         break;
-        case ione_api_cmd_set_lighting_value:
-            uprintf("API=>Set Lighting Value:\r\n");
-            
-            if (*payload_length == 4 && (recive_payload[0] < 5)) {
-                *send_status = ione_api_status_success;
-                switch(recive_payload[0]){
-                    case 1:
-                        uprintf("API=>Bright:\r\n");
-                        currentLED_RunMode.brightness = brightness_percent_to_internal(recive_payload[1]);
+				case ione_api_cmd_set_lighting_value:
+				{
+						uint8_t sub_cmd = 0xFF;
 
-                        if (currentLED_RunMode.brightness == 0) {
-                            currentLED_RunMode.type = offMode;
-                        } else if (currentLED_RunMode.type == offMode) {
-                            currentLED_RunMode.type = normalMode;
-                        }
+						uprintf("\r\n");
+						uprintf("[LIGHT_API] ===== Set Lighting Value START =====\r\n");
+						uprintf("[LIGHT_API] payload_length_ptr=%p\r\n", (void *)payload_length);
+						uprintf("[LIGHT_API] payload_ptr=%p\r\n", (void *)recive_payload);
+						uprintf("[LIGHT_API] send_status_ptr=%p\r\n", (void *)send_status);
 
-                        LED_SpeedChange(currentLED_RunMode.brightness, currentLED_RunMode.speed);
-                        setRunMode(currentLED_RunMode);
-                    break;
-                    case 2:
-                        uprintf("API=>Effect:\r\n");
-                        currentLED_RunMode.mode = recive_payload[1];
-                        setRunMode(currentLED_RunMode);
-                        eeprom_update_byte(KB_COLOR_MODE_ADDR, recive_payload[1]);
-                    break;
-                    case 3:
-                        uprintf("API=>Speed:\r\n");
-                        currentLED_RunMode.speed = speed_percent_to_internal(recive_payload[1]);
-                        setRunMode(currentLED_RunMode);
-                    break;
-                    case 4:
-                        uprintf("API=>Color:\r\n");
-                        mosArt.LED.red = recive_payload[1];
-                        mosArt.LED.green = recive_payload[2];
-                        mosArt.LED.blue = recive_payload[3];
+						/*
+						 * 先檢查指標，避免 payload_length、recive_payload 或 send_status
+						 * 無效時直接 HardFault。
+						 */
+						if ((payload_length == NULL) ||
+								(recive_payload == NULL) ||
+								(send_status == NULL))
+						{
+								uprintf("[LIGHT_API][ERROR] NULL pointer detected\r\n");
 
-                        eeprom_update_byte(KB_COLOR_RED_ADDR, recive_payload[1]);
-                        eeprom_update_byte(KB_COLOR_GREEN_ADDR, recive_payload[2]);
-                        eeprom_update_byte(KB_COLOR_BLUE_ADDR, recive_payload[3]);
+								if (send_status != NULL)
+								{
+										*send_status = ione_api_status_fail;
+								}
 
-                        effectStatus.effect = EffectTypeMosArt;
-                        effectStatus.mode = mosArtStatic;
-                        chBSemSignal(&ledEffetSem);  // 通知 LED_EffectThread 執行
-                    break;
-                } 
-            } else {
-                *send_status = ione_api_status_fail;
-                uprintf("Payload should be empty\r\n");
-            }
-            *payload_length = 1;
-        break;
-        case ione_api_cmd_get_lighting_value:
-            uprintf("API=>Get Lighting Value:\r\n");
-            if (*payload_length == 1 && (recive_payload[0] < 5)) {
-                *send_status = ione_api_status_success;
-                switch(recive_payload[0]){
-                    case 1:
-                        uprintf("API=>Bright:\r\n");
-                        *send_data = brightness_internal_to_percent(
-                            currentLED_RunMode.brightness,
-                            currentLED_RunMode.type == offMode
-                        );
-                    break;
-                    case 2:
-                        uprintf("API=>Effect:\r\n");
-                        *send_data = eeprom_read_byte(KB_COLOR_MODE_ADDR);//currentLED_RunMode.mode;
-                    break;
-                    case 3:
-                        uprintf("API=>Speed:\r\n");
-                        *send_data = speed_internal_to_percent(currentLED_RunMode.speed);
-                    break;
-                    case 4:
-                        uprintf("API=>Color:\r\n");
-                        *send_data = eeprom_read_byte(KB_COLOR_RED_ADDR);//LED_Datas[0].red;
-                        send_data++;
-                        *send_data = eeprom_read_byte(KB_COLOR_GREEN_ADDR);//LED_Datas[0].green;
-                        send_data++;
-                        *send_data = eeprom_read_byte(KB_COLOR_BLUE_ADDR);//LED_Datas[0].blue;
-                    break;
-                } 
-            } else {
-                *send_status = ione_api_status_fail;
-                uprintf("Fail\r\n");
-            }
-            *payload_length = 4;
-        break;
+								if (payload_length != NULL)
+								{
+										*payload_length = 1;
+								}
+
+								uprintf("[LIGHT_API] ===== Set Lighting Value ABORT =====\r\n");
+								break;
+						}
+
+						uprintf("[LIGHT_API] payload_length=%u\r\n",
+										(unsigned int)(*payload_length));
+
+						/*
+						 * 不論長度是否正確，先印出收到的資料。
+						 * 只讀取 payload_length 範圍內的資料，避免越界。
+						 */
+						if (*payload_length > 0)
+						{
+								sub_cmd = recive_payload[0];
+
+								uprintf("[LIGHT_API] sub_cmd=%u\r\n",
+												(unsigned int)sub_cmd);
+						}
+
+						if (*payload_length >= 1)
+						{
+								uprintf("[LIGHT_API] payload[0]=0x%02X\r\n",
+												recive_payload[0]);
+						}
+
+						if (*payload_length >= 2)
+						{
+								uprintf("[LIGHT_API] payload[1]=0x%02X\r\n",
+												recive_payload[1]);
+						}
+
+						if (*payload_length >= 3)
+						{
+								uprintf("[LIGHT_API] payload[2]=0x%02X\r\n",
+												recive_payload[2]);
+						}
+
+						if (*payload_length >= 4)
+						{
+								uprintf("[LIGHT_API] payload[3]=0x%02X\r\n",
+												recive_payload[3]);
+						}
+
+						uprintf(
+								"[LIGHT_API] current before: type=%u mode=%u brightness=%u speed=%u\r\n",
+								(unsigned int)currentLED_RunMode.type,
+								(unsigned int)currentLED_RunMode.mode,
+								(unsigned int)currentLED_RunMode.brightness,
+								(unsigned int)currentLED_RunMode.speed);
+
+						uprintf(
+								"[LIGHT_API] color before: R=%u G=%u B=%u\r\n",
+								(unsigned int)mosArt.LED.red,
+								(unsigned int)mosArt.LED.green,
+								(unsigned int)mosArt.LED.blue);
+
+						if ((*payload_length == 4) &&
+								(recive_payload[0] > 0) &&
+								(recive_payload[0] < 5))
+						{
+								*send_status = ione_api_status_success;
+
+								uprintf("[LIGHT_API] payload validation PASS\r\n");
+
+								switch (recive_payload[0])
+								{
+										case 1:
+										{
+												uint8_t input_brightness = recive_payload[1];
+												uint8_t converted_brightness;
+
+												uprintf("[LIGHT_API][BRIGHT] START\r\n");
+												uprintf("[LIGHT_API][BRIGHT] input=%u\r\n",
+																(unsigned int)input_brightness);
+
+												uprintf(
+														"[LIGHT_API][BRIGHT] before conversion: "
+														"type=%u brightness=%u speed=%u\r\n",
+														(unsigned int)currentLED_RunMode.type,
+														(unsigned int)currentLED_RunMode.brightness,
+														(unsigned int)currentLED_RunMode.speed);
+
+												uprintf("[LIGHT_API][BRIGHT] call brightness_percent_to_internal()\r\n");
+
+												converted_brightness =
+														brightness_percent_to_internal(input_brightness);
+
+												uprintf(
+														"[LIGHT_API][BRIGHT] brightness_percent_to_internal() done, "
+														"result=%u\r\n",
+														(unsigned int)converted_brightness);
+
+												currentLED_RunMode.brightness = converted_brightness;
+
+												if (currentLED_RunMode.brightness == 0)
+												{
+														uprintf(
+																"[LIGHT_API][BRIGHT] brightness=0, "
+																"change type to offMode\r\n");
+
+														currentLED_RunMode.type = offMode;
+												}
+												else if (currentLED_RunMode.type == offMode)
+												{
+														uprintf(
+																"[LIGHT_API][BRIGHT] leave offMode, "
+																"change type to normalMode\r\n");
+
+														currentLED_RunMode.type = normalMode;
+												}
+
+												uprintf(
+														"[LIGHT_API][BRIGHT] call LED_SpeedChange("
+														"brightness=%u, speed=%u)\r\n",
+														(unsigned int)currentLED_RunMode.brightness,
+														(unsigned int)currentLED_RunMode.speed);
+
+												LED_SpeedChange(
+														currentLED_RunMode.brightness,
+														currentLED_RunMode.speed);
+
+												uprintf("[LIGHT_API][BRIGHT] LED_SpeedChange() done\r\n");
+
+												uprintf(
+														"[LIGHT_API][BRIGHT] call setRunMode: "
+														"type=%u mode=%u brightness=%u speed=%u\r\n",
+														(unsigned int)currentLED_RunMode.type,
+														(unsigned int)currentLED_RunMode.mode,
+														(unsigned int)currentLED_RunMode.brightness,
+														(unsigned int)currentLED_RunMode.speed);
+
+												setRunMode(currentLED_RunMode);
+
+												uprintf("[LIGHT_API][BRIGHT] setRunMode() done\r\n");
+												uprintf("[LIGHT_API][BRIGHT] END\r\n");
+										}
+										break;
+
+										case 2:
+										{
+												uint8_t new_mode = recive_payload[1];
+
+												uprintf("[LIGHT_API][EFFECT] START\r\n");
+												uprintf(
+														"[LIGHT_API][EFFECT] old_mode=%u new_mode=%u\r\n",
+														(unsigned int)currentLED_RunMode.mode,
+														(unsigned int)new_mode);
+
+												currentLED_RunMode.mode = new_mode;
+
+												uprintf(
+														"[LIGHT_API][EFFECT] call setRunMode: "
+														"type=%u mode=%u brightness=%u speed=%u\r\n",
+														(unsigned int)currentLED_RunMode.type,
+														(unsigned int)currentLED_RunMode.mode,
+														(unsigned int)currentLED_RunMode.brightness,
+														(unsigned int)currentLED_RunMode.speed);
+
+												setRunMode(currentLED_RunMode);
+
+												uprintf("[LIGHT_API][EFFECT] setRunMode() done\r\n");
+
+												uprintf(
+														"[LIGHT_API][EFFECT] EEPROM write START: "
+														"addr=%p value=0x%02X\r\n",
+														(void *)KB_COLOR_MODE_ADDR,
+														new_mode);
+
+												eeprom_update_byte(
+														KB_COLOR_MODE_ADDR,
+														new_mode);
+
+												uprintf("[LIGHT_API][EFFECT] EEPROM write done\r\n");
+												uprintf("[LIGHT_API][EFFECT] END\r\n");
+										}
+										break;
+
+										case 3:
+										{
+												uint8_t input_speed = recive_payload[1];
+												uint8_t converted_speed;
+
+												uprintf("[LIGHT_API][SPEED] START\r\n");
+												uprintf("[LIGHT_API][SPEED] input=%u\r\n",
+																(unsigned int)input_speed);
+
+												uprintf("[LIGHT_API][SPEED] call speed_percent_to_internal()\r\n");
+
+												converted_speed =
+														speed_percent_to_internal(input_speed);
+
+												uprintf(
+														"[LIGHT_API][SPEED] speed_percent_to_internal() done, "
+														"result=%u\r\n",
+														(unsigned int)converted_speed);
+
+												currentLED_RunMode.speed = converted_speed;
+
+												uprintf(
+														"[LIGHT_API][SPEED] call setRunMode: "
+														"type=%u mode=%u brightness=%u speed=%u\r\n",
+														(unsigned int)currentLED_RunMode.type,
+														(unsigned int)currentLED_RunMode.mode,
+														(unsigned int)currentLED_RunMode.brightness,
+														(unsigned int)currentLED_RunMode.speed);
+
+												setRunMode(currentLED_RunMode);
+
+												uprintf("[LIGHT_API][SPEED] setRunMode() done\r\n");
+												uprintf("[LIGHT_API][SPEED] END\r\n");
+										}
+										break;
+
+										case 4:
+										{
+												uint8_t red   = recive_payload[1];
+												uint8_t green = recive_payload[2];
+												uint8_t blue  = recive_payload[3];
+
+												uprintf("[LIGHT_API][COLOR] START\r\n");
+												uprintf(
+														"[LIGHT_API][COLOR] new color: R=%u G=%u B=%u\r\n",
+														(unsigned int)red,
+														(unsigned int)green,
+														(unsigned int)blue);
+
+												mosArt.LED.red   = red;
+												mosArt.LED.green = green;
+												mosArt.LED.blue  = blue;
+
+												uprintf(
+														"[LIGHT_API][COLOR] RAM updated: R=%u G=%u B=%u\r\n",
+														(unsigned int)mosArt.LED.red,
+														(unsigned int)mosArt.LED.green,
+														(unsigned int)mosArt.LED.blue);
+
+												uprintf(
+														"[LIGHT_API][COLOR] EEPROM RED write START: "
+														"addr=%p value=0x%02X\r\n",
+														(void *)KB_COLOR_RED_ADDR,
+														red);
+
+												eeprom_update_byte(
+														KB_COLOR_RED_ADDR,
+														red);
+
+												uprintf("[LIGHT_API][COLOR] EEPROM RED write done\r\n");
+
+												uprintf(
+														"[LIGHT_API][COLOR] EEPROM GREEN write START: "
+														"addr=%p value=0x%02X\r\n",
+														(void *)KB_COLOR_GREEN_ADDR,
+														green);
+
+												eeprom_update_byte(
+														KB_COLOR_GREEN_ADDR,
+														green);
+
+												uprintf("[LIGHT_API][COLOR] EEPROM GREEN write done\r\n");
+
+												uprintf(
+														"[LIGHT_API][COLOR] EEPROM BLUE write START: "
+														"addr=%p value=0x%02X\r\n",
+														(void *)KB_COLOR_BLUE_ADDR,
+														blue);
+
+												eeprom_update_byte(
+														KB_COLOR_BLUE_ADDR,
+														blue);
+
+												uprintf("[LIGHT_API][COLOR] EEPROM BLUE write done\r\n");
+
+												effectStatus.effect = EffectTypeMosArt;
+												effectStatus.mode   = mosArtStatic;
+
+												uprintf(
+														"[LIGHT_API][COLOR] effectStatus updated: "
+														"effect=%u mode=%u\r\n",
+														(unsigned int)effectStatus.effect,
+														(unsigned int)effectStatus.mode);
+
+												uprintf(
+														"[LIGHT_API][COLOR] ledEffetSem=%p, "
+														"call chBSemSignal()\r\n",
+														(void *)&ledEffetSem);
+
+												chBSemSignal(&ledEffetSem);
+
+												uprintf("[LIGHT_API][COLOR] chBSemSignal() done\r\n");
+												uprintf("[LIGHT_API][COLOR] END\r\n");
+										}
+										break;
+
+										default:
+												uprintf(
+														"[LIGHT_API][ERROR] unexpected sub command=%u\r\n",
+														(unsigned int)recive_payload[0]);
+
+												*send_status = ione_api_status_fail;
+												break;
+								}
+						}
+						else
+						{
+								*send_status = ione_api_status_fail;
+
+								uprintf(
+										"[LIGHT_API][ERROR] invalid payload: "
+										"length=%u sub_cmd=%u, expected length=4 and sub_cmd=1~4\r\n",
+										(unsigned int)(*payload_length),
+										(unsigned int)sub_cmd);
+						}
+
+						/*
+						 * 回覆一個 status byte。
+						 */
+						*payload_length = 1;
+
+						uprintf(
+								"[LIGHT_API] response: status=%u payload_length=%u\r\n",
+								(unsigned int)(*send_status),
+								(unsigned int)(*payload_length));
+
+						uprintf(
+								"[LIGHT_API] current after: "
+								"type=%u mode=%u brightness=%u speed=%u\r\n",
+								(unsigned int)currentLED_RunMode.type,
+								(unsigned int)currentLED_RunMode.mode,
+								(unsigned int)currentLED_RunMode.brightness,
+								(unsigned int)currentLED_RunMode.speed);
+
+						uprintf("[LIGHT_API] ===== Set Lighting Value END =====\r\n");
+				}
+				break;
+				case ione_api_cmd_get_lighting_value:
+				{
+						uint8_t sub_cmd = 0xFF;
+
+						uprintf("\r\n");
+						uprintf("[LIGHT_API] ===== Get Lighting Value START =====\r\n");
+
+						if ((payload_length == NULL) ||
+								(recive_payload == NULL) ||
+								(send_status == NULL) ||
+								(send_data == NULL))
+						{
+								uprintf("[LIGHT_API][ERROR] NULL pointer\r\n");
+
+								if (send_status)
+										*send_status = ione_api_status_fail;
+
+								if (payload_length)
+										*payload_length = 0;
+
+								break;
+						}
+
+						uprintf("[LIGHT_API] payload_length=%u\r\n",
+										(unsigned int)(*payload_length));
+
+						if (*payload_length >= 1)
+						{
+								sub_cmd = recive_payload[0];
+
+								uprintf("[LIGHT_API] sub_cmd=%u\r\n",
+												(unsigned int)sub_cmd);
+						}
+
+						uprintf("[LIGHT_API] current:"
+										" type=%u mode=%u brightness=%u speed=%u\r\n",
+										(unsigned int)currentLED_RunMode.type,
+										(unsigned int)currentLED_RunMode.mode,
+										(unsigned int)currentLED_RunMode.brightness,
+										(unsigned int)currentLED_RunMode.speed);
+
+						uprintf("[LIGHT_API] current color:"
+										" R=%u G=%u B=%u\r\n",
+										(unsigned int)mosArt.LED.red,
+										(unsigned int)mosArt.LED.green,
+										(unsigned int)mosArt.LED.blue);
+
+						if ((*payload_length == 1) &&
+								(sub_cmd > 0) &&
+								(sub_cmd < 5))
+						{
+								*send_status = ione_api_status_success;
+
+								switch (sub_cmd)
+								{
+										case 1:
+										{
+												uint8_t value;
+
+												uprintf("[LIGHT_API][GET] Brightness\r\n");
+
+												value = brightness_internal_to_percent(
+																		currentLED_RunMode.brightness,
+																		currentLED_RunMode.type == offMode);
+
+												*send_data = value;
+
+												uprintf("[LIGHT_API][GET] brightness=%u\r\n",
+																(unsigned int)value);
+										}
+										break;
+
+										case 2:
+										{
+												uint8_t value;
+
+												uprintf("[LIGHT_API][GET] Effect\r\n");
+
+												value = eeprom_read_byte(KB_COLOR_MODE_ADDR);
+
+												*send_data = value;
+
+												uprintf("[LIGHT_API][GET] EEPROM Mode=0x%02X (%u)\r\n",
+																value,
+																(unsigned int)value);
+										}
+										break;
+
+										case 3:
+										{
+												uint8_t value;
+
+												uprintf("[LIGHT_API][GET] Speed\r\n");
+
+												value = speed_internal_to_percent(
+																		currentLED_RunMode.speed);
+
+												*send_data = value;
+
+												uprintf("[LIGHT_API][GET] speed=%u\r\n",
+																(unsigned int)value);
+										}
+										break;
+
+										case 4:
+										{
+												uint8_t red;
+												uint8_t green;
+												uint8_t blue;
+
+												uprintf("[LIGHT_API][GET] Color\r\n");
+
+												red = eeprom_read_byte(KB_COLOR_RED_ADDR);
+												green = eeprom_read_byte(KB_COLOR_GREEN_ADDR);
+												blue = eeprom_read_byte(KB_COLOR_BLUE_ADDR);
+
+												send_data[0] = red;
+												send_data[1] = green;
+												send_data[2] = blue;
+
+												uprintf("[LIGHT_API][GET] EEPROM Color:"
+																" R=%u G=%u B=%u\r\n",
+																(unsigned int)red,
+																(unsigned int)green,
+																(unsigned int)blue);
+										}
+										break;
+								}
+						}
+						else
+						{
+								*send_status = ione_api_status_fail;
+
+								uprintf("[LIGHT_API][ERROR] Invalid payload"
+												" len=%u sub=%u\r\n",
+												(unsigned int)(*payload_length),
+												(unsigned int)sub_cmd);
+						}
+
+						*payload_length = 4;
+
+						uprintf("[LIGHT_API] send_status=%u\r\n",
+										(unsigned int)(*send_status));
+
+						uprintf("[LIGHT_API] return_length=%u\r\n",
+										(unsigned int)(*payload_length));
+
+						if (sub_cmd == 4)
+						{
+								uprintf("[LIGHT_API] return:"
+												" %02X %02X %02X\r\n",
+												send_data[0],
+												send_data[1],
+												send_data[2]);
+						}
+						else if (*send_status == ione_api_status_success)
+						{
+								uprintf("[LIGHT_API] return=%02X\r\n",
+												send_data[0]);
+						}
+
+						uprintf("[LIGHT_API] ===== Get Lighting Value END =====\r\n");
+				}
+				break;
 		// case ione_api_cmd_set_test_mode:
 		// break;
 
