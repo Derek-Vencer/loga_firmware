@@ -648,6 +648,35 @@ void toggle_key_set(uint8_t layer, uint8_t row, uint8_t col, uint8_t keycode) {
 
     toggle_last_pressed[layer][row][col] = false;
 }
+
+void toggle_key_load_from_eeprom(void)
+{
+    for (uint8_t i = 0; i < toggle_key_pair_count; i++)
+    {
+        toggle_key_slot_t tmp;
+
+        eeconfig_read_toggle_entry(i, &tmp);
+
+        if (tmp.enabled == 0x01 &&
+            tmp.layer < LAYERS_PER_PROFILE &&
+            tmp.row   < MATRIX_ROWS &&
+            tmp.col   < MATRIX_COLS)
+        {
+            toggle_key_slot_t *tka =
+                &toggle_keys[tmp.layer][tmp.row][tmp.col];
+
+            tka->enabled = true;
+            tka->state   = false;
+            tka->keycode = tmp.keycode;
+            tka->layer   = tmp.layer;
+            tka->row     = tmp.row;
+            tka->col     = tmp.col;
+        }
+    }
+
+    uprintf("[TOGGLE] load done\r\n");
+}
+
 // void toggle_key_set(uint8_t layer, uint8_t row, uint8_t col, uint8_t keycode) {
 //     if (layer >= KEYMAPS_COUNT || row >= MATRIX_ROWS || col >= MATRIX_COLS) {
 //         return;
@@ -1029,6 +1058,36 @@ static inline bool calc_pressed_now(uint8_t row, uint8_t col, int32_t adcCalc) {
 #endif // socd
 // #define FORCE_HARDCODE_RT_PROFILE // dynamic keystroke
 
+/*
+static void external_eeprom_clear_all(void)
+{
+    uint8_t buffer[128];
+
+    memset(buffer, 0xFF, sizeof(buffer));
+
+    uprintf("[EEPROM] clear start\r\n");
+
+    for (uint32_t addr = 0; addr < 65536U; addr += sizeof(buffer))
+    {
+        eeprom_write_block(
+            buffer,
+            (void *)(uintptr_t)addr,
+            sizeof(buffer)
+        );
+
+        if ((addr & 0x0FFFU) == 0U)
+        {
+            uprintf(
+                "[EEPROM] clear addr=0x%04lX\r\n",
+                (unsigned long)addr
+            );
+        }
+    }
+
+    uprintf("[EEPROM] clear complete\r\n");
+}
+
+*/
 bool isMac = false;
 static hsv_t current_hsv;
 extern led_config_t c;
@@ -1045,6 +1104,7 @@ void hook_early_init(void)
     i2c_init();
     uart_init();
 	osalThreadSleepMilliseconds(1000); // led delay add in here work
+		//external_eeprom_clear_all();
     uprintf("\033[2J\033[HiOne M18 Start .....\r\n");
     uprintf("KeyMap Size:%d %X END:%d %X\r\n",KEYMAP_SIZE,KEYMAP_SIZE,EECONFIG_END,EECONFIG_END);
 
@@ -1153,96 +1213,34 @@ void sensorPowerCtrl(bool enable){
 	}
 }
 
-void hook_late_init()
+void hook_late_init(void)
 {
     palSetPad(GPIOB, 3);
     palSetPad(GPIOB, 4);
- 
-	// sleep mode
+
     idle_led_last_activity_ms = timer_read32();
     idle_led_timeout_reported = false;
     idle_led_is_sleeping = false;
-    idle_led_restore_mode = idle_led_build_mode(currentLED_RunMode, normalMode, eeprom_read_byte(KB_COLOR_MODE_ADDR));
-	// end sleep mode
+
+    idle_led_restore_mode = idle_led_build_mode(
+        currentLED_RunMode,
+        normalMode,
+        eeprom_read_byte(KB_COLOR_MODE_ADDR)
+    );
 
     macro_engine_init();
-    // macro_engine_setup_test_copy_paste();
 
-	#ifdef toggleKey
-	// test code
-	// toggle_key_set(0, 2, 2, 0x04);   // 0x04 = KC_A
-	// toggle_key_set(0, 2, 2, 0x00);   // 0x04 = KC_A
-	#endif // toggleKey
+    usb_set_polling_rate(
+        eeprom_read_byte((uint8_t *)EECONFIG_POLLING_RATE)
+    );
 
+    load_all_rappy_snappy();
+    modtap_load_form_eeprom();
 
+    isSOCD = socd_setting_read();
+    isMac = eeprom_read_byte((uint8_t *)EECONFIG_MAC_MODE);
 
-	uint8_t FACTORY_INIT_MAGIC = 0xA5;
-    uint8_t flag = eeprom_read_byte((uint8_t *)EEPROM_FACTORY_INIT_FLAG_ADDR);
-	usb_set_polling_rate(eeprom_read_byte((uint8_t *)EECONFIG_POLLING_RATE));
-
-    // uprintf("=============factory init flag = %u\n", flag);
-
-    if (flag != FACTORY_INIT_MAGIC) {
-		eeprom_update_byte((uint8_t *)EEPROM_FACTORY_INIT_FLAG_ADDR, FACTORY_INIT_MAGIC);
-		// eeprom_write_word(EECONFIG_KEYMAP_TRIGGER_LEVEL, 0x00C8);
-	    // eeprom_write_word(EECONFIG_KEYMAP_RELEASE_LEVEL, 0x0000);
-		eeprom_write_word(EECONFIG_KEYMAP_TRIGGER_LEVEL, keyMatrixTriggerLevel);
-	    eeprom_write_word(EECONFIG_KEYMAP_RELEASE_LEVEL, keyMatrixReleaseLevel);
-		rapidKeyEnable = eeprom_read_byte(RAPID_KEY_ENABLE_ADDR);
-		eeprom_update_byte((uint8_t *)KB_COLOR_MODE_ADDR, 8);
-		eeprom_update_byte((uint8_t *)EECONFIG_POLLING_RATE, 0x00);
-		eeprom_update_byte((uint8_t *)EECONFIG_MAC_MODE, 0x00);
-		socd_setting_write(true);
-		eeconfig_clear_all_toggle_entry();
-
-		knobState = 0;
-		eeprom_update_byte(KB_ENCODER_MODE_ADDR, knobState);
-		eeconfig_socd_clear();
-		eeconfig_rappy_snappy_clear();
-		eeconfig_modtap_clear();
-		currentLED_RunMode.mode = 8;
-		currentLED_RunMode.type = offMode;
-		setRunMode(currentLED_RunMode);
-		eeprom_update_byte((uint8_t *)KB_COLOR_MODE_ADDR, currentLED_RunMode.mode);
-		eeprom_update_byte((uint8_t *)EECONFIG_POLLING_RATE, 0x00);
-		eeconfig_rapidTrigger_init();
-		keyMatrixTriggerLevel = DEFAULT_TRIGGER_LEVEL;
-		keyMatrixReleaseLevel = DEFAULT_RELEASE_LEVEL;
-		write_trigger_to_eeprom();
-		write_Release_to_eeprom();
-		write_keymap_to_eeprom();
-		dynamic_macro_reset_eeprom();
-
-		eeprom_update_byte((uint8_t *)EEPROM_FACTORY_INIT_FLAG_ADDR, 0xFA);
-		chThdSleepMilliseconds(100);
-		NVIC_SystemReset();
-		
-	}
-	load_all_rappy_snappy();
-	modtap_load_form_eeprom();
-	isSOCD = socd_setting_read();
-	isMac = eeprom_read_byte((uint8_t *)EECONFIG_MAC_MODE);
-
-	void toggle_key_load_from_eeprom(void)//toggle_key_pair_count
-	{
-		for (uint8_t i = 0; i < toggle_key_pair_count; i++) {
-			toggle_key_slot_t tmp;
-			eeconfig_read_toggle_entry(i, &tmp);
-
-			// toggle_key_slot_t toggle_keys[MAX_TOGGLE_KEYS];
-			if(tmp.enabled == 0x01 && tmp.layer <= LAYERS_PER_PROFILE && tmp.row <= MATRIX_ROWS && tmp.col <= MATRIX_COLS){
-				toggle_key_slot_t *tka = &toggle_keys[tmp.layer][tmp.row][tmp.col];
-				tka->enabled = true;
-				tka->state   = false;     // 新設定預設 OFF
-				tka->keycode = tmp.keycode;
-				tka->layer   = tmp.layer;
-				tka->row     = tmp.row;
-				tka->col     = tmp.col;
-				uprintf("load toggle eeprom\r\n");
-			}
-		}
-	}
-	toggle_key_load_from_eeprom();
+    toggle_key_load_from_eeprom();
 }
 
 
@@ -3441,60 +3439,217 @@ static THD_FUNCTION(ADC_ProcessThread, arg)
 
     }
 }
-bool rapidTriggerKeyBuilder(uint8_t key){
 
-analogKey_Config_t keyLocation;
-uint16_t initPosValue, travelPosValue;
-keyevent_t event;
-uint16_t shiftValue;
-	rapidTriggerKey[key].key = eeconfig_read_rapidTrigger(key);
-	if (rapidTriggerKey[key].key.counts>= RAPID_TRIGGER_LEVELS || rapidTriggerKey[key].key.row>MATRIX_ROWS || rapidTriggerKey[key].key.col>MATRIX_COLS){return false;}
+bool rapidTriggerKeyBuilder(uint8_t key)
+{
+    analogKey_Config_t keyLocation;
+    uint16_t initPosValue;
+    uint16_t travelPosValue;
+    keyevent_t event;
 
-	keyLocation = matrixAnalogRelocate[rapidTriggerKey[key].key.row][rapidTriggerKey[key].key.col];
-	initPosValue = initPostionLevel[keyLocation.colA][keyLocation.rowA];
-	travelPosValue = travelPostionLevel[keyLocation.colA][keyLocation.rowA];
-    for (uint8_t i=0; i< rapidTriggerKey[key].key.counts; i++){
-    	rapidTriggerKey[key].onLevel[rapidTriggerKey[key].key.counts-i] = keyMatrixTriggerLevel + (1-sqrt((float)i/(float)rapidTriggerKey[key].key.counts)) * (travelPosValue - initPosValue - keyMatrixTriggerLevel);
-    	rapidTriggerKey[key].onLevel[rapidTriggerKey[key].key.counts-i] *= 1.015;
-    }
-    rapidTriggerKey[key].onLevel[0] = keyMatrixTriggerLevel;
-
-    for (uint8_t i=0; i< rapidTriggerKey[key].key.counts-1; i++){
-    	rapidTriggerKey[key].offLevel[i] = rapidTriggerKey[key].onLevel[i+1] - ((rapidTriggerKey[key].onLevel[i+1] - rapidTriggerKey[key].onLevel[i])/8);
-    	//uprintf ("Off: %4d %4d\r\n",rapidTriggerKeys[key].onLevel[i+1],rapidTriggerKeys[key].onLevel[i]);
-
+    if (key >= RAPID_TRIGGER_COUNT) {
+        uprintf(
+            "[RT][ERROR] invalid slot=%u max=%u\r\n",
+            key,
+            RAPID_TRIGGER_COUNT
+        );
+        return false;
     }
 
+    rapidTriggerKey[key].key = eeconfig_read_rapidTrigger(key);
+
+    uprintf(
+        "[RT] slot=%u enable=%u row=%u col=%u counts=%u\r\n",
+        key,
+        rapidTriggerKey[key].key.enable,
+        rapidTriggerKey[key].key.row,
+        rapidTriggerKey[key].key.col,
+        rapidTriggerKey[key].key.counts
+    );
+
+    /*
+     * EEPROM ??????? 0xFF?
+     * ????????????????
+     */
+    if (rapidTriggerKey[key].key.enable != 1) {
+        return false;
+    }
+
+    if (rapidTriggerKey[key].key.counts == 0 ||
+        rapidTriggerKey[key].key.counts >= RAPID_TRIGGER_LEVELS) {
+
+        uprintf(
+            "[RT][INVALID] slot=%u counts=%u\r\n",
+            key,
+            rapidTriggerKey[key].key.counts
+        );
+
+        return false;
+    }
+
+    if (rapidTriggerKey[key].key.row >= MATRIX_ROWS ||
+        rapidTriggerKey[key].key.col >= MATRIX_COLS) {
+
+        uprintf(
+            "[RT][INVALID] slot=%u row=%u/%u col=%u/%u\r\n",
+            key,
+            rapidTriggerKey[key].key.row,
+            MATRIX_ROWS,
+            rapidTriggerKey[key].key.col,
+            MATRIX_COLS
+        );
+
+        return false;
+    }
+
+    keyLocation =
+        matrixAnalogRelocate
+            [rapidTriggerKey[key].key.row]
+            [rapidTriggerKey[key].key.col];
+
+    /*
+     * matrixAnalogRelocate ????????????
+     */
+    if (keyLocation.colA >= ADC_BUF_DEPTH ||
+        keyLocation.rowA >= ADC_NUM_CHANNELS) {
+
+        uprintf(
+            "[RT][INVALID] slot=%u ADC col=%u/%u row=%u/%u\r\n",
+            key,
+            keyLocation.colA,
+            ADC_BUF_DEPTH,
+            keyLocation.rowA,
+            ADC_NUM_CHANNELS
+        );
+
+        return false;
+    }
+
+    initPosValue =
+        initPostionLevel[keyLocation.colA][keyLocation.rowA];
+
+    travelPosValue =
+        travelPostionLevel[keyLocation.colA][keyLocation.rowA];
+
+    uprintf(
+        "[RT] slot=%u init=%u travel=%u trigger=%u\r\n",
+        key,
+        initPosValue,
+        travelPosValue,
+        keyMatrixTriggerLevel
+    );
+
+    /*
+     * ?? EEPROM ??????????? unsigned underflow?
+     */
+    if (travelPosValue <= initPosValue ||
+        (travelPosValue - initPosValue) <= keyMatrixTriggerLevel) {
+
+        uprintf(
+            "[RT][INVALID] calibration slot=%u init=%u travel=%u\r\n",
+            key,
+            initPosValue,
+            travelPosValue
+        );
+
+        return false;
+    }
+
+    for (uint8_t i = 0;
+         i < rapidTriggerKey[key].key.counts;
+         i++) {
+
+        uint8_t index =
+            rapidTriggerKey[key].key.counts - i;
+
+        if (index >= RAPID_TRIGGER_LEVELS) {
+            uprintf(
+                "[RT][ERROR] onLevel index=%u\r\n",
+                index
+            );
+            return false;
+        }
+
+        rapidTriggerKey[key].onLevel[index] =
+            keyMatrixTriggerLevel +
+            (1.0f -
+             sqrtf(
+                 (float)i /
+                 (float)rapidTriggerKey[key].key.counts
+             )) *
+            (
+                travelPosValue -
+                initPosValue -
+                keyMatrixTriggerLevel
+            );
+
+        rapidTriggerKey[key].onLevel[index] =
+            (uint16_t)(
+                rapidTriggerKey[key].onLevel[index] *
+                1.015f
+            );
+    }
+
+    rapidTriggerKey[key].onLevel[0] =
+        keyMatrixTriggerLevel;
+
+    for (uint8_t i = 0;
+         i + 1 < rapidTriggerKey[key].key.counts;
+         i++) {
+
+        rapidTriggerKey[key].offLevel[i] =
+            rapidTriggerKey[key].onLevel[i + 1] -
+            (
+                (
+                    rapidTriggerKey[key].onLevel[i + 1] -
+                    rapidTriggerKey[key].onLevel[i]
+                ) / 8
+            );
+    }
 
     rapidTriggerKey[key].lastStep = -1;
     rapidTriggerKey[key].triggeredLevel = 0;
-	//memcpy (rapidTriggerKeys[key].keycode,keycode,counts*2);
-	event.key.row = rapidTriggerKey[key].key.row;
-	event.key.col = rapidTriggerKey[key].key.col;
-	//uprintf ("rapidTriggerKey row:%d col:%d counts:%d keycode:%04X\r\n",rapidTriggerKey[key].key.row, rapidTriggerKey[key].key.col, rapidTriggerKey[key].key.counts,keymap_key_to_keycode(biton32(layer_state),event.key));
-	for (uint8_t i=0;i<rapidTriggerKey[key].key.counts;i++){
-		//uprintf ("onLevel  %d:%0d\t",i , rapidTriggerKey[key].onLevel[i]);
-	}
-	//uprintf ("\r\n");
-	for (uint8_t i=0;i<rapidTriggerKey[key].key.counts-1;i++){
-		//uprintf ("offLevel %d:%0d\t",i , rapidTriggerKey[key].offLevel[i]);
-	}
-	//uprintf ("\r\n");
-	for (uint8_t i=0;i<rapidTriggerKey[key].key.counts;i++){
-		//uprintf ("Keycode %d:%04x\t",i , rapidTriggerKey[key].key.keycode[i]);
-	}
-	//uprintf ("\r\n");
-	return 0;
+
+    event.key.row = rapidTriggerKey[key].key.row;
+    event.key.col = rapidTriggerKey[key].key.col;
+
+    uprintf("[RT] slot=%u build done\r\n", key);
+
+    return true;
 }
 
-void rapidTriggerProcess(bool mode, uint8_t key){
-	if (mode){
-		for (uint8_t i=0;i<RAPID_TRIGGER_COUNT;i++){
-			rapidTriggerKeyBuilder(i);
-		}
-	} else {
-		rapidTriggerKeyBuilder(key);
-	}
+void rapidTriggerProcess(bool mode, uint8_t key)
+{
+    uprintf(
+        "[RT] process begin mode=%u key=%u count=%u\r\n",
+        mode,
+        key,
+        RAPID_TRIGGER_COUNT
+    );
+
+    if (mode) {
+        for (uint8_t i = 0; i < RAPID_TRIGGER_COUNT; i++) {
+            uprintf("[RT] build slot=%u begin\r\n", i);
+
+            bool result = rapidTriggerKeyBuilder(i);
+
+            uprintf(
+                "[RT] build slot=%u result=%u\r\n",
+                i,
+                result
+            );
+        }
+    } else {
+        bool result = rapidTriggerKeyBuilder(key);
+
+        uprintf(
+            "[RT] build single slot=%u result=%u\r\n",
+            key,
+            result
+        );
+    }
+
+    uprintf("[RT] process end\r\n");
 }
 
 //typedef struct {
@@ -3508,6 +3663,51 @@ void rapidTriggerProcess(bool mode, uint8_t key){
 //    uint16_t lastKeycode;
 //} rapidTrigger_config_t;
 
+/*
+static bool eeprom_write_self_test(void)
+{
+    const uint8_t test_value = 0x5A;
+    const uint16_t test_addr = 0xFFF0;
+
+    uprintf("[EEPROM-TEST] begin\r\n");
+
+    palSetPadMode(GPIOB, 7, PAL_MODE_OUTPUT_PUSHPULL);
+    palClearPad(GPIOB, 7);
+    chThdSleepMilliseconds(10);
+
+    uprintf(
+        "[EEPROM-TEST] WP=%d\r\n",
+        palReadPad(GPIOB, 7)
+    );
+
+    uprintf(
+        "[EEPROM-TEST] before=0x%02X\r\n",
+        eeprom_read_byte((uint8_t *)(uintptr_t)test_addr)
+    );
+
+    uprintf("[EEPROM-TEST] write begin\r\n");
+
+    eeprom_update_byte(
+        (uint8_t *)(uintptr_t)test_addr,
+        test_value
+    );
+
+    uprintf("[EEPROM-TEST] write returned\r\n");
+
+    chThdSleepMilliseconds(6);
+
+    uint8_t readback =
+        eeprom_read_byte((uint8_t *)(uintptr_t)test_addr);
+
+    uprintf(
+        "[EEPROM-TEST] readback=0x%02X expected=0x%02X\r\n",
+        readback,
+        test_value
+    );
+
+    return readback == test_value;
+}
+*/
 void matrix_init(void)//
 {
 	//uprintf ("rapidTrigger_config_t size:%d\r\n",sizeof(rapidTrigger_config_t));
@@ -3546,8 +3746,6 @@ void matrix_init(void)//
 //
 
 
-
-
 	if (globleTrigger){
 //		keycodeOutput = false;
 //		keyScanEffect = true;
@@ -3569,21 +3767,84 @@ void matrix_init(void)//
 
     //Reade Iniit/Travel postion calibration data
 
-    if (!eepromInitCheck){
-    	uprintf("Factory Reset start\r\n");
-    	write_keymap_to_eeprom();
-    	eeconfig_rapidTrigger_init();
-    	dynamic_macro_reset_eeprom();
-    	eeprom_write_word(EECONFIG_KEYMAP_TRIGGER_LEVEL, DEFAULT_TRIGGER_LEVEL);
-    	eeprom_write_word(EECONFIG_KEYMAP_RELEASE_LEVEL, DEFAULT_RELEASE_LEVEL);
-    	write_trigger_to_eeprom();
-    	write_Release_to_eeprom();
-    	eeconfig_rapidTrigger_init();
-    	adcOffsetCalc(true, true, 1500);
-		eeconfig_socd_clear();
-    	uprintf("Factory Reset end\r\n");
-//    	NVIC_SystemReset();
+if (!eepromInitCheck) {
+    uprintf("[FR][01] Factory Reset start\r\n");
+
+    uprintf("[FR][03] keymap begin\r\n");
+    write_keymap_to_eeprom();
+    uprintf("[FR][04] keymap done\r\n");
+
+    uprintf("[FR][05] rapid trigger begin\r\n");
+    eeconfig_rapidTrigger_init();
+    uprintf("[FR][06] rapid trigger done\r\n");
+
+    uprintf("[FR][07] macro reset begin\r\n");
+    dynamic_macro_reset_eeprom();
+    uprintf("[FR][08] macro reset done\r\n");
+
+    keyMatrixTriggerLevel = DEFAULT_TRIGGER_LEVEL;
+    keyMatrixReleaseLevel = DEFAULT_RELEASE_LEVEL;
+
+    eeprom_write_word(
+        EECONFIG_KEYMAP_TRIGGER_LEVEL,
+        keyMatrixTriggerLevel
+    );
+
+    eeprom_write_word(
+        EECONFIG_KEYMAP_RELEASE_LEVEL,
+        keyMatrixReleaseLevel
+    );
+
+    uprintf("[FR][09] trigger table begin\r\n");
+    write_trigger_to_eeprom();
+    uprintf("[FR][10] trigger table done\r\n");
+
+    uprintf("[FR][11] release table begin\r\n");
+    write_Release_to_eeprom();
+    uprintf("[FR][12] release table done\r\n");
+
+    uprintf("[FR][13] ADC calibration begin\r\n");
+    adcOffsetCalc(true, true, 1500);
+    uprintf("[FR][14] ADC calibration done\r\n");
+
+    eeconfig_socd_clear();
+
+    /*
+     * ??????????????
+     */
+    eeprom_update_byte(
+        (uint8_t *)KB_COLOR_MODE_ADDR,
+        8
+    );
+
+    eeprom_update_byte(
+        (uint8_t *)EECONFIG_POLLING_RATE,
+        0
+    );
+
+    eeprom_update_byte(
+        (uint8_t *)EECONFIG_MAC_MODE,
+        0
+    );
+
+    eeprom_update_byte(
+        KB_ENCODER_MODE_ADDR,
+        0
+    );
+
+    /*
+     * ? write_keymap_to_eeprom() ?????? Keymap Magic,
+     * ????????
+     */
+    uprintf("[FR][15] Factory Reset end\r\n");
+
+    chThdSleepMilliseconds(100);
+    NVIC_SystemReset();
+
+    while (true) {
+        chThdSleepMilliseconds(1000);
     }
+}
     chThdCreateStatic(waADC_ProcessThread, sizeof(waADC_ProcessThread), NORMALPRIO - 4, ADC_ProcessThread, NULL);
     LED_init();
 	knobState = eeprom_read_byte(KB_ENCODER_MODE_ADDR);
@@ -5010,3 +5271,4 @@ bool process_rappy_fixed_ratio(rappy_fixed_ratio_t *rappy) {
 }
 
 #endif // rappyTrigger
+
