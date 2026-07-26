@@ -22,6 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "keymap_in_eeprom.h"
 #include "matrix.h"
 #include "debug.h"
+#include "eeprom.h"
 
 uint16_t eepromKeyBuffer[KEYMAPS_COUNT][MATRIX_ROWS][MATRIX_COLS];
 uint16_t eepromTriggerBuffer[MATRIX_ROWS][MATRIX_COLS];

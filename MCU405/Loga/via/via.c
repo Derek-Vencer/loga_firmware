@@ -552,7 +552,7 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length)
             } else {
                 *send_status = ione_api_status_fail;
             }
-            payload_length = 1;
+            *payload_length = 1;
         break;
 		case ione_api_cmd_konb_state:
             uprintf ("API=>Get Konb state:\r\n");
@@ -1994,7 +1994,7 @@ void raw_hid_receive(uint8_t *data, uint8_t length) {
         case id_loga_api: //
             // uprintf("call ione\r\n");
         	if (!raw_hid_receive_ione(data, length)){
-        		return false;
+        		return;
         	}
         	break;
         /* As VIA removed bootloader jump entirely, we shall only keep it for secure builds */

@@ -8,7 +8,7 @@
 #include <stddef.h>
 #include <stdlib.h>
 #include <stddef.h>
-
+#include "eeprom.h"
 
 _Static_assert(
     sizeof(dynamic_macro_t) == DYNAMIC_MACRO_EEPROM_SLOT_SIZE,
