@@ -1684,11 +1684,7 @@ void Calculate_Flashing_Volume(uint8_t speed, uint16_t timebase, uint8_t* bright
     }
 }
 
-void Calculate_Waving_Volumn(
-    uint8_t speed,
-    uint16_t timebase,
-    uint8_t *bright
-)
+void Calculate_Waving_Volumn(uint8_t speed,uint16_t timebase,uint8_t *bright)
 {
     /*
      * 橫向波長：每 12 column 完成一個波形週期。
@@ -1768,62 +1764,154 @@ void Calculate_Waving_Volumn(
         (uint16_t)(timebase + TIMEBASE_STEP);
 }
 
-bool LED_ModesBuilder(uint8_t action,bool start,uint8_t effect, bool enable, uint32_t interval, uint8_t colorMode, uint8_t mode, led_config_t color, uint8_t brightness, uint8_t speed, bool direction){
-	switch (action){
-		case	newDemo:
-		case	addDemoEffect:
-			switch (action){
-				case newDemo:
-				LED_DemoModeIndex = 0;
-				break;
-			case	addDemoEffect:
-				if (LED_DemoModeIndex++>LED_DemoModes){
-					return false;
-				}
-				break;
-			}
-			LED_DemoMode[LED_DemoModeIndex].effect = effect;
-			LED_DemoMode[LED_DemoModeIndex].enable = enable;
-			LED_DemoMode[LED_DemoModeIndex].interval = interval;
-			LED_DemoMode[LED_DemoModeIndex].colorMode = colorMode;
-			LED_DemoMode[LED_DemoModeIndex].mode = mode;
-			LED_DemoMode[LED_DemoModeIndex].color = color;
-			LED_DemoMode[LED_DemoModeIndex].brightness = brightness;
-			LED_DemoMode[LED_DemoModeIndex].speed = speed;
-			LED_DemoMode[LED_DemoModeIndex].direction = direction;
-			if (start){
-				chVTReset(&randColor_vt);
-				ledAllOff(false);
-				//chThdSleepMilliseconds(150);
-				effectStatus.runMode = demoMode;
-				LED_DemoCurrentMode = 0;
-				chBSemSignal(&ledRunmodeSem);
-			}
-			break;
-		case	newPreset:
-		case	addPresetEffect:
-			switch (action){
-				case	newPreset:
-				LED_PresetModeIndex = 0;
-				break;
-			case	addPresetEffect:
-				if (LED_PresetModeIndex++>LED_PresetModeIndex){
-					return false;
-				}
-			break;
-			}
-			LED_PresetMode[LED_PresetModeIndex].effect = effect;
-			LED_PresetMode[LED_PresetModeIndex].enable = enable;
-			LED_PresetMode[LED_PresetModeIndex].interval = 0;
-			LED_PresetMode[LED_PresetModeIndex].colorMode = colorMode;
-			LED_PresetMode[LED_PresetModeIndex].mode = mode;
-			LED_PresetMode[LED_PresetModeIndex].color = color;
-			LED_PresetMode[LED_PresetModeIndex].brightness = normalBrightness;
-			LED_PresetMode[LED_PresetModeIndex].speed = normalSpeed;
-			LED_PresetMode[LED_PresetModeIndex].direction = direction;
-	}
+bool LED_ModesBuilder(
+    uint8_t action,
+    bool start,
+    uint8_t effect,
+    bool enable,
+    uint32_t interval,
+    uint8_t colorMode,
+    uint8_t mode,
+    led_config_t color,
+    uint8_t brightness,
+    uint8_t speed,
+    bool direction
+)
+{
+    const uint8_t demoModeCount =
+        (uint8_t)(sizeof(LED_DemoMode) /
+                  sizeof(LED_DemoMode[0]));
 
-	return false;
+    const uint8_t presetModeCount =
+        (uint8_t)(sizeof(LED_PresetMode) /
+                  sizeof(LED_PresetMode[0]));
+
+    switch (action)
+    {
+        case newDemo:
+        {
+            /*
+             * 建立新的 Demo 清單，從第 0 筆開始。
+             */
+            LED_DemoModeIndex = 0U;
+
+            LED_DemoMode[LED_DemoModeIndex].effect     = effect;
+            LED_DemoMode[LED_DemoModeIndex].enable     = enable;
+            LED_DemoMode[LED_DemoModeIndex].interval   = interval;
+            LED_DemoMode[LED_DemoModeIndex].colorMode  = colorMode;
+            LED_DemoMode[LED_DemoModeIndex].mode       = mode;
+            LED_DemoMode[LED_DemoModeIndex].color      = color;
+            LED_DemoMode[LED_DemoModeIndex].brightness = brightness;
+            LED_DemoMode[LED_DemoModeIndex].speed      = speed;
+            LED_DemoMode[LED_DemoModeIndex].direction  = direction;
+
+            if (start)
+            {
+                chVTReset(&randColor_vt);
+                ledAllOff(false);
+
+                effectStatus.runMode = demoMode;
+                LED_DemoCurrentMode = 0U;
+
+                chBSemSignal(&ledRunmodeSem);
+            }
+
+            return true;
+        }
+
+        case addDemoEffect:
+        {
+            /*
+             * 先檢查下一個 index 是否超過陣列範圍，
+             * 確認安全後才遞增。
+             */
+            if (((uint16_t)LED_DemoModeIndex + 1U) >=
+                demoModeCount)
+            {
+                return false;
+            }
+
+            LED_DemoModeIndex++;
+
+            LED_DemoMode[LED_DemoModeIndex].effect     = effect;
+            LED_DemoMode[LED_DemoModeIndex].enable     = enable;
+            LED_DemoMode[LED_DemoModeIndex].interval   = interval;
+            LED_DemoMode[LED_DemoModeIndex].colorMode  = colorMode;
+            LED_DemoMode[LED_DemoModeIndex].mode       = mode;
+            LED_DemoMode[LED_DemoModeIndex].color      = color;
+            LED_DemoMode[LED_DemoModeIndex].brightness = brightness;
+            LED_DemoMode[LED_DemoModeIndex].speed      = speed;
+            LED_DemoMode[LED_DemoModeIndex].direction  = direction;
+
+            if (start)
+            {
+                chVTReset(&randColor_vt);
+                ledAllOff(false);
+
+                effectStatus.runMode = demoMode;
+                LED_DemoCurrentMode = 0U;
+
+                chBSemSignal(&ledRunmodeSem);
+            }
+
+            return true;
+        }
+
+        case newPreset:
+        {
+            /*
+             * 建立新的 Preset 清單，從第 0 筆開始。
+             */
+            LED_PresetModeIndex = 0U;
+
+            LED_PresetMode[LED_PresetModeIndex].effect     = effect;
+            LED_PresetMode[LED_PresetModeIndex].enable     = enable;
+            LED_PresetMode[LED_PresetModeIndex].interval   = 0U;
+            LED_PresetMode[LED_PresetModeIndex].colorMode  = colorMode;
+            LED_PresetMode[LED_PresetModeIndex].mode       = mode;
+            LED_PresetMode[LED_PresetModeIndex].color      = color;
+            LED_PresetMode[LED_PresetModeIndex].brightness =
+                normalBrightness;
+            LED_PresetMode[LED_PresetModeIndex].speed =
+                normalSpeed;
+            LED_PresetMode[LED_PresetModeIndex].direction =
+                direction;
+
+            return true;
+        }
+
+        case addPresetEffect:
+        {
+            /*
+             * 檢查下一筆是否仍在 LED_PresetMode 陣列範圍內。
+             */
+            if (((uint16_t)LED_PresetModeIndex + 1U) >=
+                presetModeCount)
+            {
+                return false;
+            }
+
+            LED_PresetModeIndex++;
+
+            LED_PresetMode[LED_PresetModeIndex].effect     = effect;
+            LED_PresetMode[LED_PresetModeIndex].enable     = enable;
+            LED_PresetMode[LED_PresetModeIndex].interval   = 0U;
+            LED_PresetMode[LED_PresetModeIndex].colorMode  = colorMode;
+            LED_PresetMode[LED_PresetModeIndex].mode       = mode;
+            LED_PresetMode[LED_PresetModeIndex].color      = color;
+            LED_PresetMode[LED_PresetModeIndex].brightness =
+                normalBrightness;
+            LED_PresetMode[LED_PresetModeIndex].speed =
+                normalSpeed;
+            LED_PresetMode[LED_PresetModeIndex].direction =
+                direction;
+
+            return true;
+        }
+
+        default:
+            return false;
+    }
 }
 
 

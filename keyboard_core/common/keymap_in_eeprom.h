@@ -30,7 +30,7 @@
 #   endif
 #   ifndef MESSAGE_EECONFIG_KEYMAP_IN_EEPROM
 #       define MESSAGE_EECONFIG_KEYMAP_IN_EEPROM
-#       pragma message(VAR_NAME_VALUE(EECONFIG_KEYMAP_IN_EEPROM))
+//#       pragma message(VAR_NAME_VALUE(EECONFIG_KEYMAP_IN_EEPROM))
 #   endif
 #endif
 
@@ -90,6 +90,7 @@ uint16_t fn_actions_count(void);
 void write_Release_to_eeprom(void);
 uint16_t eeconfig_read_Trigger(uint8_t row, uint8_t col);
 uint16_t eeconfig_read_Release(uint8_t row, uint8_t col);
+void eeconfig_keyBuffer_init(void);
 #endif
 
 #endif

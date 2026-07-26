@@ -78,66 +78,139 @@ void eeprom_driver_erase(void) {
 #endif
 }
 
-void eeprom_read_block(void *buf, const void *addr, size_t len) {
+void eeprom_read_block(void *buf, const void *addr, size_t len)
+{
     uint8_t complete_packet[EXTERNAL_EEPROM_ADDRESS_SIZE];
+
     fill_target_address(complete_packet, addr);
+
     i2cAcquireBus(&I2C_DRIVER);
-    i2c_transmit(EXTERNAL_EEPROM_I2C_ADDRESS((uintptr_t)addr), complete_packet, EXTERNAL_EEPROM_ADDRESS_SIZE, 100);
-    i2c_receive(EXTERNAL_EEPROM_I2C_ADDRESS((uintptr_t)addr), buf, len, 100);
+
+    i2c_transmit(
+        EXTERNAL_EEPROM_I2C_ADDRESS((uintptr_t)addr),
+        complete_packet,
+        EXTERNAL_EEPROM_ADDRESS_SIZE,
+        100
+    );
+
+    i2c_receive(
+        EXTERNAL_EEPROM_I2C_ADDRESS((uintptr_t)addr),
+        buf,
+        len,
+        100
+    );
+
     i2cReleaseBus(&I2C_DRIVER);
 
 #if defined(CONSOLE_ENABLE) && defined(DEBUG_EEPROM_OUTPUT)
-    dprintf("[EEPROM R] 0x%04X: ", ((int)addr));
-    for (size_t i = 0; i < len; ++i) {
-        dprintf(" %02X", (int)(((uint8_t *)buf)[i]));
+    dprintf(
+        "[EEPROM R] 0x%04lX:",
+        (unsigned long)(uintptr_t)addr
+    );
+
+    for (size_t i = 0U; i < len; ++i)
+    {
+        dprintf(
+            " %02X",
+            (unsigned int)((const uint8_t *)buf)[i]
+        );
     }
+
     dprintf("\n");
-#endif // DEBUG_EEPROM_OUTPUT
+#endif
 }
 
-void eeprom_write_block(const void *buf, void *addr, size_t len) {
-    uint8_t   complete_packet[EXTERNAL_EEPROM_ADDRESS_SIZE + EXTERNAL_EEPROM_PAGE_SIZE];
-    uint8_t * read_buf    = (uint8_t *)buf;
-    uintptr_t target_addr = (uintptr_t)addr;
+void eeprom_write_block(const void *buf, void *addr, size_t len)
+{
+    uint8_t complete_packet[
+        EXTERNAL_EEPROM_ADDRESS_SIZE +
+        EXTERNAL_EEPROM_PAGE_SIZE
+    ];
+
+    const uint8_t *read_buf =
+        (const uint8_t *)buf;
+
+    uintptr_t target_addr =
+        (uintptr_t)addr;
 
 #if defined(EXTERNAL_EEPROM_WP_PIN)
     setPinOutput(EXTERNAL_EEPROM_WP_PIN);
     writePin(EXTERNAL_EEPROM_WP_PIN, 0);
 #endif
 
-    while (len > 0) {
-        uintptr_t page_offset  = target_addr % EXTERNAL_EEPROM_PAGE_SIZE;
-        int       write_length = EXTERNAL_EEPROM_PAGE_SIZE - page_offset;
-        if (write_length > len) {
+    while (len > 0U)
+    {
+        const size_t page_offset =
+            (size_t)(
+                target_addr %
+                (uintptr_t)EXTERNAL_EEPROM_PAGE_SIZE
+            );
+
+        size_t write_length =
+            (size_t)EXTERNAL_EEPROM_PAGE_SIZE -
+            page_offset;
+
+        if (write_length > len)
+        {
             write_length = len;
         }
 
-        fill_target_address(complete_packet, (const void *)target_addr);
-        for (uint8_t i = 0; i < write_length; i++) {
-            complete_packet[EXTERNAL_EEPROM_ADDRESS_SIZE + i] = read_buf[i];
+        fill_target_address(
+            complete_packet,
+            (const void *)target_addr
+        );
+
+        for (size_t i = 0U; i < write_length; ++i)
+        {
+            complete_packet[
+                EXTERNAL_EEPROM_ADDRESS_SIZE + i
+            ] = read_buf[i];
         }
 
 #if defined(CONSOLE_ENABLE) && defined(DEBUG_EEPROM_OUTPUT)
-        dprintf("[EEPROM W] 0x%04X: ", ((int)target_addr));
-        for (uint8_t i = 0; i < write_length; i++) {
-            dprintf(" %02X", (int)(read_buf[i]));
+        dprintf(
+            "[EEPROM W] 0x%04lX:",
+            (unsigned long)target_addr
+        );
+
+        for (size_t i = 0U; i < write_length; ++i)
+        {
+            dprintf(
+                " %02X",
+                (unsigned int)read_buf[i]
+            );
         }
+
         dprintf("\n");
-#endif // DEBUG_EEPROM_OUTPUT
+#endif
 
         i2cAcquireBus(&I2C_DRIVER);
-        i2c_transmit(EXTERNAL_EEPROM_I2C_ADDRESS((uintptr_t)addr), complete_packet, EXTERNAL_EEPROM_ADDRESS_SIZE + write_length, 100);
+
+        i2c_transmit(
+            EXTERNAL_EEPROM_I2C_ADDRESS(target_addr),
+            complete_packet,
+            EXTERNAL_EEPROM_ADDRESS_SIZE +
+                write_length,
+            100
+        );
+
         wait_ms(EXTERNAL_EEPROM_WRITE_TIME);
+
         i2cReleaseBus(&I2C_DRIVER);
 
-        read_buf += write_length;
+        read_buf   += write_length;
         target_addr += write_length;
-        len -= write_length;
+        len         -= write_length;
     }
 
 #if defined(EXTERNAL_EEPROM_WP_PIN)
-    /* We are setting the WP pin to high in a way that requires at least two bit-flips to change back to 0 */
+    /*
+     * 將 WP 設為高電位，並切換為上拉輸入，
+     * 降低意外重新進入寫入狀態的可能性。
+     */
     writePin(EXTERNAL_EEPROM_WP_PIN, 1);
     setPinInputHigh(EXTERNAL_EEPROM_WP_PIN);
 #endif
 }
+
+

@@ -30,6 +30,7 @@
 
 #include "action.h"
 #include "led/led_effect.h"
+#include "i2c_master.h"
 
 // extern uint16_t keyMatrixDelta[MATRIX_ROWS][MATRIX_COLS];
 
@@ -45,7 +46,11 @@ extern socd_policy_t g_policy;
 #include "../../keyboard_core/protocol/chibios/usb_main.h"
 #define TRAVEL_STEPS 350
 
-//
+/*
+ * Missing declarations used by matrix.c.
+ */
+//uint8_t get_highest_layer(layer_state_t state);
+
 extern led_runMode_t currentLED_RunMode, lastLED_RunMode;
 extern binary_semaphore_t ledUpdateSem;
 extern led_config_t LED_Datas[LedNumbers];
@@ -163,6 +168,7 @@ static void macro_engine_setup_test_copy_paste(void) {
     uprintf("[MACRO] test copy/paste macro loaded to slot 0\r\n");
 }
 */
+/*
 static bool macro_engine_set_step_like_api(
     uint8_t macro_index,
     uint8_t step_index,
@@ -190,7 +196,7 @@ static bool macro_engine_set_step_like_api(
     macro_save_to_eeprom(macro_index);
     return true;
 }
-
+*/
 /*
 static void macro_engine_write_test_copy_paste_api_style(uint8_t macro_index) {
     macro_clear(macro_index);
@@ -464,8 +470,9 @@ static inline void mt_on_up(uint8_t L,uint8_t R,uint8_t C){
     mt_state_clear_idx(s);
 }
 
-// ????????(???�????�????)
-static inline void mt_tick(uint8_t L){
+static inline void mt_tick(uint8_t L)
+{
+    (void)L;
     for (int i=0;i<MT_CAP_ACTIVE;i++){
         if (mt_active_list[i].used && mt_active_list[i].down && !mt_active_list[i].hold){
             int e=mt_find(mt_active_list[i].L, mt_active_list[i].R, mt_active_list[i].C);
@@ -586,16 +593,47 @@ static toggle_key_slot_t toggle_keys[KEYMAPS_COUNT][MATRIX_ROWS][MATRIX_COLS];
 // ??????????????????,??? rising edge ??
 static bool toggle_last_pressed[KEYMAPS_COUNT][MATRIX_ROWS][MATRIX_COLS];
 
+/*
+ * Toggle-key EEPROM function prototypes.
+ *
+ * These declarations must appear before toggle_key_set() and
+ * toggle_key_load_from_eeprom(), because those functions call the
+ * EEPROM access functions before their actual definitions below.
+ */
+void eeconfig_write_toggle_entry(
+    uint8_t index,
+    const toggle_key_slot_t *entry
+);
+
+void eeconfig_read_toggle_entry(
+    uint8_t index,
+    toggle_key_slot_t *entry
+);
+
+void eeconfig_clear_toggle_entry(
+    uint8_t index
+);
+
+void eeconfig_clear_all_toggle_entry(void);
 
 // two api
-void toggle_key_set(uint8_t layer, uint8_t row, uint8_t col, uint8_t keycode) {
-    if (layer >= KEYMAPS_COUNT || row >= MATRIX_ROWS || col >= MATRIX_COLS) {
+void toggle_key_set(uint8_t layer,uint8_t row,uint8_t col,uint8_t keycode)
+{
+    if (layer >= KEYMAPS_COUNT ||
+        row >= MATRIX_ROWS ||
+        col >= MATRIX_COLS)
+    {
         return;
     }
 
     toggle_key_slot_t *tk = &toggle_keys[layer][row][col];
 
-    if (keycode == 0) {
+    /*
+     * keycode == 0:
+     * Disable this toggle key and clear the corresponding EEPROM entry.
+     */
+    if (keycode == 0)
+    {
         tk->enabled = false;
         tk->state   = false;
         tk->keycode = 0;
@@ -603,20 +641,33 @@ void toggle_key_set(uint8_t layer, uint8_t row, uint8_t col, uint8_t keycode) {
         tk->row     = row;
         tk->col     = col;
 
-        for (int i = 0; i < toggle_key_pair_count; i++) {
+        for (uint8_t i = 0; i < toggle_key_pair_count; i++)
+        {
             toggle_key_slot_t tmp = {0};
+
             eeconfig_read_toggle_entry(i, &tmp);
 
             if (tmp.enabled == 0x01 &&
                 tmp.layer == tk->layer &&
                 tmp.row == tk->row &&
-                tmp.col == tk->col) {
+                tmp.col == tk->col)
+            {
                 eeconfig_clear_toggle_entry(i);
-                uprintf("clear toggle eeprom idx=%d\r\n", i);
+
+                uprintf(
+                    "clear toggle eeprom idx=%u\r\n",
+                    i
+                );
+
                 break;
             }
         }
-    } else {
+    }
+    else
+    {
+        /*
+         * Enable or update this toggle key.
+         */
         tk->enabled = true;
         tk->state   = false;
         tk->keycode = keycode;
@@ -624,266 +675,244 @@ void toggle_key_set(uint8_t layer, uint8_t row, uint8_t col, uint8_t keycode) {
         tk->row     = row;
         tk->col     = col;
 
-		uint8_t data_start;
-        bool isRepeat = false;
+        bool is_repeat = false;
 
-        for (int i = 0; i < toggle_key_pair_count; i++) {
+        /*
+         * Search for an existing EEPROM entry with the same
+         * layer/row/column. If found, update its keycode.
+         */
+        for (uint8_t i = 0; i < toggle_key_pair_count; i++)
+        {
             toggle_key_slot_t tmp = {0};
+
             eeconfig_read_toggle_entry(i, &tmp);
 
             if (tmp.enabled == 0x01 &&
                 tmp.layer == tk->layer &&
                 tmp.row == tk->row &&
-                tmp.col == tk->col) {
-                isRepeat = true;
-                uprintf("isRepeat true idx=%d\r\n", i);
+                tmp.col == tk->col)
+            {
+                is_repeat = true;
 
-                // ????????????? keycode,???????
+                uprintf(
+                    "isRepeat true idx=%u\r\n",
+                    i
+                );
+
                 eeconfig_write_toggle_entry(i, tk);
-                uprintf("update toggle eeprom idx=%d\r\n", i);
+
+                uprintf(
+                    "update toggle eeprom idx=%u\r\n",
+                    i
+                );
+
                 break;
             }
         }
 
-        if (!isRepeat) {
-            for (int i = 0; i < toggle_key_pair_count; i++) {
+        /*
+         * No existing entry was found. Write this key into the first
+         * available EEPROM slot.
+         */
+        if (!is_repeat)
+        {
+            bool slot_found = false;
+
+            for (uint8_t i = 0; i < toggle_key_pair_count; i++)
+            {
                 toggle_key_slot_t tmp = {0};
+
                 eeconfig_read_toggle_entry(i, &tmp);
 
-                if (tmp.enabled != 0x01) {
+                if (tmp.enabled != 0x01)
+                {
                     eeconfig_write_toggle_entry(i, tk);
-                    uprintf("write toggle eeprom idx=%d\r\n", i);
+
+                    uprintf(
+                        "write toggle eeprom idx=%u\r\n",
+                        i
+                    );
+
+                    slot_found = true;
                     break;
                 }
+            }
+
+            if (!slot_found)
+            {
+                uprintf(
+                    "[TOGGLE] EEPROM full, L=%u R=%u C=%u KC=0x%02X\r\n",
+                    layer,
+                    row,
+                    col,
+                    keycode
+                );
             }
         }
     }
 
+    /*
+     * Reset the runtime press-state whenever the configuration changes.
+     */
     toggle_last_pressed[layer][row][col] = false;
 }
 
 void toggle_key_load_from_eeprom(void)
 {
+    /*
+     * Clear the runtime table before loading saved entries.
+     * This prevents old RAM values from remaining after reload.
+     */
+    memset(toggle_keys, 0, sizeof(toggle_keys));
+    memset(toggle_last_pressed, 0, sizeof(toggle_last_pressed));
+
     for (uint8_t i = 0; i < toggle_key_pair_count; i++)
     {
-        toggle_key_slot_t tmp;
+        toggle_key_slot_t tmp = {0};
 
         eeconfig_read_toggle_entry(i, &tmp);
 
         if (tmp.enabled == 0x01 &&
-            tmp.layer < LAYERS_PER_PROFILE &&
-            tmp.row   < MATRIX_ROWS &&
-            tmp.col   < MATRIX_COLS)
+            tmp.layer < KEYMAPS_COUNT &&
+            tmp.row < MATRIX_ROWS &&
+            tmp.col < MATRIX_COLS)
         {
-            toggle_key_slot_t *tka =
+            toggle_key_slot_t *tk =
                 &toggle_keys[tmp.layer][tmp.row][tmp.col];
 
-            tka->enabled = true;
-            tka->state   = false;
-            tka->keycode = tmp.keycode;
-            tka->layer   = tmp.layer;
-            tka->row     = tmp.row;
-            tka->col     = tmp.col;
+            tk->enabled = true;
+            tk->state   = false;
+            tk->keycode = tmp.keycode;
+            tk->layer   = tmp.layer;
+            tk->row     = tmp.row;
+            tk->col     = tmp.col;
         }
     }
 
     uprintf("[TOGGLE] load done\r\n");
 }
 
-// void toggle_key_set(uint8_t layer, uint8_t row, uint8_t col, uint8_t keycode) {
-//     if (layer >= KEYMAPS_COUNT || row >= MATRIX_ROWS || col >= MATRIX_COLS) {
-//         return;
-//     }
-
-//     toggle_key_slot_t *tk = &toggle_keys[layer][row][col];
-
-//     if (keycode == 0) {
-//         // keycode=0 ??????? toggle key?
-//         tk->enabled = false;
-//         tk->state   = false;
-//         tk->keycode = 0;
-// 		tk->layer   = layer;
-// 		tk->row     = row;
-// 		tk->col     = col;
-
-// 		for(int i = 0; i < toggle_key_pair_count; i++){
-// 			toggle_key_slot_t tmp;
-// 			eeconfig_read_toggle_entry(i, &tmp);
-// 			if(tmp.enabled == 0x01 && tmp.layer == tk->layer && tmp.row == tk->row && tmp.col == tk->col){
-// 				// eeconfig_write_toggle_entry(i, &tk);
-// 				eeconfig_clear_toggle_entry(i);
-// 				uprintf("clear toggle eeprom\r\n");
-// 			}
-// 		}
-//     } else {
-//         tk->enabled = true;
-//         tk->state   = false;     // ????? OFF
-//         tk->keycode = keycode;
-// 		tk->layer   = layer;
-// 		tk->row     = row;
-// 		tk->col     = col;
-
-// 		bool isRepeat = false;
-// 		for(int i = 0; i < toggle_key_pair_count; i++){
-// 			toggle_key_slot_t tmp;
-// 			eeconfig_read_toggle_entry(i, &tmp);
-// 			if(tmp.layer == tk->layer && tmp.row == tk->row && tmp.col == tk->col){
-// 				isRepeat == true;
-// 				uprintf("isRepeat true\r\n");
-// 			}
-// 		}
-// 		if(!isRepeat){
-// 			for(int i = 0; i < toggle_key_pair_count; i++){
-// 				toggle_key_slot_t tmp;
-// 				eeconfig_read_toggle_entry(i, &tmp);
-// 				if(tmp.enabled != 0x01){
-// 					eeconfig_write_toggle_entry(i, &tk);
-// 					uprintf("write toggle eeprom\r\n");
-// 				}
-// 			}
-// 		}
-		
-//     }
-// 	// eeconfig_write_toggle_entry(0,tk);
-
-//     // ??????????,????????
-//     toggle_last_pressed[layer][row][col] = false;
-// }
-
-uint8_t toggle_key_get(uint8_t layer, uint8_t row, uint8_t col) {
-    if (layer >= KEYMAPS_COUNT || row >= MATRIX_ROWS || col >= MATRIX_COLS) {
+uint8_t toggle_key_get(uint8_t layer,uint8_t row,uint8_t col)
+{
+    if (layer >= KEYMAPS_COUNT ||
+        row >= MATRIX_ROWS ||
+        col >= MATRIX_COLS)
+    {
         return 0;
     }
+
+    if (!toggle_keys[layer][row][col].enabled)
+    {
+        return 0;
+    }
+
     return toggle_keys[layer][row][col].keycode;
 }
 
-void eeconfig_write_toggle_entry(uint8_t index, const toggle_key_slot_t *entry)
+void eeconfig_write_toggle_entry(uint8_t index,const toggle_key_slot_t *entry)
 {
-    if (index >= toggle_key_pair_count) return;
+    if (index >= toggle_key_pair_count || entry == NULL)
+    {
+        return;
+    }
 
-    uint8_t *addr = EECONFIG_TOGGLE_KEY_ADDR + index * sizeof(toggle_key_slot_t);
-    eeprom_update_block((const void *)entry, (void *)addr, sizeof(toggle_key_slot_t));
+    uint8_t *addr =
+        EECONFIG_TOGGLE_KEY_ADDR +
+        ((uint32_t)index * sizeof(toggle_key_slot_t));
+
+    eeprom_update_block(
+        (const void *)entry,
+        (void *)addr,
+        sizeof(toggle_key_slot_t)
+    );
 }
 
-void eeconfig_read_toggle_entry(uint8_t index, toggle_key_slot_t *entry)
+void eeconfig_read_toggle_entry(uint8_t index,toggle_key_slot_t *entry)
 {
-    if (index >= toggle_key_pair_count) return;
+    if (entry == NULL)
+    {
+        return;
+    }
 
-    const uint8_t *addr = EECONFIG_TOGGLE_KEY_ADDR + index * sizeof(toggle_key_slot_t);
-    eeprom_read_block((void *)entry, (const void *)addr, sizeof(toggle_key_slot_t));
+    /*
+     * Always initialize the destination. If index is invalid,
+     * the caller receives a disabled empty entry.
+     */
+    memset(entry, 0, sizeof(toggle_key_slot_t));
+
+    if (index >= toggle_key_pair_count)
+    {
+        return;
+    }
+
+    const uint8_t *addr =
+        EECONFIG_TOGGLE_KEY_ADDR +
+        ((uint32_t)index * sizeof(toggle_key_slot_t));
+
+    eeprom_read_block(
+        (void *)entry,
+        (const void *)addr,
+        sizeof(toggle_key_slot_t)
+    );
 }
 
 void eeconfig_clear_toggle_entry(uint8_t index)
 {
+    if (index >= toggle_key_pair_count)
+    {
+        return;
+    }
+
     toggle_key_slot_t empty = {0};
+
     eeconfig_write_toggle_entry(index, &empty);
 }
+void eeconfig_clear_all_toggle_entry(void)
+{
+    for (uint8_t i = 0; i < toggle_key_pair_count; i++)
+    {
+        eeconfig_clear_toggle_entry(i);
 
-void eeconfig_clear_all_toggle_entry(void){
-	for(int i = 0; i < toggle_key_pair_count; i++){
-		eeconfig_clear_toggle_entry(i);
-		uprintf("clear all toggle eeprom\r\n");
-	}
+        uprintf(
+            "clear toggle eeprom idx=%u\r\n",
+            i
+        );
+    }
+
+    memset(toggle_keys, 0, sizeof(toggle_keys));
+    memset(toggle_last_pressed, 0, sizeof(toggle_last_pressed));
+
+    uprintf("[TOGGLE] clear all done\r\n");
 }
+
 
 void toggle_key_dump_eeprom(void)
 {
-    uprintf("\r\n===== TOGGLE EEPROM DUMP START =====\r\n");
+    uprintf(
+        "\r\n===== TOGGLE EEPROM DUMP START =====\r\n"
+    );
 
-    for (uint8_t i = 0; i < 10; i++) {   // ???? 5,????????
+    for (uint8_t i = 0; i < toggle_key_pair_count; i++)
+    {
         toggle_key_slot_t tmp = {0};
 
         eeconfig_read_toggle_entry(i, &tmp);
 
-        uprintf("[IDX %u] en=%u L=%u R=%u C=%u KC=0x%04X\r\n",
-                i,
-                tmp.enabled,
-                tmp.layer,
-                tmp.row,
-                tmp.col,
-                tmp.keycode);
+        uprintf(
+            "[IDX %u] en=%u L=%u R=%u C=%u KC=0x%04X\r\n",
+            i,
+            tmp.enabled,
+            tmp.layer,
+            tmp.row,
+            tmp.col,
+            tmp.keycode
+        );
     }
 
-    uprintf("===== TOGGLE EEPROM DUMP END =====\r\n\r\n");
+    uprintf(
+        "===== TOGGLE EEPROM DUMP END =====\r\n\r\n"
+    );
 }
-
-// int8_t toggle_key_find_empty_slot(void)
-// {
-//     toggle_key_slot_t temp;
-
-//     for (uint8_t i = 0; i < MAX_TOGGLE_KEYS; i++) {
-//         eeconfig_read_toggle_entry(i, &temp);
-//         if (temp.valid == 0) {
-//             return i;
-//         }
-//     }
-//     return -1;
-// }
-
-// bool toggle_key_add(uint8_t layer, uint8_t row, uint8_t col,
-//                     uint8_t binding_count, uint16_t *kc,
-//                     uint8_t key_press, uint8_t key_release)
-// {
-//     int8_t slot = toggle_key_find_empty_slot();
-//     if (slot < 0) return false;
-
-//     toggle_key_entry_t entry = {0};
-//     entry.valid = 1;
-//     entry.layer = layer;
-//     entry.row = row;
-//     entry.col = col;
-//     entry.binding_count = binding_count;
-//     entry.key_press = key_press;
-//     entry.key_release = key_release;
-
-//     for (uint8_t i = 0; i < 4; i++) {
-//         entry.keycode[i] = (i < binding_count) ? kc[i] : 0;
-//     }
-
-//     eeconfig_write_toggle_entry(slot, &entry);
-//     return true;
-// }
-
-// int8_t toggle_key_find_by_pos(uint8_t layer, uint8_t row, uint8_t col)
-// {
-//     toggle_key_entry_t temp;
-
-//     for (uint8_t i = 0; i < MAX_TOGGLE_KEYS; i++) {
-//         eeconfig_read_toggle_entry(i, &temp);
-//         if (temp.valid &&
-//             temp.layer == layer &&
-//             temp.row == row &&
-//             temp.col == col) {
-//             return i;
-//         }
-//     }
-//     return -1;
-// }
-
-// int8_t toggle_key_find_by_pos(uint8_t layer, uint8_t row, uint8_t col)
-// {
-//     toggle_key_entry_t temp;
-
-//     for (uint8_t i = 0; i < MAX_TOGGLE_KEYS; i++) {
-//         eeconfig_read_toggle_entry(i, &temp);
-//         if (temp.valid &&
-//             temp.layer == layer &&
-//             temp.row == row &&
-//             temp.col == col) {
-//             return i;
-//         }
-//     }
-//     return -1;
-// }
-
-// bool toggle_key_remove(uint8_t layer, uint8_t row, uint8_t col)
-// {
-//     int8_t slot = toggle_key_find_by_pos(layer, row, col);
-//     if (slot < 0) return false;
-
-//     eeconfig_clear_toggle_entry(slot);
-//     return true;
-// }
 
 #endif // toggleKey
 
@@ -1363,8 +1392,9 @@ static const ADCConversionGroup adcgrpcfg2 = {
 
 //OK
 #ifdef ADC_v1
-void irq_storm_gpt9_cb(GPTDriver* gptp)
+void irq_storm_gpt9_cb(GPTDriver *gptp)
 {
+    (void)gptp;
     //	msg_t msg;
     //
     //	(void)gptp;
@@ -1383,8 +1413,9 @@ void irq_storm_gpt9_cb(GPTDriver* gptp)
 #endif
 
 #ifdef ADC_v2
-void irq_storm_gpt9_cb(GPTDriver* gptp)
+void irq_storm_gpt9_cb(GPTDriver *gptp)
 {
+    (void)gptp;
 	sensorPowerCtrl(true);
 	testCB++;
 //	adcsampleIndex = -1;
@@ -1454,8 +1485,9 @@ void irq_storm_gpt9_cb(GPTDriver* gptp)
 //#endif
 
 #ifdef ADC_v4
-void irq_storm_gpt9_cb(GPTDriver* gptp)
+void irq_storm_gpt9_cb(GPTDriver *gptp)
 {
+    (void)gptp;
 	switch(adcStauts){
 		case adcIdel:
 			if (dly_times-- == 0){
@@ -1512,8 +1544,9 @@ void irq_storm_gpt9_cb(GPTDriver* gptp)
 #endif
 
 #ifdef ADC_v5
-void irq_storm_gpt9_cb(GPTDriver* gptp)
+void irq_storm_gpt9_cb(GPTDriver *gptp)
 {
+    (void)gptp;
 	switch(adcStauts){
 		case adcSensorPowerOn:
 			sensorPowerCtrl(true);
@@ -3437,7 +3470,6 @@ bool rapidTriggerKeyBuilder(uint8_t key)
     analogKey_Config_t keyLocation;
     uint16_t initPosValue;
     uint16_t travelPosValue;
-    keyevent_t event;
 
     if (key >= RAPID_TRIGGER_COUNT) {
         return false;
@@ -3445,7 +3477,7 @@ bool rapidTriggerKeyBuilder(uint8_t key)
 
     rapidTriggerKey[key].key = eeconfig_read_rapidTrigger(key);
 
-    /* EEPROM ??????? */
+    /* EEPROM entry is not enabled. */
     if (rapidTriggerKey[key].key.enable != 1) {
         return false;
     }
@@ -3465,7 +3497,7 @@ bool rapidTriggerKeyBuilder(uint8_t key)
             [rapidTriggerKey[key].key.row]
             [rapidTriggerKey[key].key.col];
 
-    /* matrixAnalogRelocate ?????? */
+    /* Validate matrixAnalogRelocate result. */
     if (keyLocation.colA >= ADC_BUF_DEPTH ||
         keyLocation.rowA >= ADC_NUM_CHANNELS) {
         return false;
@@ -3477,7 +3509,7 @@ bool rapidTriggerKeyBuilder(uint8_t key)
     travelPosValue =
         travelPostionLevel[keyLocation.colA][keyLocation.rowA];
 
-    /* ?? unsigned underflow */
+    /* Prevent unsigned underflow and invalid travel range. */
     if (travelPosValue <= initPosValue ||
         (travelPosValue - initPosValue) <= keyMatrixTriggerLevel) {
         return false;
@@ -3533,9 +3565,6 @@ bool rapidTriggerKeyBuilder(uint8_t key)
 
     rapidTriggerKey[key].lastStep = -1;
     rapidTriggerKey[key].triggeredLevel = 0;
-
-    event.key.row = rapidTriggerKey[key].key.row;
-    event.key.col = rapidTriggerKey[key].key.col;
 
     return true;
 }

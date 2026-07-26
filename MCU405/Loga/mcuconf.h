@@ -416,21 +416,13 @@
 #define CRC_USE_DMA                         TRUE
 #define AT32_CRC_CRC1_DMA_IRQ_PRIORITY      5
 #define AT32_CRC_CRC1_DMA_PRIORITY          2
-//#define AT32_CRC_CRC1_DMA_STREAM            AT32_DMA_STREAM_ID_ANY
-#define CRCSW_USE_CRC1                      FALSE
+#define AT32_CRC_CRC1_DMA_STREAM           AT32_DMA_STREAM_ID_ANY
 
-
-//#define AT32_USE_DMA_V1                     TRUE
-
+#define AT32_USE_DMA_V1                     FALSE
 
 /*
  * CRC driver system settings.
  */
-#define AT32_CRC_USE_CRC1                  TRUE
-#define AT32_CRC_CRC1_DMA_IRQ_PRIORITY     5
-#define AT32_CRC_CRC1_DMA_PRIORITY         2
-#define AT32_CRC_CRC1_DMA_STREAM           AT32_DMA1_STREAM2
-
 #define CRCSW_USE_CRC1                      FALSE
 #define CRCSW_CRC32_TABLE                   TRUE
 #define CRCSW_CRC16_TABLE                   TRUE

@@ -5,6 +5,7 @@ encoding//led/led_function.h=UTF-8
 encoding//led/main.c=UTF-8
 encoding//via/via.c=UTF-8
 encoding/config.h=UTF-8
+encoding/keymap_common.c=UTF-8
 encoding/loga_function.h=UTF-8
 encoding/matrix.c=UTF-8
 encoding/rappy_snappy.c=UTF-8

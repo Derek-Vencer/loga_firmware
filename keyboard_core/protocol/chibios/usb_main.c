@@ -1,8 +1,12 @@
 #include "ch.h"
 #include "hal.h"
 
-#include "usb_main.h"
+#ifndef USB_SUSPEND_WAKEUP_DELAY
+#    define USB_SUSPEND_WAKEUP_DELAY 0U
+#endif
 
+#include "usb_main.h"
+#include <string.h>
 #include "host.h"
 #include "debug.h"
 #include "suspend.h"
@@ -186,7 +190,7 @@ uint8_t keyboard_protocol __attribute__((aligned(2))) = 1;
 uint16_t keyboard_led_stats __attribute__((aligned(2))) = 0;
 volatile uint16_t keyboard_idle_count = 0;
 static virtual_timer_t keyboard_idle_timer;
-static void keyboard_idle_timer_cb(void *arg);
+static void keyboard_idle_timer_cb(virtual_timer_t *vtp, void *arg);
 #ifdef NKRO_ENABLE
 extern bool keyboard_nkro;
 #endif /* NKRO_ENABLE */
@@ -2952,8 +2956,8 @@ static const USBDescriptor hid_configuration_descriptor_1000hz = {
 };
 
 // active descriptor pointer
-static const USBDescriptor *active_hid_configuration_descriptor =
-    &hid_configuration_descriptor_8000hz;
+//static const USBDescriptor *active_hid_configuration_descriptor =
+//    &hid_configuration_descriptor_8000hz;
 
 /* wrappers */
 #define HID_DESCRIPTOR_SIZE 9
@@ -3083,225 +3087,284 @@ static const USBDescriptor usb_strings[] = {
  *
  * Returns the proper descriptor
  */
-static const USBDescriptor *usb_get_descriptor_cb(USBDriver *usbp, uint8_t dtype, uint8_t dindex, uint16_t lang)
+static const USBDescriptor *usb_get_descriptor_cb(
+    USBDriver *usbp,
+    uint8_t dtype,
+    uint8_t dindex,
+    uint16_t lang
+)
 {
     (void)usbp;
-    (void)lang;
+
     switch (dtype)
     {
-    /* Generic descriptors */
-    case USB_DESCRIPTOR_DEVICE: /* Device Descriptor */
-        return &usb_device_descriptor;
+        /* Generic descriptors */
+        case USB_DESCRIPTOR_DEVICE:
+            return &usb_device_descriptor;
 
-        // case USB_DESCRIPTOR_OS_EXTEND:
-        //   return &usb_device_OSdescriptor;
-
-    case USB_DESCRIPTOR_CONFIGURATION: /* Configuration Descriptor */
-        // return &hid_configuration_descriptor;
-        // return active_hid_configuration_descriptor;
-        switch (g_usb_poll_mode) {
-            case USB_POLL_8000:
-                return &hid_configuration_descriptor_8000hz;
-            case USB_POLL_4000:
-                return &hid_configuration_descriptor_4000hz;
-            case USB_POLL_2000:
-                return &hid_configuration_descriptor_2000hz;
-            case USB_POLL_1000:
-                return &hid_configuration_descriptor_1000hz;
-            default:
-                return &hid_configuration_descriptor_8000hz;
-        }
-
-    case USB_DESCRIPTOR_STRING: /* Strings */
-        if (dindex < 4)
-            return &usb_strings[dindex];
-        else
-        {
-            return &usb_device_OSdescriptor;
-        }
-        // if (dindex == 0xee){
-        //   return &usb_device_OSdescriptor;
-        // }
-        break;
-
-    /* HID specific descriptors */
-    case USB_DESCRIPTOR_HID: /* HID Descriptors */
-        switch (lang)
-        { /* yea, poor label, it's actually wIndex from the setup packet */
-        case KBD_INTERFACE:
-            // return &keyboard_hid_descriptor;
-            // return get_active_hid_descriptor_by_offset(KBD_HID_DESC_OFFSET);
-            switch (g_usb_poll_mode) {
+        case USB_DESCRIPTOR_CONFIGURATION:
+            switch (g_usb_poll_mode)
+            {
                 case USB_POLL_8000:
                     return &hid_configuration_descriptor_8000hz;
+
                 case USB_POLL_4000:
                     return &hid_configuration_descriptor_4000hz;
+
                 case USB_POLL_2000:
                     return &hid_configuration_descriptor_2000hz;
+
                 case USB_POLL_1000:
                     return &hid_configuration_descriptor_1000hz;
+
                 default:
                     return &hid_configuration_descriptor_8000hz;
             }
+
+        case USB_DESCRIPTOR_STRING:
+            if (dindex < 4)
+            {
+                return &usb_strings[dindex];
+            }
+            else
+            {
+                return &usb_device_OSdescriptor;
+            }
+
+        /* HID specific descriptors */
+        case USB_DESCRIPTOR_HID:
+            /*
+             * lang is actually wIndex here, which contains the
+             * requested HID interface number.
+             */
+            switch (lang)
+            {
+                case KBD_INTERFACE:
+                    switch (g_usb_poll_mode)
+                    {
+                        case USB_POLL_8000:
+                            return &hid_configuration_descriptor_8000hz;
+
+                        case USB_POLL_4000:
+                            return &hid_configuration_descriptor_4000hz;
+
+                        case USB_POLL_2000:
+                            return &hid_configuration_descriptor_2000hz;
+
+                        case USB_POLL_1000:
+                            return &hid_configuration_descriptor_1000hz;
+
+                        default:
+                            return &hid_configuration_descriptor_8000hz;
+                    }
 
 #ifdef MOUSE_ENABLE
-        case MOUSE_INTERFACE:
-            // return &mouse_hid_descriptor;
-            // return get_active_hid_descriptor_by_offset(MOUSE_HID_DESC_OFFSET);
-            switch (g_usb_poll_mode) {
-                case USB_POLL_8000:
-                    return &hid_configuration_descriptor_8000hz;
-                case USB_POLL_4000:
-                    return &hid_configuration_descriptor_4000hz;
-                case USB_POLL_2000:
-                    return &hid_configuration_descriptor_2000hz;
-                case USB_POLL_1000:
-                    return &hid_configuration_descriptor_1000hz;
-                default:
-                    return &hid_configuration_descriptor_8000hz;
-            }
+                case MOUSE_INTERFACE:
+                    switch (g_usb_poll_mode)
+                    {
+                        case USB_POLL_8000:
+                            return &hid_configuration_descriptor_8000hz;
+
+                        case USB_POLL_4000:
+                            return &hid_configuration_descriptor_4000hz;
+
+                        case USB_POLL_2000:
+                            return &hid_configuration_descriptor_2000hz;
+
+                        case USB_POLL_1000:
+                            return &hid_configuration_descriptor_1000hz;
+
+                        default:
+                            return &hid_configuration_descriptor_8000hz;
+                    }
 #endif /* MOUSE_ENABLE */
 
 #ifdef RAW_ENABLE
-        case RAW_INTERFACE:
-            // return &raw_hid_descriptor;
-            // return get_active_hid_descriptor_by_offset(RAW_HID_DESC_OFFSET);
-            switch (g_usb_poll_mode) {
-                case USB_POLL_8000:
-                    return &hid_configuration_descriptor_8000hz;
-                case USB_POLL_4000:
-                    return &hid_configuration_descriptor_4000hz;
-                case USB_POLL_2000:
-                    return &hid_configuration_descriptor_2000hz;
-                case USB_POLL_1000:
-                    return &hid_configuration_descriptor_1000hz;
-                default:
-                    return &hid_configuration_descriptor_8000hz;
-            }
-#endif /* RAW_ENABLE */
-#ifdef CONSOLE_ENABLE
-        case CONSOLE_INTERFACE:
-            // return &console_hid_descriptor;
-            // return get_active_hid_descriptor_by_offset(CONSOLE_HID_DESC_OFFSET);
-            switch (g_usb_poll_mode) {
-                case USB_POLL_8000:
-                    return &hid_configuration_descriptor_8000hz;
-                case USB_POLL_4000:
-                    return &hid_configuration_descriptor_4000hz;
-                case USB_POLL_2000:
-                    return &hid_configuration_descriptor_2000hz;
-                case USB_POLL_1000:
-                    return &hid_configuration_descriptor_1000hz;
-                default:
-                    return &hid_configuration_descriptor_8000hz;
-            }
-#endif /* CONSOLE_ENABLE */
-#ifdef EXTRAKEY_ENABLE
-        case EXTRA_INTERFACE:
-            // return &extra_hid_descriptor;
-            // return get_active_hid_descriptor_by_offset(EXTRA_HID_DESC_OFFSET);
-            switch (g_usb_poll_mode) {
-                case USB_POLL_8000:
-                    return &hid_configuration_descriptor_8000hz;
-                case USB_POLL_4000:
-                    return &hid_configuration_descriptor_4000hz;
-                case USB_POLL_2000:
-                    return &hid_configuration_descriptor_2000hz;
-                case USB_POLL_1000:
-                    return &hid_configuration_descriptor_1000hz;
-                default:
-                    return &hid_configuration_descriptor_8000hz;
-            }
-#endif /* EXTRAKEY_ENABLE */
-#ifdef NKRO_ENABLE
-        case NKRO_INTERFACE:
-            // return &nkro_hid_descriptor;
-            // return get_active_hid_descriptor_by_offset(NKRO_HID_DESC_OFFSET);
-            switch (g_usb_poll_mode) {
-                case USB_POLL_8000:
-                    return &hid_configuration_descriptor_8000hz;
-                case USB_POLL_4000:
-                    return &hid_configuration_descriptor_4000hz;
-                case USB_POLL_2000:
-                    return &hid_configuration_descriptor_2000hz;
-                case USB_POLL_1000:
-                    return &hid_configuration_descriptor_1000hz;
-                default:
-                    return &hid_configuration_descriptor_8000hz;
-            }
-#endif /* NKRO_ENABLE */
-#ifdef LAMP_ARRAY_ENABLE
-        case LAMP_ARRAY_INTERFACE:
-            // return &lamp_array_hid_descriptor;
-            // return get_active_hid_descriptor_by_offset(LAMP_ARRAY_HID_DESC_OFFSET);
-            switch (g_usb_poll_mode) {
-                case USB_POLL_8000:
-                    return &hid_configuration_descriptor_8000hz;
-                case USB_POLL_4000:
-                    return &hid_configuration_descriptor_4000hz;
-                case USB_POLL_2000:
-                    return &hid_configuration_descriptor_2000hz;
-                case USB_POLL_1000:
-                    return &hid_configuration_descriptor_1000hz;
-                default:
-                    return &hid_configuration_descriptor_8000hz;
-            }
-#endif /* LAMP_ARRAY_ENABLE */
-#ifdef CONTROL_ENABLE
-        case CONTROL_INTERFACE:
-            // return &control_hid_descriptor;
-            // return get_active_hid_descriptor_by_offset(CONTROL_HID_DESC_OFFSET);
-            switch (g_usb_poll_mode) {
-                case USB_POLL_8000:
-                    return &hid_configuration_descriptor_8000hz;
-                case USB_POLL_4000:
-                    return &hid_configuration_descriptor_4000hz;
-                case USB_POLL_2000:
-                    return &hid_configuration_descriptor_2000hz;
-                case USB_POLL_1000:
-                    return &hid_configuration_descriptor_1000hz;
-                default:
-                    return &hid_configuration_descriptor_8000hz;
-            }
-#endif /* CONTROL_ENABLE */
-        }
+                case RAW_INTERFACE:
+                    switch (g_usb_poll_mode)
+                    {
+                        case USB_POLL_8000:
+                            return &hid_configuration_descriptor_8000hz;
 
-    case USB_DESCRIPTOR_HID_REPORT: /* HID Report Descriptor */
-        switch (lang)
-        {
-        case KBD_INTERFACE:
-            return &keyboard_hid_report_descriptor;
+                        case USB_POLL_4000:
+                            return &hid_configuration_descriptor_4000hz;
+
+                        case USB_POLL_2000:
+                            return &hid_configuration_descriptor_2000hz;
+
+                        case USB_POLL_1000:
+                            return &hid_configuration_descriptor_1000hz;
+
+                        default:
+                            return &hid_configuration_descriptor_8000hz;
+                    }
+#endif /* RAW_ENABLE */
+
+#ifdef CONSOLE_ENABLE
+                case CONSOLE_INTERFACE:
+                    switch (g_usb_poll_mode)
+                    {
+                        case USB_POLL_8000:
+                            return &hid_configuration_descriptor_8000hz;
+
+                        case USB_POLL_4000:
+                            return &hid_configuration_descriptor_4000hz;
+
+                        case USB_POLL_2000:
+                            return &hid_configuration_descriptor_2000hz;
+
+                        case USB_POLL_1000:
+                            return &hid_configuration_descriptor_1000hz;
+
+                        default:
+                            return &hid_configuration_descriptor_8000hz;
+                    }
+#endif /* CONSOLE_ENABLE */
+
+#ifdef EXTRAKEY_ENABLE
+                case EXTRA_INTERFACE:
+                    switch (g_usb_poll_mode)
+                    {
+                        case USB_POLL_8000:
+                            return &hid_configuration_descriptor_8000hz;
+
+                        case USB_POLL_4000:
+                            return &hid_configuration_descriptor_4000hz;
+
+                        case USB_POLL_2000:
+                            return &hid_configuration_descriptor_2000hz;
+
+                        case USB_POLL_1000:
+                            return &hid_configuration_descriptor_1000hz;
+
+                        default:
+                            return &hid_configuration_descriptor_8000hz;
+                    }
+#endif /* EXTRAKEY_ENABLE */
+
+#ifdef NKRO_ENABLE
+                case NKRO_INTERFACE:
+                    switch (g_usb_poll_mode)
+                    {
+                        case USB_POLL_8000:
+                            return &hid_configuration_descriptor_8000hz;
+
+                        case USB_POLL_4000:
+                            return &hid_configuration_descriptor_4000hz;
+
+                        case USB_POLL_2000:
+                            return &hid_configuration_descriptor_2000hz;
+
+                        case USB_POLL_1000:
+                            return &hid_configuration_descriptor_1000hz;
+
+                        default:
+                            return &hid_configuration_descriptor_8000hz;
+                    }
+#endif /* NKRO_ENABLE */
+
+#ifdef LAMP_ARRAY_ENABLE
+                case LAMP_ARRAY_INTERFACE:
+                    switch (g_usb_poll_mode)
+                    {
+                        case USB_POLL_8000:
+                            return &hid_configuration_descriptor_8000hz;
+
+                        case USB_POLL_4000:
+                            return &hid_configuration_descriptor_4000hz;
+
+                        case USB_POLL_2000:
+                            return &hid_configuration_descriptor_2000hz;
+
+                        case USB_POLL_1000:
+                            return &hid_configuration_descriptor_1000hz;
+
+                        default:
+                            return &hid_configuration_descriptor_8000hz;
+                    }
+#endif /* LAMP_ARRAY_ENABLE */
+
+#ifdef CONTROL_ENABLE
+                case CONTROL_INTERFACE:
+                    switch (g_usb_poll_mode)
+                    {
+                        case USB_POLL_8000:
+                            return &hid_configuration_descriptor_8000hz;
+
+                        case USB_POLL_4000:
+                            return &hid_configuration_descriptor_4000hz;
+
+                        case USB_POLL_2000:
+                            return &hid_configuration_descriptor_2000hz;
+
+                        case USB_POLL_1000:
+                            return &hid_configuration_descriptor_1000hz;
+
+                        default:
+                            return &hid_configuration_descriptor_8000hz;
+                    }
+#endif /* CONTROL_ENABLE */
+
+                default:
+                    break;
+            }
+
+            /*
+             * Important:
+             * Do not fall through into USB_DESCRIPTOR_HID_REPORT.
+             */
+            break;
+
+        case USB_DESCRIPTOR_HID_REPORT:
+            switch (lang)
+            {
+                case KBD_INTERFACE:
+                    return &keyboard_hid_report_descriptor;
 
 #ifdef MOUSE_ENABLE
-        case MOUSE_INTERFACE:
-            return &mouse_hid_report_descriptor;
+                case MOUSE_INTERFACE:
+                    return &mouse_hid_report_descriptor;
 #endif /* MOUSE_ENABLE */
+
 #ifdef RAW_ENABLE
-        case RAW_INTERFACE:
-            return &raw_hid_report_descriptor;
+                case RAW_INTERFACE:
+                    return &raw_hid_report_descriptor;
 #endif /* RAW_ENABLE */
+
 #ifdef CONSOLE_ENABLE
-        case CONSOLE_INTERFACE:
-            return &console_hid_report_descriptor;
+                case CONSOLE_INTERFACE:
+                    return &console_hid_report_descriptor;
 #endif /* CONSOLE_ENABLE */
+
 #ifdef EXTRAKEY_ENABLE
-        case EXTRA_INTERFACE:
-            return &extra_hid_report_descriptor;
+                case EXTRA_INTERFACE:
+                    return &extra_hid_report_descriptor;
 #endif /* EXTRAKEY_ENABLE */
+
 #ifdef NKRO_ENABLE
-        case NKRO_INTERFACE:
-            return &nkro_hid_report_descriptor;
+                case NKRO_INTERFACE:
+                    return &nkro_hid_report_descriptor;
 #endif /* NKRO_ENABLE */
+
 #ifdef LAMP_ARRAY_ENABLE
-        case LAMP_ARRAY_INTERFACE:
-            return &lamp_array_hid_report_descriptor;
+                case LAMP_ARRAY_INTERFACE:
+                    return &lamp_array_hid_report_descriptor;
 #endif /* LAMP_ARRAY_ENABLE */
+
 #ifdef CONTROL_ENABLE
-        case CONTROL_INTERFACE:
-            return &control_hid_report_descriptor;
+                case CONTROL_INTERFACE:
+                    return &control_hid_report_descriptor;
 #endif /* CONTROL_ENABLE */
-        }
+
+                default:
+                    break;
+            }
+            break;
+
+        default:
+            break;
     }
+
     return NULL;
 }
 
@@ -3343,7 +3406,7 @@ static const USBEndpointConfig mouse_ep_config = {
 #ifdef RAW_ENABLE
 /* raw endpoint state structure */
 static USBInEndpointState raw_in_ep_state;
-static USBInEndpointState raw_out_ep_state;
+static USBOutEndpointState raw_out_ep_state;
 
 /* raw endpoint initialization structure (IN/OUT) */
 static const USBEndpointConfig raw_ep_config = {
@@ -3491,7 +3554,7 @@ static const USBEndpointConfig lamp_array_ep_config = {
     NULL                   /* SETUP buffer (not a SETUP endpoint) */
 };
 #endif /* LAMP_ARRAY_ENABLE */
-
+#if 0
 #ifdef CONTROL_ENABLE
 /* lamp array endpoint state structure */
 static USBInEndpointState control_ep_state;
@@ -3510,6 +3573,7 @@ static const USBEndpointConfig control_ep_config = {
     NULL                   /* SETUP buffer (not a SETUP endpoint) */
 };
 #endif /* CONTROL_ENABLE */
+#endif
 /* ---------------------------------------------------------
  *                  USB driver functions
  * ---------------------------------------------------------
@@ -3561,6 +3625,13 @@ static void usb_event_cb(USBDriver *usbp, usbevent_t event)
 #endif
         osalSysUnlockFromISR();
         return;
+				
+		case USB_EVENT_UNCONFIGURED:
+				/*
+				 * Host 移除 USB configuration。
+				 * 若有 endpoint busy flag，可在此清除。
+				 */
+				break;
 
     case USB_EVENT_SUSPEND:
         // TODO: from ISR! print("[S]");
@@ -3613,8 +3684,7 @@ uint8_t lamp_array_processing(uint8_t *usb_setup, report_lamp_array_t *report)
     report_lamp_array_attrib_request_report attrib_request_report;
     static uint16_t lampID = 0;
     uint32_t blVersion;
-    uint8_t size;
-    size = LAMP_ARRAY_EPSIZE - 3;
+
     switch (usb_setup[0])
     {
     case 0xa1:
@@ -3818,6 +3888,7 @@ uint8_t lamp_array_processing(uint8_t *usb_setup, report_lamp_array_t *report)
 
         break;
     }
+		return FALSE;
 }
 
 uint8_t control_processing(uint8_t *usb_setup, report_lamp_array_t *report)
@@ -3825,8 +3896,7 @@ uint8_t control_processing(uint8_t *usb_setup, report_lamp_array_t *report)
     report_lamp_array_attrib_report attrib_report;
     report_lamp_array_attrib_request_report attrib_request_report;
     static uint16_t lampID = 0;
-    uint8_t size;
-    size = LAMP_ARRAY_EPSIZE - 3;
+
     switch (usb_setup[0])
     {
     case 0xa1:
@@ -3968,11 +4038,13 @@ uint8_t control_processing(uint8_t *usb_setup, report_lamp_array_t *report)
 
         break;
     }
+		return FALSE;
 }
 
 #ifdef RAW_ENABLE
-static void rawReciveCB(void)
+static void rawReciveCB(USBDriver *usbp)
 {
+    (void)usbp;
     osalSysLockFromISR();
     // memcpy(dynamaticReciveBuff, lamp_array_data_report.data, sizeof(dynamaticReciveBuff));
 //     chBSemSignalI(&ledDynamaticLightingSem);
@@ -3983,8 +4055,9 @@ static void rawReciveCB(void)
 #endif
 
 #ifdef LAMP_ARRAY_ENABLE
-static void dynamticReciveCB(void)
+static void dynamticReciveCB(USBDriver *usbp)
 {
+    (void)usbp;
     osalSysLockFromISR();
     memcpy(dynamaticReciveBuff, lamp_array_data_report.data, sizeof(dynamaticReciveBuff));
     chBSemSignalI(&ledDynamaticLightingSem);
@@ -3994,8 +4067,9 @@ static void dynamticReciveCB(void)
 #endif
 
 #ifdef CONTROL_ENABLE
-static void controlReciveCB(void)
+static void controlReciveCB(USBDriver *usbp)
 {
+    (void)usbp;
     // chBSemSignal(&usbControlSem);
     osalSysLockFromISR();
     control_data_report.updated = true;
@@ -4009,244 +4083,421 @@ static bool usb_request_hook_cb(USBDriver *usbp)
 {
     const USBDescriptor *dp;
 
-    /* usbp->setup fields:
+    /*
+     * usbp->setup fields:
      *  0:   bmRequestType (bitmask)
      *  1:   bRequest
      *  2,3: (LSB,MSB) wValue
      *  4,5: (LSB,MSB) wIndex
-     *  6,7: (LSB,MSB) wLength (number of bytes to transfer if there is a data phase) */
+     *  6,7: (LSB,MSB) wLength
+     */
 
-    /* Handle HID class specific requests */
+    /*
+     * Handle vendor-specific requests.
+     */
     switch (usbp->setup[0])
     {
-    case USB_RTYPE_TYPE_VENDOR_1:
-        usbSetupTransfer(usbp, (uint8_t *)&WINUSB_ExtendedCompatId_Descritpor + 8, usbp->setup[6], NULL);
-        return true;
-        break;
+        case USB_RTYPE_TYPE_VENDOR_1:
+            usbSetupTransfer(
+                usbp,
+                (uint8_t *)&WINUSB_ExtendedCompatId_Descritpor + 8,
+                usbp->setup[6],
+                NULL
+            );
+            return TRUE;
 
-    case USB_RTYPE_TYPE_VENDOR_2:
-        usbSetupTransfer(usbp, (uint8_t *)&WINUSB_ExtendedProperty_InterfaceGUID_Descritpor + 8, usbp->setup[6], NULL);
-        return true;
-        break;
+        case USB_RTYPE_TYPE_VENDOR_2:
+            usbSetupTransfer(
+                usbp,
+                (uint8_t *)&WINUSB_ExtendedProperty_InterfaceGUID_Descritpor + 8,
+                usbp->setup[6],
+                NULL
+            );
+            return TRUE;
+
+        default:
+            break;
     }
 
-    // switch (usbp->setup[0]){
-    //   case USB_RTYPE_TYPE_VENDOR_1:
-    //     if (usbp->setup[1] == vendorCode && usbp->setup[4] == 0x04){
-    //       usbSetupTransfer(usbp, (uint8_t *)&WINUSB_ExtendedCompatId_Descritpor+8, usbp->setup[6], NULL);
-    //       return true;
-    //     }
-    //   break;
-
-    //   case USB_RTYPE_TYPE_VENDOR_2:
-    //     if (usbp->setup[1] == vendorCode && usbp->setup[4] == 0x05){
-    //       usbSetupTransfer(usbp, (uint8_t *)&WINUSB_ExtendedProperty_InterfaceGUID_Descritpor+8, usbp->setup[6], NULL);
-    //       return true;
-    //     }
-    //   break;
-    // }
-
-    if (((usbp->setup[0] & USB_RTYPE_TYPE_MASK) == USB_RTYPE_TYPE_CLASS) &&
-        ((usbp->setup[0] & USB_RTYPE_RECIPIENT_MASK) == USB_RTYPE_RECIPIENT_INTERFACE))
+    /*
+     * Handle HID class-specific interface requests.
+     */
+    if (((usbp->setup[0] & USB_RTYPE_TYPE_MASK) ==
+         USB_RTYPE_TYPE_CLASS) &&
+        ((usbp->setup[0] & USB_RTYPE_RECIPIENT_MASK) ==
+         USB_RTYPE_RECIPIENT_INTERFACE))
     {
         switch (usbp->setup[0] & USB_RTYPE_DIR_MASK)
         {
-
-        case USB_RTYPE_DIR_DEV2HOST:
-            switch (usbp->setup[1])
-            { /* bRequest */
-            case HID_GET_REPORT:
-                switch (usbp->setup[4])
-                { /* LSB(wIndex) (check MSB==0?) */
-                case KBD_INTERFACE:
+            /*
+             * Device-to-host requests.
+             */
+            case USB_RTYPE_DIR_DEV2HOST:
+                switch (usbp->setup[1])
+                {
+                    case HID_GET_REPORT:
+                        switch (usbp->setup[4])
+                        {
+                            case KBD_INTERFACE:
 #ifdef NKRO_ENABLE
-                case NKRO_INTERFACE:
+                            case NKRO_INTERFACE:
 #endif /* NKRO_ENABLE */
-                    usbSetupTransfer(usbp, (uint8_t *)&keyboard_report_sent, sizeof(keyboard_report_sent), NULL);
-                    return TRUE;
-                    break;
+                                usbSetupTransfer(
+                                    usbp,
+                                    (uint8_t *)&keyboard_report_sent,
+                                    sizeof(keyboard_report_sent),
+                                    NULL
+                                );
+                                return TRUE;
 
 #ifdef LAMP_ARRAY_ENABLE
-                case LAMP_ARRAY_INTERFACE:
-                    osalSysLockFromISR();
-                    lamp_array_processing(&usbp->setup, &lamp_array_report);
-                    usbSetupTransfer(usbp, (uint8_t *)&lamp_array_report, sizeof(lamp_array_report.data), NULL);
-                    osalSysUnlockFromISR();
-                    return TRUE;
-                    break;
+                            case LAMP_ARRAY_INTERFACE:
+                                osalSysLockFromISR();
+
+                                lamp_array_processing(
+                                    usbp->setup,
+                                    &lamp_array_report
+                                );
+
+                                usbSetupTransfer(
+                                    usbp,
+                                    (uint8_t *)&lamp_array_report,
+                                    sizeof(lamp_array_report.data),
+                                    NULL
+                                );
+
+                                osalSysUnlockFromISR();
+                                return TRUE;
 #endif /* LAMP_ARRAY_ENABLE */
 
 #ifdef CONTROL_ENABLE
-                case CONTROL_INTERFACE:
-                    osalSysLockFromISR();
-                    lamp_array_processing(&usbp->setup, &lamp_array_report);
-                    usbSetupTransfer(usbp, (uint8_t *)&lamp_array_report, sizeof(lamp_array_report.data), NULL);
-                    osalSysUnlockFromISR();
-                    return TRUE;
-                    break;
+                            case CONTROL_INTERFACE:
+                                osalSysLockFromISR();
+
+                                /*
+                                 * 保留目前原始流程，不在本次修改中
+                                 * 改變 Control GET_REPORT 的處理邏輯。
+                                 */
+                                lamp_array_processing(
+                                    usbp->setup,
+                                    &lamp_array_report
+                                );
+
+                                usbSetupTransfer(
+                                    usbp,
+                                    (uint8_t *)&lamp_array_report,
+                                    sizeof(lamp_array_report.data),
+                                    NULL
+                                );
+
+                                osalSysUnlockFromISR();
+                                return TRUE;
 #endif /* CONTROL_ENABLE */
 
 #ifdef MOUSE_ENABLE
-                case MOUSE_INTERFACE:
-                    usbSetupTransfer(usbp, (uint8_t *)&mouse_report_blank, sizeof(mouse_report_blank), NULL);
-                    return TRUE;
-                    break;
+                            case MOUSE_INTERFACE:
+                                usbSetupTransfer(
+                                    usbp,
+                                    (uint8_t *)&mouse_report_blank,
+                                    sizeof(mouse_report_blank),
+                                    NULL
+                                );
+                                return TRUE;
 #endif /* MOUSE_ENABLE */
 
 #ifdef RAW_ENABLE
-                case RAW_INTERFACE:
-                    usbSetupTransfer(usbp, (uint8_t *)&raw_report, usbp->setup[6], rawReciveCB);
-                    // printf("test1");
-                    return TRUE;
-                    break;
+                            case RAW_INTERFACE:
+                                usbSetupTransfer(
+                                    usbp,
+                                    (uint8_t *)&raw_report,
+                                    usbp->setup[6],
+                                    rawReciveCB
+                                );
+                                return TRUE;
 #endif /* RAW_ENABLE */
 
-
 #ifdef CONSOLE_ENABLE
-                case CONSOLE_INTERFACE:
-                    usbSetupTransfer(usbp, console_queue_buffer, CONSOLE_EPSIZE, NULL);
-                    return TRUE;
-                    break;
+                            case CONSOLE_INTERFACE:
+                                usbSetupTransfer(
+                                    usbp,
+                                    console_queue_buffer,
+                                    CONSOLE_EPSIZE,
+                                    NULL
+                                );
+                                return TRUE;
 #endif /* CONSOLE_ENABLE */
 
 #ifdef EXTRAKEY_ENABLE
-                case EXTRA_INTERFACE:
-                    if (usbp->setup[3] == 1)
-                    { /* MSB(wValue) [Report Type] == 1 [Input Report] */
-                        switch (usbp->setup[2])
-                        { /* LSB(wValue) [Report ID] */
-                        case REPORT_ID_SYSTEM:
-                            extra_report_blank[0] = REPORT_ID_SYSTEM;
-                            usbSetupTransfer(usbp, (uint8_t *)extra_report_blank, sizeof(extra_report_blank), NULL);
-                            return TRUE;
-                            break;
-                        case REPORT_ID_CONSUMER:
-                            extra_report_blank[0] = REPORT_ID_CONSUMER;
-                            usbSetupTransfer(usbp, (uint8_t *)extra_report_blank, sizeof(extra_report_blank), NULL);
-                            return TRUE;
-                            break;
-                            // case REPORT_ID_GAMEPAD:
-                            // 	extra_game_report.report_ID = REPORT_ID_GAMEPAD;
-                            //     usbSetupTransfer(usbp, (uint8_t*)&extra_game_report, sizeof(extra_game_report), NULL);
-                            //     return TRUE;
-                            break;
-                        default:
-                            return FALSE;
-                        }
-                    }
-                    else
-                    {
-                        return FALSE;
-                    }
-                    break;
+                            case EXTRA_INTERFACE:
+                                /*
+                                 * MSB(wValue) == 1 means Input Report.
+                                 */
+                                if (usbp->setup[3] == 1)
+                                {
+                                    switch (usbp->setup[2])
+                                    {
+                                        case REPORT_ID_SYSTEM:
+                                            extra_report_blank[0] =
+                                                REPORT_ID_SYSTEM;
+
+                                            usbSetupTransfer(
+                                                usbp,
+                                                (uint8_t *)extra_report_blank,
+                                                sizeof(extra_report_blank),
+                                                NULL
+                                            );
+                                            return TRUE;
+
+                                        case REPORT_ID_CONSUMER:
+                                            extra_report_blank[0] =
+                                                REPORT_ID_CONSUMER;
+
+                                            usbSetupTransfer(
+                                                usbp,
+                                                (uint8_t *)extra_report_blank,
+                                                sizeof(extra_report_blank),
+                                                NULL
+                                            );
+                                            return TRUE;
+
+                                        /*
+                                        case REPORT_ID_GAMEPAD:
+                                            extra_game_report.report_ID =
+                                                REPORT_ID_GAMEPAD;
+
+                                            usbSetupTransfer(
+                                                usbp,
+                                                (uint8_t *)&extra_game_report,
+                                                sizeof(extra_game_report),
+                                                NULL
+                                            );
+                                            return TRUE;
+                                        */
+
+                                        default:
+                                            return FALSE;
+                                    }
+                                }
+
+                                return FALSE;
 #endif /* EXTRAKEY_ENABLE */
 
-                default:
-                    usbSetupTransfer(usbp, NULL, 0, NULL);
-                    return TRUE;
-                    break;
+                            default:
+                                usbSetupTransfer(
+                                    usbp,
+                                    NULL,
+                                    0,
+                                    NULL
+                                );
+                                return TRUE;
+                        }
+
+                    case HID_GET_PROTOCOL:
+                        if ((usbp->setup[4] == KBD_INTERFACE) &&
+                            (usbp->setup[5] == 0))
+                        {
+                            usbSetupTransfer(
+                                usbp,
+                                &keyboard_protocol,
+                                1,
+                                NULL
+                            );
+                            return TRUE;
+                        }
+                        break;
+
+                    case HID_GET_IDLE:
+                        usbSetupTransfer(
+                            usbp,
+                            &keyboard_idle,
+                            1,
+                            NULL
+                        );
+                        return TRUE;
+
+                    default:
+                        break;
                 }
                 break;
 
-            case HID_GET_PROTOCOL:
-                if ((usbp->setup[4] == KBD_INTERFACE) && (usbp->setup[5] == 0))
-                { /* wIndex */
-                    usbSetupTransfer(usbp, &keyboard_protocol, 1, NULL);
-                    return TRUE;
-                }
-                break;
-
-            case HID_GET_IDLE:
-                usbSetupTransfer(usbp, &keyboard_idle, 1, NULL);
-                return TRUE;
-                break;
-            }
-            break;
-
-        case USB_RTYPE_DIR_HOST2DEV:
-            switch (usbp->setup[1])
-            { /* bRequest */
-            case HID_SET_REPORT:
-                switch (usbp->setup[4])
-                { /* LSB(wIndex) (check MSB==0 and wLength==1?) */
-                case KBD_INTERFACE:
+            /*
+             * Host-to-device requests.
+             */
+            case USB_RTYPE_DIR_HOST2DEV:
+                switch (usbp->setup[1])
+                {
+                    case HID_SET_REPORT:
+                        /*
+                         * HID_SET_REPORT selects the target interface
+                         * through LSB(wIndex), setup[4].
+                         */
+                        switch (usbp->setup[4])
+                        {
+                            case KBD_INTERFACE:
 #ifdef NKRO_ENABLE
-                case NKRO_INTERFACE:
+                            case NKRO_INTERFACE:
 #endif /* NKRO_ENABLE */
-                    /* keyboard_led_stats = <read byte from next OUT report>
-                     * keyboard_led_stats needs be word (or dword), otherwise we get an exception on F0 */
-                    usbSetupTransfer(usbp, (uint8_t *)&keyboard_led_stats, 1, NULL);
-                    return TRUE;
-                    break;
-                }
+                                /*
+                                 * keyboard_led_stats must be word/dword
+                                 * aligned; otherwise F0 can cause an
+                                 * exception.
+                                 */
+                                usbSetupTransfer(
+                                    usbp,
+                                    (uint8_t *)&keyboard_led_stats,
+                                    1,
+                                    NULL
+                                );
+                                return TRUE;
 
 #ifdef LAMP_ARRAY_ENABLE
-            case LAMP_ARRAY_INTERFACE:
-                usbSetupTransfer(usbp, (uint8_t *)&lamp_array_data_report, usbp->setup[6], dynamticReciveCB);
-                lamp_array_data_report.length = usbp->setup[6] - 1;
-                return TRUE;
-                break;
+                            case LAMP_ARRAY_INTERFACE:
+                                usbSetupTransfer(
+                                    usbp,
+                                    (uint8_t *)&lamp_array_data_report,
+                                    usbp->setup[6],
+                                    dynamticReciveCB
+                                );
+
+                                lamp_array_data_report.length =
+                                    usbp->setup[6] - 1;
+
+                                return TRUE;
 #endif /* LAMP_ARRAY_ENABLE */
 
 #ifdef CONTROL_ENABLE
-            case CONTROL_INTERFACE:
-                usbSetupTransfer(usbp, (uint8_t *)&control_data_report, usbp->setup[6], controlReciveCB);
-                control_data_report.length = usbp->setup[6] - 1;
-                return TRUE;
-                break;
+                            case CONTROL_INTERFACE:
+                                usbSetupTransfer(
+                                    usbp,
+                                    (uint8_t *)&control_data_report,
+                                    usbp->setup[6],
+                                    controlReciveCB
+                                );
+
+                                control_data_report.length =
+                                    usbp->setup[6] - 1;
+
+                                return TRUE;
 #endif /* CONTROL_ENABLE */
 
-            case HID_SET_PROTOCOL:
-                if ((usbp->setup[4] == KBD_INTERFACE) && (usbp->setup[5] == 0))
-                {                                                   /* wIndex */
-                    keyboard_protocol = ((usbp->setup[2]) != 0x00); /* LSB(wValue) */
+                            default:
+                                break;
+                        }
+
+                        /*
+                         * HID_SET_REPORT was not handled by any known
+                         * interface. Do not fall through to
+                         * HID_SET_PROTOCOL.
+                         */
+                        break;
+
+                    case HID_SET_PROTOCOL:
+                        if ((usbp->setup[4] == KBD_INTERFACE) &&
+                            (usbp->setup[5] == 0))
+                        {
+                            keyboard_protocol =
+                                (usbp->setup[2] != 0x00);
+
 #ifdef NKRO_ENABLE
-                    keyboard_nkro = !!keyboard_protocol;
-                    if (!keyboard_nkro && keyboard_idle)
-                    {
-#else  /* NKRO_ENABLE */
-                    if (keyboard_idle)
-                    {
+                            keyboard_nkro = !!keyboard_protocol;
+
+                            if (!keyboard_nkro && keyboard_idle)
+                            {
+#else
+                            if (keyboard_idle)
+                            {
 #endif /* NKRO_ENABLE */
-                        /* arm the idle timer if boot protocol & idle */
-                        osalSysLockFromISR();
-                        chVTSetI(&keyboard_idle_timer, 4 * MS2ST(keyboard_idle), keyboard_idle_timer_cb, (void *)usbp);
-                        osalSysUnlockFromISR();
-                    }
+                                /*
+                                 * Arm the idle timer when boot protocol
+                                 * and idle rate are active.
+                                 */
+                                osalSysLockFromISR();
+
+                                chVTSetI(
+                                    &keyboard_idle_timer,
+                                    4 * MS2ST(keyboard_idle),
+                                    keyboard_idle_timer_cb,
+                                    (void *)usbp
+                                );
+
+                                osalSysUnlockFromISR();
+                            }
+                        }
+
+                        usbSetupTransfer(
+                            usbp,
+                            NULL,
+                            0,
+                            NULL
+                        );
+                        return TRUE;
+
+                    case HID_SET_IDLE:
+                        keyboard_idle = usbp->setup[3];
+
+#ifdef NKRO_ENABLE
+                        if (!keyboard_nkro && keyboard_idle)
+                        {
+#else
+                        if (keyboard_idle)
+                        {
+#endif /* NKRO_ENABLE */
+                            osalSysLockFromISR();
+
+                            chVTSetI(
+                                &keyboard_idle_timer,
+                                4 * MS2ST(keyboard_idle),
+                                keyboard_idle_timer_cb,
+                                (void *)usbp
+                            );
+
+                            osalSysUnlockFromISR();
+                        }
+
+                        usbSetupTransfer(
+                            usbp,
+                            NULL,
+                            0,
+                            NULL
+                        );
+                        return TRUE;
+
+                    default:
+                        break;
                 }
-                usbSetupTransfer(usbp, NULL, 0, NULL);
-                return TRUE;
                 break;
 
-            case HID_SET_IDLE:
-                keyboard_idle = usbp->setup[3]; /* MSB(wValue) */
-                                                /* arm the timer */
-#ifdef NKRO_ENABLE
-                if (!keyboard_nkro && keyboard_idle)
-                {
-#else  /* NKRO_ENABLE */
-                if (keyboard_idle)
-                {
-#endif /* NKRO_ENABLE */
-                    osalSysLockFromISR();
-                    chVTSetI(&keyboard_idle_timer, 4 * MS2ST(keyboard_idle), keyboard_idle_timer_cb, (void *)usbp);
-                    osalSysUnlockFromISR();
-                }
-                usbSetupTransfer(usbp, NULL, 0, NULL);
-                return TRUE;
+            default:
                 break;
-            }
-            break;
         }
     }
 
-    /* Handle the Get_Descriptor Request for HID class (not handled by the default hook) */
-    if ((usbp->setup[0] == 0x81) && (usbp->setup[1] == USB_REQ_GET_DESCRIPTOR))
+    /*
+     * Handle HID class Get Descriptor requests that are not handled
+     * by the default request hook.
+     */
+    if ((usbp->setup[0] == 0x81) &&
+        (usbp->setup[1] == USB_REQ_GET_DESCRIPTOR))
     {
-        dp = usbp->config->get_descriptor_cb(usbp, usbp->setup[3], usbp->setup[2], get_hword(&usbp->setup[4]));
+        dp = usbp->config->get_descriptor_cb(
+            usbp,
+            usbp->setup[3],
+            usbp->setup[2],
+            get_hword(&usbp->setup[4])
+        );
+
         if (dp == NULL)
+        {
             return FALSE;
-        usbSetupTransfer(usbp, (uint8_t *)dp->ud_string, dp->ud_size, NULL);
+        }
+
+        usbSetupTransfer(
+            usbp,
+            (uint8_t *)dp->ud_string,
+            dp->ud_size,
+            NULL
+        );
+
         return TRUE;
     }
 
@@ -4307,7 +4558,7 @@ void send_remote_wakeup(USBDriver *usbp)
     chThdSleepMilliseconds(15);
     STM32_USB->CNTR &= ~CNTR_RESUME;
 #else                                          /* STM32F0XX || STM32F1XX */
-#warning Sending remote wakeup packet not implemented for your platform.
+//#warning Sending remote wakeup packet not implemented for your platform.
 #endif /* K20x || KL2x */
     usbWakeupHost(&USB_DRIVER);
 }
@@ -4345,9 +4596,11 @@ void kbd_sof_cb(USBDriver *usbp)
 
 /* Idle requests timer code
  * callback (called from ISR, unlocked state) */
-static void keyboard_idle_timer_cb(void *arg)
+static void keyboard_idle_timer_cb(virtual_timer_t *vtp, void *arg)
 {
     USBDriver *usbp = (USBDriver *)arg;
+
+    (void)vtp;
 
     osalSysLockFromISR();
 
@@ -4594,26 +4847,28 @@ static void send_extra_report(uint8_t report_id, uint16_t data)
     osalSysUnlock();
 }
 
-static void send_extra_gamepad_report(uint8_t report_id, report_gamepad_report data)
+static void send_extra_gamepad_report(uint8_t report_id,report_gamepad_report data)
 {
-    uint8_t *dataTest;
-    dataTest = &extra_game_report;
     osalSysLock();
-    if (usbGetDriverStateI(&USB_DRIVER) != USB_ACTIVE || usbGetTransmitStatusI(&USB_DRIVER, EXTRA_ENDPOINT))
+
+    if ((usbGetDriverStateI(&USB_DRIVER) != USB_ACTIVE) ||
+        usbGetTransmitStatusI(&USB_DRIVER, EXTRA_ENDPOINT))
     {
         osalSysUnlock();
-        // chBSemSignal(&gamepadAnalogSemWait);
         return;
     }
-    data.report_ID = report_id;
-    // for (uint8_t i=0;i<sizeof(extra_game_report);i++){
-    //  for (uint8_t i=0;i<3;i++){
-    //      uprintf ("%03d ",*(dataTest+i));
-    //  }
-    //  uprintf ("\r\n");
-    usbStartTransmitI(&USB_DRIVER, EXTRA_ENDPOINT, (uint8_t *)&extra_game_report, sizeof(report_gamepad_report));
+
+    extra_game_report = data;
+    extra_game_report.report_ID = report_id;
+
+    usbStartTransmitI(
+        &USB_DRIVER,
+        EXTRA_ENDPOINT,
+        (uint8_t *)&extra_game_report,
+        sizeof(extra_game_report)
+    );
+
     osalSysUnlock();
-    // chBSemSignal(&gamepadAnalogSemWait);
 }
 
 void send_system(uint16_t data)
@@ -4958,7 +5213,7 @@ void usb_force_reenumeration(void) {
     usbDisconnectBus(&USBD2);
 
     // 2. Wait 500ms to ensure the host OS has enough time to process the disconnect
-    wait_ms(500);
+    chThdSleepMilliseconds(500);
 
     // 3. Reconnect the USB bus (this triggers the host to re-read descriptors)
     usbConnectBus(&USBD2);
@@ -4994,7 +5249,7 @@ void usb_force_reenumeration(void) {
 // set polling rate
 void usb_update_polling_rate(uint16_t polling_rate)
 {
-    uint16_t current = usb_get_polling_hz();
+    uint16_t current = get_usb_poll_rate_hz();
 
     uprintf("[USB] request=%u Hz, current=%u Hz\r\n", polling_rate, current);
 
@@ -5014,39 +5269,38 @@ void usb_update_polling_rate(uint16_t polling_rate)
 
 void usb_set_polling_rate(uint8_t idx)
 {
-    if (idx > 3) {
-        // uprintf("[USB] invalid polling idx=%u\r\n", idx);
-        return false;
-    }
-
-    if (g_usb_poll_mode == idx) {
-        // uprintf("[USB] polling unchanged (%u Hz)\r\n",
-        //         usb_poll_idx_to_hz(idx));
-        return true;
-    }
-
-    // uint16_t old_hz = usb_poll_idx_to_hz(s_usb_poll_idx);
-    // uint16_t new_hz = usb_poll_idx_to_hz(idx);
-
-    // uprintf("[USB] polling change: %u Hz -> %u Hz\r\n",
-    //         old_hz, new_hz);
-
-    // s_usb_poll_idx = idx;
+    uint8_t new_mode;
 
     switch (idx) {
         case 0:
-            g_usb_poll_mode = USB_POLL_8000;
+            new_mode = USB_POLL_8000;
             break;
+
         case 1:
-            g_usb_poll_mode = USB_POLL_4000;
+            new_mode = USB_POLL_4000;
             break;
+
         case 2:
-            g_usb_poll_mode = USB_POLL_2000;
+            new_mode = USB_POLL_2000;
             break;
+
         case 3:
-            g_usb_poll_mode = USB_POLL_1000;
+            new_mode = USB_POLL_1000;
             break;
+
+        default:
+            return;
     }
+
+    if (g_usb_poll_mode == new_mode) {
+        return;
+    }
+
+    g_usb_poll_mode = new_mode;
 
     restart_usb_driver(&USBD2);
 }
+
+
+
+
