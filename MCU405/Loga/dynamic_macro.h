@@ -1,4 +1,3 @@
-
 #pragma once
 
 #include "action.h"
@@ -75,4 +74,5 @@ void dynamic_macro_save_eeprom(uint8_t macro_id, bool mode);
 bool dynamic_macro_header_correct(void);
 void dynamic_macro_reset_eeprom(void);
 #endif
+
 

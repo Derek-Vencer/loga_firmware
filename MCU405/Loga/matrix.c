@@ -21,6 +21,9 @@
 # include "macro_engine.h"
 # include "led/main.h"
 # include "rappy_snappy.h"
+# include <math.h>
+# include <stdint.h>
+# include <string.h>
 
 // extern uint16_t keyMatrixDelta[MATRIX_ROWS][MATRIX_COLS];
 
@@ -123,8 +126,8 @@ void send_string(const char *str) {
 
 void send_A_to_Z(void) {
     for (uint16_t kc = KC_A; kc <= KC_Z; kc++) {
-        tap_code(kc);       // 輸出單一按鍵
-        // 如果需要節奏感或避免主機合併事件，可以加一點延遲：
+        tap_code(kc);       // ??????
+        // ????????????????,???????:
         // chThdSleepMilliseconds(10);
     }
 }
@@ -221,7 +224,7 @@ static void macro_engine_write_full_slot_api_style(uint8_t macro_index) {
 }
 
 static void macro_engine_dump_eeprom_slot(uint8_t index) {
-    uint16_t base_addr;
+    uint8_t *base_addr;
     uint8_t step_count;
     macro_step_t step = {0};
 
@@ -231,7 +234,7 @@ static void macro_engine_dump_eeprom_slot(uint8_t index) {
     }
 
     base_addr = EEPROM_MACRO_SLOT_ADDR(index);
-    step_count = eeprom_read_byte((const uint8_t *)base_addr);
+    step_count = eeprom_read_byte(base_addr);
 
     uprintf("[MACRO][EEPROM] slot=%u step_count=%u\r\n", index, step_count);
 
@@ -243,7 +246,7 @@ static void macro_engine_dump_eeprom_slot(uint8_t index) {
     for (uint8_t i = 0; i < step_count; i++) {
         eeprom_read_block(
             &step,
-            (const void *)(base_addr + 1 + ((uint16_t)i * sizeof(macro_step_t))),
+            (const void *)(base_addr + 1U + ((uint16_t)i * sizeof(macro_step_t))),
             sizeof(step)
         );
 
@@ -360,10 +363,10 @@ bool winLock, altTabLock, altF4Lock = false;
 
 #ifdef modTap // need socd function
 
-// #define KB_ROWS 6     // ← 改成你的實際 ROW
-// #define KB_COLS 15    // ← 改成你的實際 COL
+// #define KB_ROWS 6     // ? ?????? ROW
+// #define KB_COLS 15    // ? ?????? COL
 
-// // 目標鍵與觸發鍵的座標（請改成 A、P 的實際 row/col）
+// // ??????????(??? A?P ??? row/col)
 // #define A_ROW 3
 // #define A_COL 3
 // #define P_ROW 2
@@ -373,17 +376,17 @@ bool winLock, altTabLock, altF4Lock = false;
 #include "timer.h"
 #include "keycode.h"
 
-// 你的矩陣大小（僅拿來做邊界檢查，不參與陣列維度）
-#define KB_ROWS 6      // ← 改成你實際 ROW
-#define KB_COLS 15     // ← 改成你實際 COL
+// ??????(????????,???????)
+#define KB_ROWS 6      // ? ????? ROW
+#define KB_COLS 15     // ? ????? COL
 
-// 目標鍵座標（請改成 A 與 P 的實際 row/col）
-// #define A_ROW 3 // 好像完整版不需要
+// ?????(??? A ? P ??? row/col)
+// #define A_ROW 3 // ????????
 // #define A_COL 3
 // #define P_ROW 2
 // #define P_COL 10
 
-// 同時支援的 Mod-Tap 鍵數 / 同時按住的 Mod-Tap 鍵數
+// ????? Mod-Tap ?? / ????? Mod-Tap ??
 #ifndef MT_CAP_MAP
 #  define MT_CAP_MAP    8
 #endif
@@ -394,7 +397,7 @@ bool winLock, altTabLock, altF4Lock = false;
 // typedef struct { uint8_t L,R,C,hold,click; bool used; } mt_entry_t; // in matrix.h
 // static mt_entry_t mt_map[MT_CAP_MAP];
 mt_entry_t mt_map[MT_CAP_MAP] = {0}; 
-static bool mt_prev[KB_ROWS][KB_COLS];   // 專給 Mod-Tap 邊緣偵測用
+static bool mt_prev[KB_ROWS][KB_COLS];   // ?? Mod-Tap ?????
 
 static int mt_find(uint8_t L,uint8_t R,uint8_t C){
     for (int i=0;i<MT_CAP_MAP;i++)
@@ -403,12 +406,12 @@ static int mt_find(uint8_t L,uint8_t R,uint8_t C){
 }
 static int mt_alloc(void){
     for (int i=0;i<MT_CAP_MAP;i++) if (!mt_map[i].used) return i;
-    return 0; // 滿了就覆蓋第 0 筆（簡單策略）
+    return 0; // ?????? 0 ?(????)
 }
 static inline void mt_set(uint8_t L,uint8_t R,uint8_t C,uint8_t hold,uint8_t click){
     if (R>=KB_ROWS || C>=KB_COLS) {
 		// uprintf("skip set\r\n");
-		return;}        // 邊界保護
+		return;}        // ????
     if (!hold && !click){ 
 		// uprintf("arrive set\r\n");
 		int k=mt_find(L,R,C); if (k>=0) mt_map[k].used=false; return; }
@@ -421,7 +424,7 @@ static inline void mt_set(uint8_t L,uint8_t R,uint8_t C,uint8_t hold,uint8_t cli
 }
 static inline bool mt_active(uint8_t L,uint8_t R,uint8_t C){ return mt_find(L,R,C) >= 0; }
 
-// 目前被按住中的 Mod-Tap（動態狀態）
+// ??????? Mod-Tap(????)
 typedef struct { bool used,down,hold; uint8_t L,R,C; uint16_t t; } mt_state_t;
 static mt_state_t mt_active_list[MT_CAP_ACTIVE];
 
@@ -438,7 +441,7 @@ static int mt_state_alloc(uint8_t L,uint8_t R,uint8_t C){
 }
 static inline void mt_state_clear_idx(int i){ mt_active_list[i].used=false; }
 
-// 事件 API（不依賴 keycode / record；只吃 L/R/C 與 pressed 狀態）
+// ?? API(??? keycode / record;?? L/R/C ? pressed ??)
 static inline void mt_on_down(uint8_t L,uint8_t R,uint8_t C){
     if (mt_active(L,R,C)) (void)mt_state_alloc(L,R,C);
 }
@@ -451,7 +454,7 @@ static inline void mt_on_up(uint8_t L,uint8_t R,uint8_t C){
     mt_state_clear_idx(s);
 }
 
-// 每輪掃描尾端呼叫（只處理“正在按住”的少量鍵）
+// ????????(???�????�????)
 static inline void mt_tick(uint8_t L){
     for (int i=0;i<MT_CAP_ACTIVE;i++){
         if (mt_active_list[i].used && mt_active_list[i].down && !mt_active_list[i].hold){
@@ -466,7 +469,7 @@ static inline void mt_tick(uint8_t L){
     }
 }
 
-// 排程修改：避免在事件回呼內直接改表（防重入/卡死）
+// ????:????????????(???/??)
 static bool    mt_pending=false;
 static uint8_t pL,pR,pC,pHold,pClick;
 void mt_schedule_set(uint8_t L,uint8_t R,uint8_t C,uint8_t h,uint8_t k){ // 1
@@ -480,12 +483,12 @@ static inline void mt_apply_pending(void){
 		// uprintf("no");
 		return;
 	} 
-    // 只在目標鍵空閒時套用，避免改到正在處理的鍵
+    // ??????????,??????????
     if (mt_state_find(pL,pR,pC) < 0){
 		// uprintf("in pednding: %d %d %d\r\n", pL,pR,pC);
         mt_set(pL,pR,pC,pHold,pClick);
         mt_pending=false;
-        // 若要偵錯再開：uprintf("[MT] set L%u R%u C%u h=0x%02X k=0x%02X\r\n", pL,pR,pC,pHold,pClick);
+        // ??????:uprintf("[MT] set L%u R%u C%u h=0x%02X k=0x%02X\r\n", pL,pR,pC,pHold,pClick);
     }
 }
 
@@ -500,7 +503,7 @@ void eeconfig_write_modtap(uint8_t idx, const mt_entry_t* in)
     );
 }
 
-void eeconfig_read_modtap(uint8_t idx, socd_config_t* out)
+void eeconfig_read_modtap(uint8_t idx, mt_entry_t *out)
 {
     if (idx >= MT_CAP_MAP) {
         memset(out, 0, sizeof(*out));
@@ -570,7 +573,7 @@ static matrix_row_t matrix_temp[MATRIX_ROWS];
 // [layer][row][col]
 static toggle_key_slot_t toggle_keys[KEYMAPS_COUNT][MATRIX_ROWS][MATRIX_COLS];
 
-// 記錄實體按鍵上一次是否被視為「按下」，用來做 rising edge 判斷
+// ??????????????????,??? rising edge ??
 static bool toggle_last_pressed[KEYMAPS_COUNT][MATRIX_ROWS][MATRIX_COLS];
 
 
@@ -625,7 +628,7 @@ void toggle_key_set(uint8_t layer, uint8_t row, uint8_t col, uint8_t keycode) {
                 isRepeat = true;
                 uprintf("isRepeat true idx=%d\r\n", i);
 
-                // 如果你希望重設同位置時更新 keycode，這裡應直接覆寫
+                // ????????????? keycode,???????
                 eeconfig_write_toggle_entry(i, tk);
                 uprintf("update toggle eeprom idx=%d\r\n", i);
                 break;
@@ -685,7 +688,7 @@ void toggle_key_load_from_eeprom(void)
 //     toggle_key_slot_t *tk = &toggle_keys[layer][row][col];
 
 //     if (keycode == 0) {
-//         // keycode=0 當作「清除這個 toggle key」
+//         // keycode=0 ??????? toggle key?
 //         tk->enabled = false;
 //         tk->state   = false;
 //         tk->keycode = 0;
@@ -704,7 +707,7 @@ void toggle_key_load_from_eeprom(void)
 // 		}
 //     } else {
 //         tk->enabled = true;
-//         tk->state   = false;     // 新設定預設 OFF
+//         tk->state   = false;     // ????? OFF
 //         tk->keycode = keycode;
 // 		tk->layer   = layer;
 // 		tk->row     = row;
@@ -733,7 +736,7 @@ void toggle_key_load_from_eeprom(void)
 //     }
 // 	// eeconfig_write_toggle_entry(0,tk);
 
-//     // 實體按鍵的狀態也清掉，避免殘留觸發一次
+//     // ??????????,????????
 //     toggle_last_pressed[layer][row][col] = false;
 // }
 
@@ -748,7 +751,7 @@ void eeconfig_write_toggle_entry(uint8_t index, const toggle_key_slot_t *entry)
 {
     if (index >= toggle_key_pair_count) return;
 
-    uint16_t addr = EECONFIG_TOGGLE_KEY_ADDR + index * sizeof(toggle_key_slot_t);
+    uint8_t *addr = EECONFIG_TOGGLE_KEY_ADDR + index * sizeof(toggle_key_slot_t);
     eeprom_update_block((const void *)entry, (void *)addr, sizeof(toggle_key_slot_t));
 }
 
@@ -756,7 +759,7 @@ void eeconfig_read_toggle_entry(uint8_t index, toggle_key_slot_t *entry)
 {
     if (index >= toggle_key_pair_count) return;
 
-    uint16_t addr = EECONFIG_TOGGLE_KEY_ADDR + index * sizeof(toggle_key_slot_t);
+    const uint8_t *addr = EECONFIG_TOGGLE_KEY_ADDR + index * sizeof(toggle_key_slot_t);
     eeprom_read_block((void *)entry, (const void *)addr, sizeof(toggle_key_slot_t));
 }
 
@@ -766,7 +769,7 @@ void eeconfig_clear_toggle_entry(uint8_t index)
     eeconfig_write_toggle_entry(index, &empty);
 }
 
-void eeconfig_clear_all_toggle_entry(){
+void eeconfig_clear_all_toggle_entry(void){
 	for(int i = 0; i < toggle_key_pair_count; i++){
 		eeconfig_clear_toggle_entry(i);
 		uprintf("clear all toggle eeprom\r\n");
@@ -777,7 +780,7 @@ void toggle_key_dump_eeprom(void)
 {
     uprintf("\r\n===== TOGGLE EEPROM DUMP START =====\r\n");
 
-    for (uint8_t i = 0; i < 10; i++) {   // 你現在用 5，也可以先印多一點
+    for (uint8_t i = 0; i < 10; i++) {   // ???? 5,????????
         toggle_key_slot_t tmp = {0};
 
         eeconfig_read_toggle_entry(i, &tmp);
@@ -1033,20 +1036,20 @@ static inline void on_key_changed(uint8_t row, uint8_t col, bool pressed) {
 
     if (slot >= 0) {
         socd_post_event(slot, keycode, pressed);
-        return;   // ★ SOCD 接管，跳過原本流程
+        return;   // ? SOCD ??,??????
     }
 }
 // *********/
-// 放在 matrix.c 檔案頂端「函式外」或其他合適區域
+// ?? matrix.c ????????????????
 static inline bool calc_pressed_now(uint8_t row, uint8_t col, int32_t adcCalc) {
 
-    // 先取「上一輪的狀態」當作中間帶的預設
+    // ??????????????????
     bool prev = ( (matrix_temp[row] >> col) & 0x01 ) != 0;
 
     if (globleTrigger) {
-        if (adcCalc > (keyMatrixTriggerLevel + draftValue)) return true;   // 觸發
-        if (adcCalc <= keyMatrixReleaseLevel)               return false;  // 釋放
-        return prev;  // 落在中間帶，維持上次狀態
+        if (adcCalc > (keyMatrixTriggerLevel + draftValue)) return true;   // ??
+        if (adcCalc <= keyMatrixReleaseLevel)               return false;  // ??
+        return prev;  // ?????,??????
     } else {
         // extern int32_t eeconfig_read_Trigger(uint8_t r, uint8_t c);
         // extern int32_t eeconfig_read_Release(uint8_t r, uint8_t c);
@@ -1096,9 +1099,8 @@ static hsv_t current_hsv;
 extern led_config_t c;
 
 void hook_early_init(void)
-{	
-    int16_t i;
-		uint8_t clear_magic;
+{
+    uint8_t clear_magic;
 
     palSetPadMode(GPIOC, 13, PAL_MODE_OUTPUT_PUSHPULL);				//Analog_PWR
     palClearPad(GPIOC, 13);
@@ -1185,7 +1187,7 @@ void hook_early_init(void)
     palSetPadMode(GPIOD, 2, PAL_MODE_INPUT_PULLUP);
     palSetPadMode(GPIOC, 12, PAL_MODE_INPUT_PULLUP);
     palSetPadMode(GPIOA, 15, PAL_MODE_INPUT_PULLUP);
-    memset(matrix, 0, MATRIX_ROWS);
+    memset(matrix, 0, sizeof(matrix));
 
 	// sensorPowerCtrl(true);
 	#ifdef socd
@@ -1524,7 +1526,7 @@ void irq_storm_gpt9_cb(GPTDriver* gptp)
 					// add control gpio at here
 					// palSetPad(GPIOC, 12);    // HIGH
 					// palClearPad(GPIOC, 12);  // LOW
-					// palTogglePad(GPIOC, 12); // 反相
+					// palTogglePad(GPIOC, 12); // ??
 					// palSetPadMode(GPIOC, 12, PAL_MODE_INPUT_PULLDOWN);
 					// chThdSleep(TIME_US2I(40));
 					// chThdSleepMicroseconds(10); 
@@ -1721,10 +1723,10 @@ void adcTravelCalc(uint8_t mode) // travel max adc value
 
 //     uprintf("Start 2mm capture\r\n");
 
-//     memset(adc2mmLevel, 0, sizeof(adc2mmLevel));   // 清空緩衝區
+//     memset(adc2mmLevel, 0, sizeof(adc2mmLevel));   // ?????
 //     SampleTimer = timer_read();
 
-//     // 暫時停掉不必要功能，避免干擾
+//     // ?????????,????
 //     lastKeyScanEffect  = keyScanEffect;
 //     lastRapidKeyEnable = rapidKeyEnable;
 //     lastkeycodeOutput  = keycodeOutput;
@@ -1734,13 +1736,13 @@ void adcTravelCalc(uint8_t mode) // travel max adc value
 //     keycodeOutput  = false;
 //     currentKeyMatrixMode = keyMatrixMode_InitialPostionCalc;
 
-//     // 給 20~50ms 穩定時間
+//     // ? 20~50ms ????
 //     while (timer_elapsed(SampleTimer) < 50) {
-//         // 等待 ADC 有更新 samples2[][]，略延遲
+//         // ?? ADC ??? samples2[][],???
 //         chThdSleepMilliseconds(1);
 //     }
 
-//     // 🔹讀取當前 ADC 值當作「2mm 壓下」時的樣本
+//     // ?????? ADC ????2mm ???????
 //     for (uint8_t i = 0; i < ADC_NUM_CHANNELS; i++) {
 //         for (uint8_t j = 0; j < ADC_BUF_DEPTH; j++) {
 //             adc2mmLevel[j][i] = samples2[j][i];
@@ -1750,7 +1752,7 @@ void adcTravelCalc(uint8_t mode) // travel max adc value
 
 //     uprintf("Captured 2mm ADC values\r\n");
 
-//     // 🔹是否要更新 EEPROM
+//     // ??????? EEPROM
 //     if (update) {
 //         uprintf("Saving 2mm ADC values to EEPROM...\r\n");
 //         for (i = 0; i < (ADC_NUM_CHANNELS * ADC_BUF_DEPTH); i++) {
@@ -1760,7 +1762,7 @@ void adcTravelCalc(uint8_t mode) // travel max adc value
 //         uprintf("Save done\r\n");
 //     }
 
-//     // 恢復原狀態
+//     // ?????
 //     currentKeyMatrixMode = keyMatrixMode_Normal;
 //     keyScanEffect  = lastKeyScanEffect;
 //     rapidKeyEnable = lastRapidKeyEnable;
@@ -1948,9 +1950,9 @@ static void adccallback(ADCDriver* adcp)
 	sensorPowerCtrl(false);
 	muxSelect(++adcsampleIndex);
 #ifndef ADC_Oversample
-	gptStartOneShot(&GPTD9, 14); //lyon 更改這個數值至3看看adc數值是否正常//original is 7 // 9問題改8測試8可以，為什麼13可以，改10吧(為了8k)會有問題
-	// maybe change to higher value give it more time to process ex: 01-9, 02-8,02會有點狀況改成刪除狀態?no
-	// 7 / 60000 秒 ＝ 約 116.7 µs
+	gptStartOneShot(&GPTD9, 14); //lyon ???????3??adc??????//original is 7 // 9???8??8??,???13??,?10?(??8k)????
+	// maybe change to higher value give it more time to process ex: 01-9, 02-8,02????????????no
+	// 7 / 60000 ? = ? 116.7 �s
 	// 8 / 140000sec = 57usec, 7/140000=50
 	#else
 	gptStartOneShot(&GPTD9, 3);
@@ -2297,6 +2299,78 @@ void analogPowerSwitch(uint8_t data)
 uint16_t current_keycode = KC_NO;
 uint8_t level = 0;
 
+static void eeclr_task(void)
+{
+	if (!eeclr_pressed || eeclr_fired) {
+		return;
+	}
+
+	if (timer_elapsed32(eeclr_timer) >= 3000) {
+		eeclr_fired = true;
+		eeclr_pressed = false;
+
+		uprintf("[EECLR] hold 3s -> factory reset\r\n");
+		// keyboard_factory_reset_all();
+		knobState = 0;
+		eeprom_update_byte(KB_ENCODER_MODE_ADDR, knobState);
+		eeconfig_socd_clear();
+		eeconfig_rappy_snappy_clear();
+		eeconfig_modtap_clear();
+		currentLED_RunMode.mode = 8;
+		currentLED_RunMode.type = offMode;
+		setRunMode(currentLED_RunMode);
+		eeprom_update_byte((uint8_t *)KB_COLOR_MODE_ADDR, currentLED_RunMode.mode);
+		eeprom_update_byte((uint8_t *)EECONFIG_POLLING_RATE, 0x00);
+		uprintf (".");
+		eeconfig_rapidTrigger_init();
+		keyMatrixTriggerLevel = DEFAULT_TRIGGER_LEVEL;
+		keyMatrixReleaseLevel = DEFAULT_RELEASE_LEVEL;
+		eeprom_write_word(EECONFIG_KEYMAP_TRIGGER_LEVEL, keyMatrixTriggerLevel);
+		uprintf (".");
+		eeprom_write_word(EECONFIG_KEYMAP_RELEASE_LEVEL, keyMatrixReleaseLevel);
+		uprintf (".");
+		write_trigger_to_eeprom();
+		uprintf (".");
+		write_Release_to_eeprom();
+		uprintf (".");
+		eeconfig_rapidTrigger_init();
+		uprintf (".");
+		write_keymap_to_eeprom();
+		uprintf (".");
+		dynamic_macro_reset_eeprom();
+		uprintf (".");
+		uprintf (".");
+		eeprom_update_byte((uint8_t *)EEPROM_FACTORY_INIT_FLAG_ADDR, 0xFA);
+		uprintf("\r\nEnd\r\n");
+		chThdSleepMilliseconds(500);
+		NVIC_SystemReset();
+	}
+}
+
+#ifdef eepromClear
+static void perform_factory_reset(void)
+{
+    currentLED_RunMode.mode = 0;
+    currentLED_RunMode.type = normalMode;
+    setRunMode(currentLED_RunMode);
+
+    keyMatrixTriggerLevel = DEFAULT_TRIGGER_LEVEL;
+    keyMatrixReleaseLevel = DEFAULT_RELEASE_LEVEL;
+
+    eeprom_write_word(EECONFIG_KEYMAP_TRIGGER_LEVEL, keyMatrixTriggerLevel);
+    eeprom_write_word(EECONFIG_KEYMAP_RELEASE_LEVEL, keyMatrixReleaseLevel);
+
+    write_trigger_to_eeprom();
+    write_Release_to_eeprom();
+    eeconfig_rapidTrigger_init();
+    write_keymap_to_eeprom();
+    dynamic_macro_reset_eeprom();
+
+    chThdSleepMilliseconds(100);
+    NVIC_SystemReset();
+}
+#endif // eepromClear
+
 bool matrixAnalogScan(void)
 {
 	bool rapidKeyStatus;
@@ -2309,37 +2383,20 @@ bool matrixAnalogScan(void)
 //    chSysLock();
 
 #ifdef eepromClear
-// 在 matrixAnalogScan() 函式中（僅需加入一次）
-void perform_factory_reset(void) {
-	currentLED_RunMode.mode = 0;
-	currentLED_RunMode.type = normalMode;
-	setRunMode(currentLED_RunMode);
-	eeconfig_rapidTrigger_init();
-	keyMatrixTriggerLevel = DEFAULT_TRIGGER_LEVEL;
-	keyMatrixReleaseLevel = DEFAULT_RELEASE_LEVEL;
-	eeprom_write_word(EECONFIG_KEYMAP_TRIGGER_LEVEL, keyMatrixTriggerLevel);
-	eeprom_write_word(EECONFIG_KEYMAP_RELEASE_LEVEL, keyMatrixReleaseLevel);
-	write_trigger_to_eeprom();
-	write_Release_to_eeprom();
-	eeconfig_rapidTrigger_init();
-	write_keymap_to_eeprom();
-	dynamic_macro_reset_eeprom();
-	chThdSleepMilliseconds(100);
-	NVIC_SystemReset();
-}
+    static bool reset_checked = false;
 
-static bool reset_checked = false;
+    if (!reset_checked) {
+        analogKey_Config_t loc = matrixAnalogRelocate[0][0];
+        int adc_val;
 
-if (!reset_checked) {
-    reset_checked = true;
+        reset_checked = true;
+        adc_val = samples2[loc.rowA][loc.colA] -
+                  initPostionLevel[loc.rowA][loc.colA];
 
-    analogKey_Config_t loc = matrixAnalogRelocate[0][0];
-	int adc_val = samples2[loc.rowA][loc.colA] - initPostionLevel[loc.rowA][loc.colA];
-
-    if (adc_val > keyMatrixTriggerLevel) {
-        perform_factory_reset();
+        if (adc_val > keyMatrixTriggerLevel) {
+            perform_factory_reset();
+        }
     }
-}
 #endif // eepromClear
 
 #ifdef minTriggerCheck
@@ -2525,7 +2582,7 @@ if (!reset_checked) {
 				// 	keyLocation.rowA, keyLocation.colA, get_highest_layer(layer_state), keycode, pressed);
 
 			#ifdef rappySnappy
-			// adcCalc 已經算好
+			// adcCalc ????
 			adcPre_value[keyLocation.rowA][keyLocation.colA] = (int16_t)adcPre;
 
 
@@ -2543,7 +2600,7 @@ if (!reset_checked) {
 
 			bool pressed_now = calc_pressed_now(keyLocation.rowA, keyLocation.colA, adcCalc);
 
-			/* ① 先通知 SOCD */
+			/* ? ??? SOCD */
 			if(isSOCD){
 				void on_key_changed(uint8_t row, uint8_t col, bool pressed);
 			}
@@ -2557,17 +2614,17 @@ if (!reset_checked) {
 			bool prev = mt_prev[keyLocation.rowA][keyLocation.colA];
 
 			if (mt_active(L, keyLocation.rowA, keyLocation.colA)) {
-				if (pressed_now && !prev) mt_on_down(L, keyLocation.rowA, keyLocation.colA);   // 上一輪未按、這輪按下 → down
-				if (!pressed_now && prev) mt_on_up  (L, keyLocation.rowA, keyLocation.colA);   // 上一輪按下、這輪放開 → up
-				mt_prev[keyLocation.rowA][keyLocation.colA] = pressed_now;                     // ★ 自行維護 prev
-				continue;                                        // ★ 跳過原本 matrix_temp 的設/清位
+				if (pressed_now && !prev) mt_on_down(L, keyLocation.rowA, keyLocation.colA);   // ?????????? ? down
+				if (!pressed_now && prev) mt_on_up  (L, keyLocation.rowA, keyLocation.colA);   // ?????????? ? up
+				mt_prev[keyLocation.rowA][keyLocation.colA] = pressed_now;                     // ? ???? prev
+				continue;                                        // ? ???? matrix_temp ??/??
 			}
 			#endif // modTap
 			#ifdef toggleKey
-			// 取得目前 active layer（假設你有 action_layer.h / layer_state）
+			// ???? active layer(???? action_layer.h / layer_state)
 			uint8_t act_layer = biton32(layer_state);
 
-			// 確保是合法位置
+			// ???????
 			if (keyLocation.rowA >= 0 && keyLocation.colA >= 0 &&
 				keyLocation.rowA < MATRIX_ROWS && keyLocation.colA < MATRIX_COLS &&
 				act_layer < KEYMAPS_COUNT) {
@@ -2575,7 +2632,7 @@ if (!reset_checked) {
 				toggle_key_slot_t *tk = &toggle_keys[act_layer][keyLocation.rowA][keyLocation.colA];
 
 				if (tk->enabled) {
-					// === 1. 用同樣門檻邏輯算「現在視為按下？」 ===
+					// === 1. ????????????????? ===
 					bool now_pressed = false;
 
 					if (globleTrigger) {
@@ -2597,19 +2654,19 @@ if (!reset_checked) {
 					bool was_pressed = toggle_last_pressed[act_layer][keyLocation.rowA][keyLocation.colA];
 					toggle_last_pressed[act_layer][keyLocation.rowA][keyLocation.colA] = now_pressed;
 
-					// === 2. Rising edge：從「沒按」變成「有按」才翻轉狀態 ===
+					// === 2. Rising edge:???????????????? ===
 					if (!was_pressed && now_pressed) {
 						tk->state = !tk->state;
 
 						if (tk->state) {
-							// 切到 ON：按下 keycode
+							// ?? ON:?? keycode
 							if (tk->keycode) {
 								register_code(tk->keycode);
 								// uprintf("Toggle ON L%u R%u C%u KC=0x%02X\r\n",
 								//         act_layer, keyLocation.rowA, keyLocation.colA, tk->keycode);
 							}
 						} else {
-							// 切回 OFF：放開 keycode
+							// ?? OFF:?? keycode
 							if (tk->keycode) {
 								unregister_code(tk->keycode);
 								// uprintf("Toggle OFF L%u R%u C%u KC=0x%02X\r\n", ...);
@@ -2617,11 +2674,11 @@ if (!reset_checked) {
 						}
 					}
 
-					// === 3. 這顆 key 當成純「控制開關」，不參與一般 matrix 掃描 ===
+					// === 3. ?? key ?????????,????? matrix ?? ===
 					matrix_temp[keyLocation.rowA] &= ~(1 << keyLocation.colA);
 
-					// 如果你不想讓它亮掃描燈效，也可以在這裡直接 continue
-					// 例如：
+					// ????????????,???????? continue
+					// ??:
 					// if (keyScanEffect) {
 					//     LED_Datas[ ledKeyMatrix[keyLocation.rowA][keyLocation.colA] ] = LED_NULL;
 					// }
@@ -2833,7 +2890,7 @@ if (!reset_checked) {
 	#endif // rappyTrigger
 
 	#ifdef modTap
-	mt_tick(0);         // 處理長按超時 → 送/收修飾鍵
+	mt_tick(0);         // ?????? ? ?/????
 	mt_apply_pending(); //
 	#endif // modTap
 
@@ -2845,17 +2902,17 @@ if (!reset_checked) {
 		// if (lastMatrix_CRC != currentMatrix_CRC)
 		if (true)
 		{
-				uint32_t layer = layer_state;   // 目前 layer 狀態
+				uint32_t layer = layer_state;   // ?? layer ??
 
-				/* 偵測 MO(1) 被按下（0 → 1） */
+				/* ?? MO(1) ???(0 ? 1) */
 				bool mo1_pressed =
 					!(last_layer_state & (1UL << 1)) &&
 					(layer & (1UL << 1));
 
 				if (mo1_pressed) {
-					clear_mods();      // 清 modifier
-					layer_clear();     // 清殘留 Fn / MO
-					layer_on(1);       // 確保 MO(1) 仍然有效
+					clear_mods();      // ? modifier
+					layer_clear();     // ??? Fn / MO
+					layer_on(1);       // ?? MO(1) ????
 				}
 
 				last_layer_state = layer;
@@ -2897,59 +2954,14 @@ if (!reset_checked) {
 		if (lastMatrix_CRC != currentMatrix_CRC) {
 			memcpy(matrix, matrix_temp, sizeof(matrix));
 			keyboard_taskTMR();
-			lastMatrix_CRC = currentMatrix_CRC;  // ← 必須有這行
+			lastMatrix_CRC = currentMatrix_CRC;  // ? ?????
 		}
 	}*/
 
-	// EECLR
-	void eeclr_task(void)
-	{
-		if (!eeclr_pressed || eeclr_fired) {
-			return;
-		}
-
-		if (timer_elapsed32(eeclr_timer) >= 3000) {
-			eeclr_fired = true;
-			eeclr_pressed = false;
-
-			uprintf("[EECLR] hold 3s -> factory reset\r\n");
-			// keyboard_factory_reset_all();
-			knobState = 0;
-			eeprom_update_byte(KB_ENCODER_MODE_ADDR, knobState);
-			eeconfig_socd_clear();
-			eeconfig_rappy_snappy_clear();
-			eeconfig_modtap_clear();
-			currentLED_RunMode.mode = 8;
-			currentLED_RunMode.type = offMode;
-			setRunMode(currentLED_RunMode);
-			eeprom_update_byte((uint8_t *)KB_COLOR_MODE_ADDR, currentLED_RunMode.mode);
-			eeprom_update_byte((uint8_t *)EECONFIG_POLLING_RATE, 0x00);
-			uprintf (".");
-			eeconfig_rapidTrigger_init();
-			keyMatrixTriggerLevel = DEFAULT_TRIGGER_LEVEL;
-			keyMatrixReleaseLevel = DEFAULT_RELEASE_LEVEL;
-			eeprom_write_word(EECONFIG_KEYMAP_TRIGGER_LEVEL, keyMatrixTriggerLevel);
-			uprintf (".");
-			eeprom_write_word(EECONFIG_KEYMAP_RELEASE_LEVEL, keyMatrixReleaseLevel);
-			uprintf (".");
-			write_trigger_to_eeprom();
-			uprintf (".");
-			write_Release_to_eeprom();
-			uprintf (".");
-			eeconfig_rapidTrigger_init();
-			uprintf (".");
-			write_keymap_to_eeprom();
-			uprintf (".");
-			dynamic_macro_reset_eeprom();
-			uprintf (".");
-			uprintf (".");
-			eeprom_update_byte((uint8_t *)EEPROM_FACTORY_INIT_FLAG_ADDR, 0xFA);
-			uprintf("\r\nEnd\r\n");
-			chThdSleepMilliseconds(500);
-			NVIC_SystemReset();
-		}
-	}
 	eeclr_task();
+
+	return true;
+
 
 }
 
@@ -3286,10 +3298,8 @@ if (!reset_checked) {
     //	}
     //}
 
-    bool matrixAnalogFind(void)
-    {
-        int triggerLevel = 20;
-        int releaseLevel = 5;
+bool matrixAnalogFind(void)
+{
         int adcCalc;
 
         uprintf("\033[2J\033[H");
@@ -3308,8 +3318,9 @@ if (!reset_checked) {
             }
             uprintf("\r\n");
         }
-    }
 
+        return true;
+}
 
 static THD_WORKING_AREA(waADC_ProcessThread, 512);
 static THD_FUNCTION(ADC_ProcessThread, arg)
@@ -3360,8 +3371,11 @@ static THD_FUNCTION(ADC_ProcessThread, arg)
     // current_hsv = rgb_to_hsv(c);
 //    currentLED_RunMode.type = offMode;
 #ifdef socd
-	socd_thread_init();  // lyon socd.c file
-	socd_load_all_from_eeprom();
+		/*
+     * socd_thread_init() already includes EEPROM loading internally;
+     * do not call socd_load_all_from_eeprom() again.
+     */
+    socd_thread_init();
 #endif
 
 
@@ -3654,7 +3668,6 @@ if (!eepromInitCheck) {
 
 uint8_t matrix_scan(void)
 {
-static counts = 0;
 	//chThdSleepMilliseconds(1);
 //	chBSemWait(&matrixScanSem);
 	keyboard_taskTMR();
@@ -3813,9 +3826,8 @@ void gamePadIndicate(void)
 	chBSemSignal(&ledUpdateSem);
 }
 
-bool process_gamepad(keyrecord_t record, uint16_t keycode){
-uint8_t * gamepad_report_Index = &extra_game_report;
-static hatSwTest = 0;
+bool process_gamepad(keyrecord_t record, uint16_t keycode)
+{
 
 	switch (keycode){
 		case KC_GAME_PAD_DPAD_UP ... KC_GAME_PAD_BUTTON_31:
@@ -3964,7 +3976,7 @@ static hatSwTest = 0;
 								break;
 							}
 					}
-				return;
+				return false;
 			break;
 
 			case KC_GAME_PAD_BUTTON_0:
@@ -4029,10 +4041,120 @@ static hatSwTest = 0;
 	return true;
 }
 
+void dump_eeprom(void)
+{
+    uint8_t buffer[32];
+
+    uint8_t *start_addr =
+        EEPROM_MACRO_SLOT_ADDR(0);
+
+    uint8_t *end_addr =
+        EEPROM_MACRO_REGION_END;
+
+    for (uint8_t *addr = start_addr;
+         addr < end_addr;
+         addr += sizeof(buffer)) {
+
+        size_t read_size =
+            (size_t)(end_addr - addr);
+
+        if (read_size > sizeof(buffer)) {
+            read_size = sizeof(buffer);
+        }
+
+        memset(buffer, 0, sizeof(buffer));
+
+        eeprom_read_block(
+            buffer,
+            (const void *)addr,
+            read_size
+        );
+
+        uprintf(
+            "EEPROM %08lX: ",
+            (unsigned long)(uintptr_t)addr
+        );
+
+        for (size_t i = 0;
+             i < read_size;
+             i++) {
+            uprintf("%02X ", buffer[i]);
+        }
+
+        uprintf("\r\n");
+    }
+}
+	
+static void eeprom_write8_verify(uint8_t *addr, uint8_t value)
+{
+    if (addr == NULL) {
+        return;
+    }
+
+    uint8_t before =
+        eeprom_read_byte((const uint8_t *)addr);
+
+    eeprom_update_byte(addr, value);
+
+    uint8_t after =
+        eeprom_read_byte((const uint8_t *)addr);
+
+    uprintf(
+        "EEPROM addr=%08lX before=%02X write=%02X after=%02X %s\r\n",
+        (unsigned long)(uintptr_t)addr,
+        before,
+        value,
+        after,
+        after == value ? "OK" : "FAIL"
+    );
+}
+
+
+static void plusHue(led_config_t in)
+{
+    current_hsv = rgb_to_hsv(in);
+    current_hsv.h = (current_hsv.h + 15U) % 360U;
+    mosArt.LED = hsv_to_rgb(current_hsv);
+}
+
+static void minusHue(led_config_t in)
+{
+    current_hsv = rgb_to_hsv(in);
+    current_hsv.h = (current_hsv.h + 345U) % 360U;
+    mosArt.LED = hsv_to_rgb(current_hsv);
+}
+
+static void plusSat(led_config_t in)
+{
+    current_hsv = rgb_to_hsv(in);
+    current_hsv.s = (current_hsv.s > 239U) ? 255U : (uint8_t)(current_hsv.s + 16U);
+    mosArt.LED = hsv_to_rgb(current_hsv);
+}
+
+static void minusSat(led_config_t in)
+{
+    current_hsv = rgb_to_hsv(in);
+    current_hsv.s = (current_hsv.s < 16U) ? 0U : (uint8_t)(current_hsv.s - 16U);
+    mosArt.LED = hsv_to_rgb(current_hsv);
+}
+
+static void plusBri(led_config_t in)
+{
+    current_hsv = rgb_to_hsv(in);
+    current_hsv.v = (current_hsv.v > 239U) ? 255U : (uint8_t)(current_hsv.v + 16U);
+    mosArt.LED = hsv_to_rgb(current_hsv);
+}
+
+static void minusBri(led_config_t in)
+{
+    current_hsv = rgb_to_hsv(in);
+    current_hsv.v = (current_hsv.v < 16U) ? 0U : (uint8_t)(current_hsv.v - 16U);
+    mosArt.LED = hsv_to_rgb(current_hsv);
+}
+
 bool hook_matrix_change(keyrecord_t record)
 {
 	uint16_t keycode = keymap_key_to_keycode(biton32(layer_state),record.event.key);
-	static uint16_t counts = 0;
 	// uprintf("KEY row=%d col=%d kc=%04X pressed=%d\r\n",
 	// 				record.event.key.row, record.event.key.col, keycode, record.event.pressed);
 //	uprintf ("Layer:%d keycode:%04x\r\n", biton32(layer_state), keycode);
@@ -4066,7 +4188,7 @@ bool hook_matrix_change(keyrecord_t record)
 		int8_t slot = socd_find_slot_by_keycode(keycode);
 		if (slot >= 0) {
 			socd_post_event(slot, keycode, record.event.pressed);
-			return false;   // SOCD 接管
+			return false;   // SOCD ??
 		}
 	}
 	#endif
@@ -4093,72 +4215,6 @@ bool hook_matrix_change(keyrecord_t record)
 
 	//uprintf ("Layer state:%d keycode:%04X\r\n", biton32(layer_state),keycode);
 
-	void dump_eeprom(void)
-	{
-		uint8_t buffer[32];
-
-		uprintf("\r\n=== EEPROM DUMP START ===\r\n");
-
-		for (uint16_t addr = EEPROM_MACRO_SLOT_ADDR(0); addr < EEPROM_MACRO_SLOT_ADDR(9)/*EEPROM_SIZE*/; addr += 32)
-		{
-			eeprom_read_block(buffer, (const void*)addr, 32);
-
-			uprintf("%04X: ", addr);
-
-			for (uint8_t i = 0; i < 32; i++)
-			{
-				uprintf("%02X ", buffer[i]);
-			}
-
-			uprintf("\r\n");
-			chThdSleepMilliseconds(1);  // 避免卡死
-		}
-
-		uprintf("=== EEPROM DUMP END ===\r\n");
-	}
-	void eeprom_write8_verify(uint16_t addr, uint8_t value)
-	{
-		uint8_t before = eeprom_read_byte((const uint8_t*)addr);
-
-		eeprom_update_byte((uint8_t*)addr, value);
-
-		uint8_t after  = eeprom_read_byte((const uint8_t*)addr);
-
-		uprintf("[EEP] W8  addr=0x%04X  before=0x%02X  write=0x%02X  after=0x%02X  %s\r\n",
-				addr, before, value, after, (after == value) ? "OK" : "FAIL");
-	}
-	// static inline uint8_t clamp_u8_i16(int16_t x)
-	// {
-	// 	if (x < 0)   return 0;
-	// 	if (x > 255) return 255;
-	// 	return (uint8_t)x;
-	// }
-	void plusHue(led_config_t in){
-		hsv = rgb_to_hsv(in);
-		current_hsv.h = (current_hsv.h + 15) % 360;
-    	mosArt.LED = hsv_to_rgb(current_hsv);
-	}
-	void minusHue(led_config_t in){
-		hsv = rgb_to_hsv(in);
-		current_hsv.h = (current_hsv.h + 345) % 360;
-    	mosArt.LED = hsv_to_rgb(current_hsv);
-	}
-	void plusSat(led_config_t in){
-		current_hsv.s = (current_hsv.s > 239) ? 255 : current_hsv.s + 16;
-    	mosArt.LED = hsv_to_rgb(current_hsv);
-	}
-	void minusSat(led_config_t in){
-		current_hsv.s = (current_hsv.s < 16) ? 0 : current_hsv.s - 16;
-    	mosArt.LED = hsv_to_rgb(current_hsv);
-	}
-	void plusBri(led_config_t in){
-		current_hsv.v = (current_hsv.v > 239) ? 255 : current_hsv.v + 16;
-    	mosArt.LED = hsv_to_rgb(current_hsv);
-	}
-	void minusBri(led_config_t in){
-		current_hsv.v = (current_hsv.v < 16) ? 0 : current_hsv.v - 16;
-    	mosArt.LED = hsv_to_rgb(current_hsv);
-	}
 
 		if (record.event.pressed){
 			//uprintf ("keymatrix change pressed code:%04X\r\n",keycode);
@@ -4171,7 +4227,7 @@ bool hook_matrix_change(keyrecord_t record)
 					}
 				break;
 				case KC_TAB:{
-					uint8_t mods = get_mods();  // 目前按著的修飾鍵
+					uint8_t mods = get_mods();  // ????????
 
 					if(altTabLock){
 						if (mods & (MOD_BIT(KC_LALT) | MOD_BIT(KC_RALT))) {
@@ -4183,7 +4239,7 @@ bool hook_matrix_change(keyrecord_t record)
 				}
 				break;
 				case KC_F4:{
-					uint8_t mods = get_mods();  // 目前按著的修飾鍵
+					uint8_t mods = get_mods();  // ????????
 
 					if(altF4Lock){//altF4Lock){
 						if (mods & (MOD_BIT(KC_LALT) | MOD_BIT(KC_RALT))) {
@@ -4202,7 +4258,7 @@ bool hook_matrix_change(keyrecord_t record)
 					// uprintf ("Trigger Level:%d output:%d btn:%d release Level:%d\r\n",keyMatrixTriggerLevel, keycodeOutput, readPin(A15),keyMatrixReleaseLevel);
 				break;
 				case KC_MBRI:
-				// 	return false; // 我已處理
+				// 	return false; // ????
 				// }
 				// return true;
 					// send_string("abcdefghijklmnopqrstuvwxyz\n"); /**/
@@ -4218,7 +4274,7 @@ bool hook_matrix_change(keyrecord_t record)
 					// uprintf("EECONFIG_SOCD_ADDR_END address is %d", EECONFIG_SOCD_ADDR_END);
 					plusBri(mosArt.LED);
 					// hsv = rgb_to_hsv(mosArt.LED);
-					// hsv.h += 2;   // 每幀轉動色相
+					// hsv.h += 2;   // ??????
 					// mosArt.LED = hsv_to_rgb(hsv);
 				break;
 				case KC_MSAT:
@@ -4414,7 +4470,7 @@ bool hook_matrix_change(keyrecord_t record)
 						eeclr_pressed = false;
 						eeclr_fired = false;
 					}
-					return false; // 不往下送出一般按鍵
+					return false; // ?????????
 				break;
 				case KC_WIN_LOCK:
 				//eeprom keylock
@@ -5005,7 +5061,7 @@ void hook_usb_suspend_entry(void)
 {
     if (timer_read() > 1500)
     {
-        currentLED_RunMode.type = powerOff;//offMode;   // 原本是 powerOff; // lyon try to fix reboot problem
+        currentLED_RunMode.type = powerOff;//offMode;   // ??? powerOff; // lyon try to fix reboot problem
         setRunMode(currentLED_RunMode);
     }
 }
@@ -5035,7 +5091,7 @@ bool process_rappy_fixed_ratio(rappy_fixed_ratio_t *rappy) {
 			uprintf(">>> press %.2f\r\n", ratio);
 		}
 	} else {
-		// 已經是按下狀態 → 要到明顯低於 release_ratio 才放開
+		// ??????? ? ?????? release_ratio ???
 		if (ratio <= rappy->release_ratio) {
 			rappy->pressed = false;
 			unregister_code(rappy->keycode);
@@ -5048,4 +5104,3 @@ bool process_rappy_fixed_ratio(rappy_fixed_ratio_t *rappy) {
 }
 
 #endif // rappyTrigger
-

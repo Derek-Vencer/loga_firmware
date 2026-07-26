@@ -29,10 +29,46 @@ typedef struct {
 } socd_slot_rt_t;
 
 static socd_slot_rt_t socd_rt[SOCD_SLOT_COUNT];
+/*
+ * 防止 socd_thread_init() 被重複呼叫。
+ */
+static bool socd_initialized = false;
 
 static inline bool socd_slot_enabled(const socd_config_t *cfg)
 {
-    return cfg->enable == 1u;
+    return (cfg != NULL) && (cfg->enable == 1u);
+}
+
+static bool socd_config_is_valid(const socd_config_t *cfg)
+{
+    if (cfg == NULL) {
+        return false;
+    }
+
+    if (cfg->enable != 1u) {
+        return false;
+    }
+
+    if (cfg->a_layer >= KEYMAPS_COUNT ||
+        cfg->b_layer >= KEYMAPS_COUNT) {
+        return false;
+    }
+
+    if (cfg->a_row >= MATRIX_ROWS ||
+        cfg->b_row >= MATRIX_ROWS) {
+        return false;
+    }
+
+    if (cfg->a_col >= MATRIX_COLS ||
+        cfg->b_col >= MATRIX_COLS) {
+        return false;
+    }
+
+    if (cfg->mode >= SOCD_DISABLE) {
+        return false;
+    }
+
+    return true;
 }
 
 static uint16_t socd_resolve_keycode(uint8_t layer, uint8_t row, uint8_t col)
@@ -66,37 +102,87 @@ void socd_apply_config(uint8_t idx, const socd_config_t *c)
 
 void socd_load_all_from_eeprom(void)
 {
+    uprintf(
+        "[SOCD] EEPROM load start, addr=0x%08lX, "
+        "slot_size=%u, slots=%u, total=%lu\r\n",
+        (unsigned long)(uintptr_t)EECONFIG_SOCD_ADDR,
+        (unsigned int)sizeof(socd_config_t),
+        (unsigned int)SOCD_SLOT_COUNT,
+        (unsigned long)EECONFIG_SOCD_SIZE
+    );
+
     for (uint8_t i = 0; i < SOCD_SLOT_COUNT; i++) {
-        // eeconfig_read_socd(i, &socd_slots[i]);
         socd_config_t tmp;
+        memset(&tmp, 0, sizeof(tmp));
+
         eeconfig_read_socd(i, &tmp);
 
-        // uprintf("EEPROM READ: slot%d ena=%d A=%04X B=%04X mode=%d\r\n",
-        //         i,
-        //         // socd_slots[i].enable,
-        //         // socd_slots[i].kc_a,
-        //         // socd_slots[i].kc_b,
-        //         // socd_slots[i].mode
-        //         tmp.enable,
-        //         tmp.kc_a,
-        //         tmp.kc_b,
-        //         tmp.mode
-        //     );
+        uprintf(
+            "[SOCD] read slot=%u ena=%u "
+            "A=%u/%u/%u kc=%04X "
+            "B=%u/%u/%u kc=%04X mode=%u\r\n",
+            i,
+            tmp.enable,
+            tmp.a_layer,
+            tmp.a_row,
+            tmp.a_col,
+            tmp.kc_a,
+            tmp.b_layer,
+            tmp.b_row,
+            tmp.b_col,
+            tmp.kc_b,
+            tmp.mode
+        );
 
-        /* 基本防呆 */
-        // if (!socd_slots[i].enable) {
-        //     socd_slots[i].mode = SOCD_DISABLE;
-        // }
-        if (!socd_slot_enabled(&tmp)) {
+        /*
+         * EEPROM 為空、舊資料或資料越界時，
+         * 一律轉為 disabled，禁止拿錯誤 layer/row/col 查 keymap。
+         */
+        if (!socd_config_is_valid(&tmp)) {
             memset(&tmp, 0, sizeof(tmp));
             tmp.mode = SOCD_DISABLE;
-        } else {
-            tmp.kc_a = socd_resolve_keycode(tmp.a_layer, tmp.a_row, tmp.a_col);
-            tmp.kc_b = socd_resolve_keycode(tmp.b_layer, tmp.b_row, tmp.b_col);
+
+            socd_apply_config(i, &tmp);
+            continue;
+        }
+
+        /*
+         * keycode 不完全信任 EEPROM 中保存的值，
+         * 每次開機根據目前 keymap 重新解析。
+         */
+        tmp.kc_a = socd_resolve_keycode(
+            tmp.a_layer,
+            tmp.a_row,
+            tmp.a_col
+        );
+
+        tmp.kc_b = socd_resolve_keycode(
+            tmp.b_layer,
+            tmp.b_row,
+            tmp.b_col
+        );
+
+        /*
+         * 無效 keycode 或兩邊相同時，停用此 slot。
+         */
+        if (tmp.kc_a == KC_NO ||
+            tmp.kc_b == KC_NO ||
+            tmp.kc_a == tmp.kc_b) {
+            uprintf(
+                "[SOCD] disable invalid slot=%u, A=%04X B=%04X\r\n",
+                i,
+                tmp.kc_a,
+                tmp.kc_b
+            );
+
+            memset(&tmp, 0, sizeof(tmp));
+            tmp.mode = SOCD_DISABLE;
         }
 
         socd_apply_config(i, &tmp);
     }
+
+    uprintf("[SOCD] EEPROM load done\r\n");
 }
 
 /* ===== Event queue ===== */
@@ -179,65 +265,158 @@ static uint16_t decide_output(const socd_config_t *cfg,
 
 /* ===== Thread ===== */
 static THD_WORKING_AREA(waSOCD, 512);
-static THD_FUNCTION(SOCDThread, arg) {
+
+static THD_FUNCTION(SOCDThread, arg)
+{
     (void)arg;
+
+    uprintf("[SOCD] THREAD START\r\n");
+
     while (true) {
-        uprintf("SOCD THREAD START\r\n");
-
         socd_evt_t ev;
-        if (!q_pop(&ev)) { chBSemWait(&semSOCD); continue; }
-        if (ev.slot >= SOCD_SLOT_COUNT) continue;
 
-        socd_config_t  *cfg = &socd_slots[ev.slot];
-        socd_slot_rt_t *rt  = &socd_rt[ev.slot];
-        if (!socd_slot_enabled(cfg)) continue;
+        if (!q_pop(&ev)) {
+            chBSemWait(&semSOCD);
+            continue;
+        }
+
+        if (ev.slot >= SOCD_SLOT_COUNT) {
+            continue;
+        }
+
+        socd_config_t *cfg = &socd_slots[ev.slot];
+        socd_slot_rt_t *rt = &socd_rt[ev.slot];
+
+        if (!socd_slot_enabled(cfg)) {
+            continue;
+        }
 
         if (ev.keycode == cfg->kc_a) {
             if (rt->A.down != ev.pressed) {
                 rt->A.down = ev.pressed;
-                if (ev.pressed) rt->A.last_press = ev.time_ms;
+
+                if (ev.pressed) {
+                    rt->A.last_press = ev.time_ms;
+                }
             }
         } else if (ev.keycode == cfg->kc_b) {
             if (rt->B.down != ev.pressed) {
                 rt->B.down = ev.pressed;
-                if (ev.pressed) rt->B.last_press = ev.time_ms;
-            }
-        } else continue;
 
-        apply_output(rt, decide_output(cfg, rt));
+                if (ev.pressed) {
+                    rt->B.last_press = ev.time_ms;
+                }
+            }
+        } else {
+            continue;
+        }
+
+        apply_output(
+            rt,
+            decide_output(cfg, rt)
+        );
     }
 }
 
 /* ===== Public ===== */
-void socd_post_event(uint8_t slot, uint16_t keycode, bool pressed) {
-    socd_evt_t e = { slot, keycode, pressed, socd_now_ms() };
+void socd_post_event(uint8_t slot,uint16_t keycode,bool pressed)
+{
+    if (!socd_initialized) {
+        return;
+    }
+
+    if (slot >= SOCD_SLOT_COUNT) {
+        return;
+    }
+
+    socd_evt_t e = {
+        .slot = slot,
+        .keycode = keycode,
+        .pressed = pressed,
+        .time_ms = socd_now_ms(),
+    };
+
     chSysLock();
+
     q_push(e);
     chBSemSignalI(&semSOCD);
+
     chSysUnlock();
 }
 
-void socd_thread_init(void) {
-    uprintf("SOCD INIT CALLED...\r\n");
+void socd_thread_init(void)
+{
+    if (socd_initialized) {
+        uprintf("[SOCD] already initialized\r\n");
+        return;
+    }
+
+    uprintf("[SOCD] INIT START\r\n");
+
+    /*
+     * 清除 RAM runtime。
+     */
+    memset(socd_slots, 0, sizeof(socd_slots));
     memset(socd_rt, 0, sizeof(socd_rt));
+    memset(q, 0, sizeof(q));
+
+    qh = 0;
+    qt = 0;
+
+    /*
+     * 初始化 semaphore。
+     * true 代表初始為 taken，thread 會等待第一個事件 signal。
+     */
     chBSemObjectInit(&semSOCD, true);
-    chThdCreateStatic(waSOCD, sizeof(waSOCD), NORMALPRIO-1, SOCDThread, NULL);
+
+    /*
+     * EEPROM layout magic 由 0xA5 更新為 0xA6。
+     *
+     * 第一次使用新版韌體時，清除舊版錯誤位址所留下的
+     * SOCD 資料，避免開機解析損壞內容。
+     */
+    uint8_t stored_magic =
+        eeprom_read_byte(SOCD_SETTING_MAGIC_ADDR);
+
+    if (stored_magic != SOCD_SETTING_MAGIC) {
+        uprintf(
+            "[SOCD] EEPROM layout changed: old=%02X new=%02X\r\n",
+            stored_magic,
+            SOCD_SETTING_MAGIC
+        );
+
+        eeconfig_socd_clear();
+
+        eeprom_update_byte(
+            SOCD_SETTING_MAGIC_ADDR,
+            SOCD_SETTING_MAGIC
+        );
+
+        uprintf("[SOCD] EEPROM region cleared\r\n");
+    }
+
+    /*
+     * 先載入並驗證 EEPROM。
+     * 不可先建立 thread，避免 thread 在資料尚未準備好時執行。
+     */
     socd_load_all_from_eeprom();
 
-    // memset(socd_rt, 0, sizeof(socd_rt));
-    // chBSemObjectInit(&semSOCD, true);
+    thread_t *tp = chThdCreateStatic(
+        waSOCD,
+        sizeof(waSOCD),
+        NORMALPRIO - 1,
+        SOCDThread,
+        NULL
+    );
 
-    // thread_t *tp = chThdCreateStatic(
-    //     waSOCD,
-    //     sizeof(waSOCD),
-    //     NORMALPRIO + 2,     // ★ 明確給高一點
-    //     SOCDThread,
-    //     NULL
-    // );
+    if (tp == NULL) {
+        uprintf("[SOCD] THREAD CREATE FAIL\r\n");
+        return;
+    }
 
-    // if (tp == NULL) {
-    //     uprintf("SOCD THREAD CREATE FAIL\r\n");
-    // }
+    socd_initialized = true;
+
+    uprintf("[SOCD] INIT DONE\r\n");
 }
 
 uint8_t socd_fill_report(uint8_t *buf) {
@@ -264,73 +443,149 @@ uint8_t socd_fill_report(uint8_t *buf) {
     return 8;
 }
 
-void socd_apply_report(const uint8_t *buf) {
-    // uint8_t idx = buf[0];
-    // if (idx >= SOCD_SLOT_COUNT) return;
+void socd_apply_report(const uint8_t *buf)
+{
+    if (buf == NULL) {
+        return;
+    }
 
-    // socd_config_t c = {
-    //     .enable = 1,
-    //     .kc_a = (uint16_t)buf[1] | ((uint16_t)buf[2] << 8),
-    //     .kc_b = (uint16_t)buf[3] | ((uint16_t)buf[4] << 8),
-    //     .mode = buf[5],
-    // };
-    // eeconfig_write_socd(idx, &c);
-    // socd_slots[idx] = c;
-    // memset(&socd_rt[idx], 0, sizeof(socd_rt[idx]));
     uint8_t idx = buf[7];
-    if (idx >= SOCD_SLOT_COUNT) return;
+
+    if (idx >= SOCD_SLOT_COUNT) {
+        uprintf("[SOCD] SET invalid slot=%u\r\n", idx);
+        return;
+    }
 
     uint8_t pri_layer = buf[0];
     uint8_t pri_row   = buf[1];
     uint8_t pri_col   = buf[2];
+
     uint8_t sec_layer = buf[3];
     uint8_t sec_row   = buf[4];
     uint8_t sec_col   = buf[5];
+
     uint8_t mode      = buf[6];
 
-    uint16_t kc_a = socd_resolve_keycode(pri_layer, pri_row, pri_col);
-    uint16_t kc_b = socd_resolve_keycode(sec_layer, sec_row, sec_col);
-
-    socd_config_t c = {
-        .enable = 1,
-        .kc_a   = kc_a,
-        .kc_b   = kc_b,
-        .a_layer = pri_layer,
-        .a_row  = pri_row,
-        .a_col  = pri_col,
-        .b_layer = sec_layer,
-        .b_row  = sec_row,
-        .b_col  = sec_col,
-        .mode   = mode,
-    };
-
-    eeconfig_write_socd(idx, &c);
-    socd_apply_config(idx, &c);
-}
-
-void eeconfig_read_socd(uint8_t idx, socd_config_t* out)
-{
-    if (idx >= SOCD_SLOT_COUNT) {
-        memset(out, 0, sizeof(*out));
+    /*
+     * App 可透過 mode=SOCD_DISABLE 清除此 slot。
+     */
+    if (mode == SOCD_DISABLE) {
+        uprintf("[SOCD] disable slot=%u\r\n", idx);
+        eeconfig_socd_clear_slot(idx);
         return;
     }
 
-    eeprom_read_block(
-        out,
-        (const void*)(EECONFIG_SOCD_ADDR + idx * sizeof(socd_config_t)),
-        sizeof(socd_config_t)
+    if (mode > SOCD_PRIORITY_NEUTRAL) {
+        uprintf(
+            "[SOCD] SET invalid mode=%u slot=%u\r\n",
+            mode,
+            idx
+        );
+        return;
+    }
+
+    if (pri_layer >= KEYMAPS_COUNT ||
+        sec_layer >= KEYMAPS_COUNT ||
+        pri_row >= MATRIX_ROWS ||
+        sec_row >= MATRIX_ROWS ||
+        pri_col >= MATRIX_COLS ||
+        sec_col >= MATRIX_COLS) {
+        uprintf(
+            "[SOCD] SET range error slot=%u "
+            "A=%u/%u/%u B=%u/%u/%u\r\n",
+            idx,
+            pri_layer,
+            pri_row,
+            pri_col,
+            sec_layer,
+            sec_row,
+            sec_col
+        );
+        return;
+    }
+
+    uint16_t kc_a = socd_resolve_keycode(
+        pri_layer,
+        pri_row,
+        pri_col
+    );
+
+    uint16_t kc_b = socd_resolve_keycode(
+        sec_layer,
+        sec_row,
+        sec_col
+    );
+
+    if (kc_a == KC_NO ||
+        kc_b == KC_NO ||
+        kc_a == kc_b) {
+        uprintf(
+            "[SOCD] SET keycode error slot=%u A=%04X B=%04X\r\n",
+            idx,
+            kc_a,
+            kc_b
+        );
+        return;
+    }
+
+    socd_config_t c;
+    memset(&c, 0, sizeof(c));
+
+    c.enable = 1;
+
+    c.kc_a = kc_a;
+    c.a_layer = pri_layer;
+    c.a_row = pri_row;
+    c.a_col = pri_col;
+
+    c.kc_b = kc_b;
+    c.b_layer = sec_layer;
+    c.b_row = sec_row;
+    c.b_col = sec_col;
+
+    c.mode = mode;
+
+    eeconfig_write_socd(idx, &c);
+    socd_apply_config(idx, &c);
+
+    uprintf(
+        "[SOCD] SET slot=%u A=%04X B=%04X mode=%u\r\n",
+        idx,
+        kc_a,
+        kc_b,
+        mode
     );
 }
 
-void eeconfig_write_socd(uint8_t idx, const socd_config_t* in)
+void eeconfig_read_socd(uint8_t idx,socd_config_t *out)
 {
-    if (idx >= SOCD_SLOT_COUNT) return;
+    if (out == NULL) {
+        return;
+    }
 
-    eeprom_update_block(
-        in,
-        (void*)(EECONFIG_SOCD_ADDR + idx * sizeof(socd_config_t)),
-        sizeof(socd_config_t)
-    );
+    memset(out, 0, sizeof(*out));
+
+    if (idx >= SOCD_SLOT_COUNT) {
+        out->mode = SOCD_DISABLE;
+        return;
+    }
+
+    uint8_t *addr = EECONFIG_SOCD_ADDR + ((uint32_t)idx * sizeof(socd_config_t));
+    eeprom_read_block(out,(const void *)addr,sizeof(*out));
+}
+
+void eeconfig_write_socd(uint8_t idx,const socd_config_t *in)
+{
+    if (in == NULL) {
+        return;
+    }
+
+    if (idx >= SOCD_SLOT_COUNT) {
+        return;
+    }
+
+    uint8_t *addr = EECONFIG_SOCD_ADDR + ((uint32_t)idx * sizeof(socd_config_t));
+    eeprom_update_block(in,(void *)addr,sizeof(*in));
 }
 
 void socd_test_write_eeprom_once(void)

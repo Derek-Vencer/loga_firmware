@@ -68,8 +68,8 @@
 #define EEPROM_FACTORY_INIT_FLAG_ADDR 0x0074
 #define KB_ENCODER_MODE_ADDR \
     ((uint8_t *)0x0075)
-#define SOCD_SETTING_MAGIC_ADDR       0x0076
-#define SOCD_SETTING_MAGIC            0xA5
+#define SOCD_SETTING_MAGIC_ADDR       ((uint8_t *)0x0076)
+#define SOCD_SETTING_MAGIC            0xA6
 #define KB_COLOR_RED_ADDR \
     ((uint8_t *)0x007B)
 #define KB_COLOR_GREEN_ADDR \
@@ -100,32 +100,72 @@
 #define EECONFIG_RAPID_TRIGGER				(uint16_t *)(EECONFIG_RELEASE_END)
 #define EECONFIG_RAPID_TRIGGER_END			(uint16_t *)(EECONFIG_RAPID_TRIGGER + (24*RAPID_TRIGGER_COUNT))
 
+/*
+ * Dynamic Macro EEPROM layout.
+ *
+ * config.h is force-included before dynamic_macro.h, therefore this file
+ * must not use sizeof(dynamic_macro_t).  v15.05 uses 48 keyrecord_t entries;
+ * the compiled dynamic_macro_t size is 388 bytes.
+ */
+#define DYNAMIC_MACRO_EEPROM_MAGIC_ADDR \
+    ((uint8_t *)(uintptr_t)(EECONFIG_RAPID_TRIGGER_END))
 
+#define DYNAMIC_MACRO_EEPROM_MAGIC_SIZE \
+    ((uint32_t)sizeof(uint16_t))
 
-#define DYNAMIC_MACRO_EEPROM_MAGIC_ADDR 	(uint16_t*)(EECONFIG_RAPID_TRIGGER_END)
+#define DYNAMIC_MACRO_EEPROM_SLOT_SIZE \
+    ((uint32_t)388U)
 
-#define DYNAMIC_MACRO_EEPROM_BLOCK0_ADDR 	(uint16_t*)(DYNAMIC_MACRO_EEPROM_MAGIC_ADDR+2) //
-#define DYNAMIC_MACRO_EEPROM_BLOCK0_ADDR_END 	(uint16_t*)(DYNAMIC_MACRO_EEPROM_BLOCK0_ADDR+2) //
+#define DYNAMIC_MACRO_EEPROM_TOTAL_SIZE \
+    (DYNAMIC_MACRO_EEPROM_SLOT_SIZE * (uint32_t)DYNAMIC_MACRO_COUNT)
 
-// SOCD
-#define EECONFIG_SOCD_ADDR                  (DYNAMIC_MACRO_EEPROM_BLOCK0_ADDR_END)
-#define EECONFIG_SOCD_SIZE                  (sizeof(socd_config_t) * SOCD_SLOT_COUNT)
-#define EECONFIG_SOCD_ADDR_END              (EECONFIG_SOCD_ADDR + EECONFIG_SOCD_SIZE) //0x3BAC not sure after fix (socd_config_t)
+#define DYNAMIC_MACRO_EEPROM_BLOCK0_ADDR \
+    (DYNAMIC_MACRO_EEPROM_MAGIC_ADDR + DYNAMIC_MACRO_EEPROM_MAGIC_SIZE)
 
-// modTap
-#define EECONFIG_MODTAP_ADDR                (EECONFIG_SOCD_ADDR_END)
-#define EECONFIG_MODTAP_SIZE                (sizeof(mt_entry_t) * MT_CAP_MAP)
-#define EECONFIG_MODTAP_ADDR_END            (EECONFIG_MODTAP_ADDR + EECONFIG_MODTAP_SIZE)
+#define DYNAMIC_MACRO_EEPROM_BLOCK0_ADDR_END \
+    (DYNAMIC_MACRO_EEPROM_BLOCK0_ADDR + DYNAMIC_MACRO_EEPROM_TOTAL_SIZE)
 
-// rappy snappy
-#define EECONFIG_RAPPYSNAPPY_ADDR           (EECONFIG_MODTAP_ADDR_END)
-#define EECONFIG_RAPPYSNAPPY_SIZE           (sizeof(rappy_snappy_pair_t) * RAPPY_SNAPPY_PAIR_COUNT)
-#define EECONFIG_RAPPYSNAPPY_ADDR_END       (EECONFIG_RAPPYSNAPPY_ADDR + EECONFIG_RAPPYSNAPPY_SIZE)
+/* SOCD */
+#define EECONFIG_SOCD_ADDR \
+    (DYNAMIC_MACRO_EEPROM_BLOCK0_ADDR_END)
 
-// toggle key
-#define EECONFIG_TOGGLE_KEY_ADDR             (EECONFIG_RAPPYSNAPPY_ADDR + EECONFIG_RAPPYSNAPPY_SIZE)
-#define EECONFIG_TOGGLE_KEY_SIZE             (sizeof(toggle_key_slot_t) * toggle_key_pair_count)
-#define EECONFIG_TOGGLE_KEY_ADDR_END         (EECONFIG_TOGGLE_KEY_ADDR + EECONFIG_TOGGLE_KEY_SIZE)
+#define EECONFIG_SOCD_SIZE \
+    ((uint32_t)sizeof(socd_config_t) * (uint32_t)SOCD_SLOT_COUNT)
+
+#define EECONFIG_SOCD_ADDR_END \
+    (EECONFIG_SOCD_ADDR + EECONFIG_SOCD_SIZE)
+
+/* Mod-Tap */
+#define EECONFIG_MODTAP_ADDR \
+    (EECONFIG_SOCD_ADDR_END)
+
+#define EECONFIG_MODTAP_SIZE \
+    ((uint32_t)sizeof(mt_entry_t) * (uint32_t)MT_CAP_MAP)
+
+#define EECONFIG_MODTAP_ADDR_END \
+    (EECONFIG_MODTAP_ADDR + EECONFIG_MODTAP_SIZE)
+
+/* Rappy Snappy */
+#define EECONFIG_RAPPYSNAPPY_ADDR \
+    (EECONFIG_MODTAP_ADDR_END)
+
+#define EECONFIG_RAPPYSNAPPY_SIZE \
+    ((uint32_t)sizeof(rappy_snappy_pair_t) * \
+     (uint32_t)RAPPY_SNAPPY_PAIR_COUNT)
+
+#define EECONFIG_RAPPYSNAPPY_ADDR_END \
+    (EECONFIG_RAPPYSNAPPY_ADDR + EECONFIG_RAPPYSNAPPY_SIZE)
+
+/* Toggle Key */
+#define EECONFIG_TOGGLE_KEY_ADDR \
+    (EECONFIG_RAPPYSNAPPY_ADDR_END)
+
+#define EECONFIG_TOGGLE_KEY_SIZE \
+    ((uint32_t)sizeof(toggle_key_slot_t) * \
+     (uint32_t)toggle_key_pair_count)
+
+#define EECONFIG_TOGGLE_KEY_ADDR_END \
+    (EECONFIG_TOGGLE_KEY_ADDR + EECONFIG_TOGGLE_KEY_SIZE)
 
 /*
  * New macro EEPROM region.

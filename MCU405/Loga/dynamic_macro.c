@@ -5,8 +5,9 @@
 #include "eeconfig.h"
 #include "debug.h"
 #include "timer.h"
-
-
+#include <stddef.h>
+#include <stdlib.h>
+#include <stddef.h>
 
 dynamic_macro_t dynamic_macros[DYNAMIC_MACRO_COUNT];//
 uint32_t macro_timeStamp = 0;
@@ -238,12 +239,20 @@ uint16_t dynamic_macro_calc_crc(dynamic_macro_t* macro) {
   return crc;
 }
 
-uint16_t dynamic_macro_eeprom_macro_addr(uint8_t macro_id) {
-    return DYNAMIC_MACRO_EEPROM_BLOCK0_ADDR + sizeof(dynamic_macro_t) * macro_id;
+static uint8_t *dynamic_macro_eeprom_macro_addr(uint8_t macro_id)
+{
+    if (macro_id >= DYNAMIC_MACRO_COUNT) {
+        return NULL;
+    }
+
+    return DYNAMIC_MACRO_EEPROM_BLOCK0_ADDR + ((uint32_t)sizeof(dynamic_macro_t) * macro_id);
 }
 
-bool dynamic_macro_header_correct(void) {
-    return eeprom_read_word(DYNAMIC_MACRO_EEPROM_MAGIC_ADDR) == DYNAMIC_MACRO_EEPROM_MAGIC;
+bool dynamic_macro_header_correct(void)
+{
+    return eeprom_read_word(
+        (const uint16_t *)DYNAMIC_MACRO_EEPROM_MAGIC_ADDR
+    ) == DYNAMIC_MACRO_EEPROM_MAGIC;
 }
 
 void dynamic_macro_load_eeprom_all(void) {
@@ -257,52 +266,97 @@ void dynamic_macro_load_eeprom_all(void) {
   }
 }
 
-void dynamic_macro_load_eeprom(uint8_t macro_id) {
-  dynamic_macro_t* dst = &dynamic_macros[macro_id];
-  uint8_t *dstAdd = &dynamic_macros[macro_id]; 
-  //eeprom_read_block(dst, dynamic_macro_eeprom_macro_addr(macro_id), sizeof(dynamic_macro_t));
-  //uprintf ("id:%d\r\n",macro_id);
-  for (uint16_t i=0;i<sizeof(dynamic_macro_t);i++){
-    *dstAdd = eeprom_read_byte(dynamic_macro_eeprom_macro_addr(macro_id)+i);
-    //uprintf ("%02X ",*dstAdd);
-    dstAdd++;
-  }  
-  //uprintf ("\r\n");
+void dynamic_macro_load_eeprom(uint8_t macro_id)
+{
+    if (macro_id >= DYNAMIC_MACRO_COUNT) {
+        return;
+    }
 
-  /* Validate checksum, ifchecksum is NOT valid for macro, set its length to 0 to prevent its use. */
-  if (dynamic_macro_calc_crc(dst) != dst->checksum) {
-    //uprintf("dynamic macro: slot %d not loaded, checksum mismatch\r\n", macro_id);
-    dst->length = 0;
+    uint8_t *eeprom_addr =
+        dynamic_macro_eeprom_macro_addr(macro_id);
 
-    return;
-  }
+    if (eeprom_addr == NULL) {
+        return;
+    }
 
-  //uprintf("dynamic macro: slot %d loaded from eeprom, checksum okay\r\n", macro_id);
+    dynamic_macro_t *dst =
+        &dynamic_macros[macro_id];
+
+    eeprom_read_block(
+        dst,
+        (const void *)eeprom_addr,
+        sizeof(*dst)
+    );
+
+    if (dynamic_macro_calc_crc(dst) != dst->checksum) {
+        dst->length = 0;
+        return;
+    }
 }
 
-void dynamic_macro_reset_eeprom(void){
-  eeprom_write_word(DYNAMIC_MACRO_EEPROM_MAGIC_ADDR, 0x0000);
+void dynamic_macro_reset_eeprom(void)
+{
+    eeprom_write_word((uint16_t *)DYNAMIC_MACRO_EEPROM_MAGIC_ADDR,0x0000);
 }
 
-void dynamic_macro_save_eeprom(uint8_t macro_id,bool mode) {
-  if (!dynamic_macro_header_correct()) {
-    eeprom_write_word(DYNAMIC_MACRO_EEPROM_MAGIC_ADDR, DYNAMIC_MACRO_EEPROM_MAGIC);
-    uprintf("dynamic macro: writing magic eeprom header\r\n");
-  }
-if (!mode){
-  for (uint16_t i=0;i<dynamic_macros[macro_id].length;i++){
-    dynamic_macros[macro_id].events[i].event.time = dynamic_macros[macro_id].events[i+1].event.time*10;
-  }
-  dynamic_macros[macro_id].events[dynamic_macros[macro_id].length-1].event.time = 0;
-}
+void dynamic_macro_save_eeprom(uint8_t macro_id, bool mode)
+{
+    if (macro_id >= DYNAMIC_MACRO_COUNT) {
+        return;
+    }
 
-  dynamic_macro_t* src = &dynamic_macros[macro_id];
-  uint8_t *srcAdd =  &dynamic_macros[macro_id];
-  uprintf ("start macro save address:%X size:%d\r\n",dynamic_macro_eeprom_macro_addr(macro_id),sizeof(dynamic_macro_t));
+    if (!dynamic_macro_header_correct()) {
+        eeprom_write_word(
+            (uint16_t *)DYNAMIC_MACRO_EEPROM_MAGIC_ADDR,
+            DYNAMIC_MACRO_EEPROM_MAGIC
+        );
 
-  for (uint16_t i=0;i<sizeof(dynamic_macro_t);i++){
-    eeprom_update_byte(dynamic_macro_eeprom_macro_addr(macro_id)+i, *srcAdd);
-    srcAdd++;
-  }
-  uprintf("dynamic macro: slot %d saved to eeprom\r\n", macro_id);
+        uprintf(
+            "dynamic macro: writing magic eeprom header\r\n"
+        );
+    }
+
+    if (!mode && dynamic_macros[macro_id].length > 0) {
+        for (uint16_t i = 0;
+             i + 1 < dynamic_macros[macro_id].length;
+             i++) {
+            dynamic_macros[macro_id].events[i].event.time =
+                dynamic_macros[macro_id]
+                    .events[i + 1]
+                    .event.time * 10;
+        }
+
+        dynamic_macros[macro_id]
+            .events[dynamic_macros[macro_id].length - 1]
+            .event.time = 0;
+    }
+
+    dynamic_macro_t *src =
+        &dynamic_macros[macro_id];
+
+    uint8_t *eeprom_addr =
+        dynamic_macro_eeprom_macro_addr(macro_id);
+
+    if (eeprom_addr == NULL) {
+        return;
+    }
+
+    src->checksum = dynamic_macro_calc_crc(src);
+
+    uprintf(
+        "start macro save address:%08lX size:%u\r\n",
+        (unsigned long)(uintptr_t)eeprom_addr,
+        (unsigned int)sizeof(*src)
+    );
+
+    eeprom_update_block(
+        src,
+        (void *)eeprom_addr,
+        sizeof(*src)
+    );
+
+    uprintf(
+        "dynamic macro: slot %u saved to eeprom\r\n",
+        macro_id
+    );
 }
