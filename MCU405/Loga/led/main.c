@@ -13,6 +13,7 @@
 # include "usbcfg.h"
 # include "main.h"
 # include "led_effect.h"
+#include "led_function.h"
 
 /*===========================================================================*/
 /* Command line related.                                                     */
@@ -23,7 +24,6 @@
 #define SerialDebugPort					SD1
 
 //extern uint32_t spi_timer,spi_timer_last;
-extern uint32_t LED_UpdateCount;
 
 uint32_t get_system_time_ticks(void);
 
@@ -200,8 +200,8 @@ void otg_test(void)
 #define ADC_GRP2_NUM_CHANNELS   8
 #define ADC_GRP2_BUF_DEPTH      16
 
-static adcsample_t samples1[ADC_GRP1_NUM_CHANNELS * ADC_GRP1_BUF_DEPTH];
-static adcsample_t samples2[ADC_GRP2_NUM_CHANNELS * ADC_GRP2_BUF_DEPTH];
+adcsample_t samples1[ADC_GRP1_NUM_CHANNELS * ADC_GRP1_BUF_DEPTH];
+adcsample_t samples2[ADC_GRP2_NUM_CHANNELS * ADC_GRP2_BUF_DEPTH];
 
 /*
  * ADC streaming callback.
@@ -333,8 +333,7 @@ int main(void)
     {
     	while(1){
     	//uprintf ("Timer:%d LED_SPI:%d\r\n",get_system_time_ticks()/1000,spi_timer_last);
-    		uprintf ("Timer:%d SPI_End:%d\r\n",get_system_time_ticks()/1000,LED_UpdateCount);
-    		LED_UpdateCount = 0;
+
     	chThdSleepMilliseconds(1000);
         wdgReset(&WDGD1); //lyon WD
     	}

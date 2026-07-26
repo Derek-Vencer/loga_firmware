@@ -20,9 +20,10 @@ typedef struct {
     uint8_t col;
     uint16_t keycode;
 
-    float trigger_ratio;   // 使用者設定觸發百分比 (0.0 ~ 1.0)
-    float release_ratio;   // 自動計算（trigger - 0.10）
+    float trigger_ratio;
+    float release_ratio;
 } rappy_fixed_ratio_t;
 
+void rapidTriggerProcess(bool mode, uint8_t key);
 
 #endif // LOGA_FUNCTION_H

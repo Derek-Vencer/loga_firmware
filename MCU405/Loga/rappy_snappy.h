@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#define RAPPY_SNAPPY_PAIR_COUNT 4   // 可自行調整
+#define RAPPY_SNAPPY_PAIR_COUNT 4   // ��銵矽�
 
 // static int16_t adc_value[MATRIX_ROWS][MATRIX_COLS];
 extern int16_t adcPre_value[MATRIX_ROWS][MATRIX_COLS];
@@ -30,9 +30,21 @@ typedef struct {
     uint8_t col_b;
     uint16_t kc_b;
 
-    int16_t hysteresis;   // 深度差門檻
+    int16_t hysteresis;   // 瘛勗漲撌桅�瑼�
     rs2_state_t state;
 } rappy_snappy_pair_t;
+
+#ifndef RAPPY_SNAPPY_H
+#define RAPPY_SNAPPY_H
+
+#include <stdint.h>
+#include <stdbool.h>
+
+/* 其他既有宣告 */
+
+void eeconfig_rappy_snappy_clear(void);
+
+#endif
 
 extern rappy_snappy_pair_t g_rappy_pairs[RAPPY_SNAPPY_PAIR_COUNT];
 

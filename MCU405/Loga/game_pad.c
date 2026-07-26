@@ -2,6 +2,7 @@
 #include "game_pad.h"
 #include "led/led_function.h"
 #include "report.h"
+#include "host.h"
 
 binary_semaphore_t gamepadAnalogSem;
 mutex_t analogStickMutex;

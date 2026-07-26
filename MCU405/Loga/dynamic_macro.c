@@ -9,6 +9,10 @@
 #include <stdlib.h>
 #include <stddef.h>
 #include "eeprom.h"
+#include "led.h"
+#include "host.h"
+#include "keymap.h"
+#include "print.h"
 
 _Static_assert(
     sizeof(dynamic_macro_t) == DYNAMIC_MACRO_EEPROM_SLOT_SIZE,

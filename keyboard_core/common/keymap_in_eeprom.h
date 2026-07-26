@@ -69,7 +69,7 @@ uint16_t eeconfig_read_keymap_key(uint8_t layer, uint8_t row, uint8_t col);
 uint16_t eeconfig_read_keymapBuffer_key(uint8_t layer, uint8_t row, uint8_t col);
 
 void write_trigger_to_eeprom(void);
-uint16_t eeconfig_read_Trigge(uint8_t row, uint8_t col);
+uint16_t eeconfig_read_Trigger(uint8_t row, uint8_t col);
 void eeconfig_write_Trigger( uint8_t row, uint8_t col, uint16_t triggerLevel);
 uint16_t eeconfig_read_Release(uint8_t row, uint8_t col);
 void eeconfig_write_Release( uint8_t row, uint8_t col, uint16_t triggerLevel);
@@ -87,6 +87,9 @@ const uint16_t* keymaps_pointer(void);
 const uint16_t* fn_actions_pointer(void);
 uint16_t keys_count(void);
 uint16_t fn_actions_count(void);
+void write_Release_to_eeprom(void);
+uint16_t eeconfig_read_Trigger(uint8_t row, uint8_t col);
+uint16_t eeconfig_read_Release(uint8_t row, uint8_t col);
 #endif
 
 #endif

@@ -24,6 +24,12 @@
 # include <math.h>
 # include <stdint.h>
 # include <string.h>
+# include "rappy_snappy.h"
+# include "via/via.h"
+# include "host.h"
+
+#include "action.h"
+#include "led/led_effect.h"
 
 // extern uint16_t keyMatrixDelta[MATRIX_ROWS][MATRIX_COLS];
 
@@ -132,6 +138,7 @@ void send_A_to_Z(void) {
     }
 }
 
+/*
 static void macro_engine_setup_test_copy_paste(void) {
     macro_config_t *cfg = macro_engine_get_config(0);
 
@@ -155,7 +162,7 @@ static void macro_engine_setup_test_copy_paste(void) {
     macro_save_to_eeprom(0);
     uprintf("[MACRO] test copy/paste macro loaded to slot 0\r\n");
 }
-
+*/
 static bool macro_engine_set_step_like_api(
     uint8_t macro_index,
     uint8_t step_index,
@@ -184,6 +191,7 @@ static bool macro_engine_set_step_like_api(
     return true;
 }
 
+/*
 static void macro_engine_write_test_copy_paste_api_style(uint8_t macro_index) {
     macro_clear(macro_index);
 
@@ -198,7 +206,8 @@ static void macro_engine_write_test_copy_paste_api_style(uint8_t macro_index) {
 
     uprintf("[MACRO][API-SIM] full macro written idx=%u step_count=8\r\n", macro_index);
 }
-
+*/
+/*
 static void macro_engine_write_full_slot_api_style(uint8_t macro_index) {
     macro_clear(macro_index);
 
@@ -222,7 +231,8 @@ static void macro_engine_write_full_slot_api_style(uint8_t macro_index) {
 
     uprintf("[MACRO][API-SIM] full-slot macro written idx=%u step_count=%u\r\n", macro_index, MACRO_MAX_STEPS);
 }
-
+*/
+/*
 static void macro_engine_dump_eeprom_slot(uint8_t index) {
     uint8_t *base_addr;
     uint8_t step_count;
@@ -260,13 +270,14 @@ static void macro_engine_dump_eeprom_slot(uint8_t index) {
         );
     }
 }
-
-// void send_string(const char *str) {
-//     while (*str) {
-//         host_keyboard_send_char(*str++);
-//     }
-// }
-
+*/
+/*
+ void send_string(const char *str) {
+     while (*str) {
+         host_keyboard_send_char(*str++);
+     }
+ }
+*/
 
 #define ADC_v5
 //#define ADC_Oversample
@@ -286,13 +297,13 @@ binary_semaphore_t adcCompleteSem;
 //mutex_t keymatrixProcessMut;
 extern binary_semaphore_t gamepadAnalogSem;
 extern uint16_t analogX,analogY,analogRx,analogRy,analogZ,analogRz;
-static bool ADC_Check = false,ADC_Wait = false;
+bool ADC_Check = false,ADC_Wait = false;
 
 //test
 bool ledOn_off_test = true;
 
 //static uint8_t adcStauts = adcSensorPowerOn;
-static uint8_t dly_times;
+uint8_t dly_times;
 uint8_t draftValue = 20;
 
 void irq_storm_gpt9_cb(GPTDriver* gptp);
@@ -330,7 +341,6 @@ typedef struct {
     uint32_t b_ts;
 } socd_runtime_t;
 
-static socd_runtime_t socd_rt[SOCD_SLOT_COUNT];
 
 #endif // socd
 #ifdef rappyTrigger
@@ -454,7 +464,7 @@ static inline void mt_on_up(uint8_t L,uint8_t R,uint8_t C){
     mt_state_clear_idx(s);
 }
 
-// ????????(???“????”????)
+// ????????(???ï¿½????ï¿½????)
 static inline void mt_tick(uint8_t L){
     for (int i=0;i<MT_CAP_ACTIVE;i++){
         if (mt_active_list[i].used && mt_active_list[i].down && !mt_active_list[i].hold){
@@ -901,7 +911,7 @@ extern int uprintf(const char* fmt, ...);
 //extern bool setRunMode(uint8_t runMode, int8_t mode, uint8_t brightness, uint8_t speed);
 void send_lamp_array(report_lamp_array_t* report);
 void adcOffsetGet(bool findMax);
-extern void LED_SpeedChange(uint8_t brightness, uint8_t speed);
+
 uint32_t testCB = 0,testADC = 0;
 
 
@@ -913,8 +923,8 @@ uint32_t testCB = 0,testADC = 0;
 /* matrix state(1:on, 0:off) */
 matrix_row_t matrix[MATRIX_ROWS];
 static matrix_row_t matrix_temp[MATRIX_ROWS];
-static bool debouncing = false;
-static uint16_t debouncing_time = 0;
+//static bool debouncing = false;
+//static uint16_t debouncing_time = 0;
 uint16_t currentMatrix_CRC, lastMatrix_CRC;
 
 rapidTriggerKey_config_t rapidTriggerKey[RAPID_TRIGGER_COUNT];
@@ -1306,7 +1316,7 @@ const GPTConfig gpt9cfg1 = {
 #define ADC_VM_HIGH				0xFFF0
 #define ADC_VM_LOW				0x0000
 
-static adcsample_t samples1[ADC_NUM_CHANNELS];
+adcsample_t samples1[ADC_NUM_CHANNELS];
 adcsample_t samples2[ADC_BUF_DEPTH][ADC_NUM_CHANNELS], initPostionLevel[ADC_BUF_DEPTH][ADC_NUM_CHANNELS], travelPostionLevel[ADC_BUF_DEPTH][ADC_NUM_CHANNELS]; ;
 // volatile adcsample_t keyRawDepth[MATRIX_ROWS][MATRIX_COLS];
 // volatile adcsample_t keyDepth[MATRIX_ROWS][MATRIX_COLS];
@@ -1530,7 +1540,7 @@ void irq_storm_gpt9_cb(GPTDriver* gptp)
 					// palSetPadMode(GPIOC, 12, PAL_MODE_INPUT_PULLDOWN);
 					// chThdSleep(TIME_US2I(40));
 					// chThdSleepMicroseconds(10); 
-					static bool toggleGpio = 0;
+					//static bool toggleGpio = 0;
 					// palSetPad(GPIOB, 12);
 					////////////////palSetPad(GPIOC, 12); 
 					// if(toggleGpio){
@@ -1773,7 +1783,7 @@ static void muxSelect(uint8_t channel){
 	// uprintf("mux idx=%d\r\n", channel);
 	uint8_t data, data_pa, data_pf;
 	data = 15-channel;
-	data_pa = (((data & 0x01) | ((data >> 2)) & 0x1e)) << 3;
+	data_pa = ((data & 0x01) | ((data >> 2) & 0x1E)) << 3;
 	data_pf = ((data >> 1) & 0x03) << 4;
 
 
@@ -1952,7 +1962,7 @@ static void adccallback(ADCDriver* adcp)
 #ifndef ADC_Oversample
 	gptStartOneShot(&GPTD9, 14); //lyon ???????3??adc??????//original is 7 // 9???8??8??,???13??,?10?(??8k)????
 	// maybe change to higher value give it more time to process ex: 01-9, 02-8,02????????????no
-	// 7 / 60000 ? = ? 116.7 µs
+	// 7 / 60000 ? = ? 116.7 ï¿½s
 	// 8 / 140000sec = 57usec, 7/140000=50
 	#else
 	gptStartOneShot(&GPTD9, 3);
@@ -1971,7 +1981,7 @@ static void adcerrorcallback(ADCDriver* adcp, adcerror_t err)
 void analogPowerSwitch(uint8_t data)
 {
 	uint8_t data_pa, data_pf;
-	data_pa = (((data & 0x01) | ((data >> 2)) & 0x1e)) << 3;
+	data_pa = ((data & 0x01) | ((data >> 2) & 0x1E)) << 3;
 	data_pf = ((data >> 1) & 0x03) << 4;
 	//uprintf ("pa:%X pf:%X\r\n",data_pa,data_pf);
 	palWriteGroup(GPIOA, PAL_PORT_BIT(3) | PAL_PORT_BIT(4), 0, data_pa);
@@ -2375,7 +2385,7 @@ bool matrixAnalogScan(void)
 {
 	bool rapidKeyStatus;
 	int adcCalc, adcPre;
-	bool rapidStartCheck, rapidEndCheck;
+	//bool rapidStartCheck, rapidEndCheck;
 	led_config_t EffectranbowColor;
 	float mult;
 	int8_t currentStep = 0;
@@ -2439,7 +2449,7 @@ bool matrixAnalogScan(void)
 
 			adcsample_t travel = travelPostionLevel[channel][group];
 			adcsample_t init   = initPostionLevel[channel][group];
-			adcsample_t now    = samples2[channel][group];
+			//adcsample_t now    = samples2[channel][group];
 			int32_t range      = (int32_t)travel - (int32_t)init;
 
 			if (adcCalc < 0 || range <= 0) {
@@ -3325,6 +3335,7 @@ bool matrixAnalogFind(void)
 static THD_WORKING_AREA(waADC_ProcessThread, 512);
 static THD_FUNCTION(ADC_ProcessThread, arg)
 {
+		(void)arg;
     uprintf("ADC Task start...\r\n");
 
     //Init ADC control GPIO
@@ -4084,7 +4095,7 @@ void dump_eeprom(void)
         uprintf("\r\n");
     }
 }
-	
+/*
 static void eeprom_write8_verify(uint8_t *addr, uint8_t value)
 {
     if (addr == NULL) {
@@ -4108,7 +4119,7 @@ static void eeprom_write8_verify(uint8_t *addr, uint8_t value)
         after == value ? "OK" : "FAIL"
     );
 }
-
+*/
 
 static void plusHue(led_config_t in)
 {
@@ -4534,9 +4545,9 @@ bool hook_matrix_change(keyrecord_t record)
 			case KC_MSTP: //F5
 				if (isMac) {
 					if (record.event.pressed) {
-						register_code(KC_RGB_VAD);
+						register_code16(KC_RGB_VAD);
 					} else {
-						unregister_code(KC_RGB_VAD);
+						unregister_code16(KC_RGB_VAD);
 					}
 					return false;
 				}
@@ -4544,9 +4555,9 @@ bool hook_matrix_change(keyrecord_t record)
 			case KC_MEDIA_PREV_TRACK:  //F6
 				if (isMac) {
 					if (record.event.pressed) {
-						register_code(KC_RGB_VAI);
+						register_code16(KC_RGB_VAI);
 					} else {
-						unregister_code(KC_RGB_VAI);
+						unregister_code16(KC_RGB_VAI);
 					}
 					return false;
 				}

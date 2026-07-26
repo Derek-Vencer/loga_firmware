@@ -11,6 +11,11 @@ void setLightRunMode (uint8_t mode);
 void via_controlSet(uint8_t *data);
 void via_rapidValueSet(uint8_t * data);
 extern uint8_t LED_PresetModeIndex;
+void dynamaticLightingRangeUpdate(uint8_t *lamp_array_data);
+void dynamaticLightingMultiUpdate(uint8_t *lamp_array_data);
+void raw_hid_send(uint8_t *data, uint8_t length);
+
+uint32_t get_system_time_ticks(void);
 
 #define LedNumbers 119+1
 //#define LedNumbers 33+1
@@ -337,9 +342,10 @@ static const ledDriver_Remap_t ledDriver_Remap[] = {
 
 
 
-uint8_t analogBtnFill (uint8_t group,uint8_t location,led_config_t color, uint16_t bright);
+//uint8_t analogBtnFill (uint8_t group,uint8_t location,led_config_t color, uint16_t bright);
 void ledAnalogMatrixzlocationTest(bool direction);
 bool setRemapLED(uint8_t row, uint8_t column, led_config_t color);
 bool setKeymapLED(uint8_t row, uint8_t column, led_config_t color);
-
+void led_updateFrameBufferSingle(uint8_t start, uint8_t end, led_config_t* led);
+void eeconfig_write_modtap(uint8_t idx, const mt_entry_t* in);
 #endif /* LED_FUNCTION_H_ */

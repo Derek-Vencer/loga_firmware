@@ -93,6 +93,10 @@ void debug_event(keyevent_t event);
 void debug_record(keyrecord_t record);
 void debug_action(action_t action);
 
+void tap_code(uint8_t code);
+void tap_code16(uint16_t code);
+void tap_code_delay(uint8_t code, uint16_t delay);
+
 #ifdef __cplusplus
 }
 #endif

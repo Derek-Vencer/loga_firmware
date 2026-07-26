@@ -19,6 +19,10 @@
 #include "driver/LED_Driver.h"
 #include <string.h>
 #include "timer.h"
+#include "keymap_in_eeprom.h"
+#include "led_effect.h"
+#include "loga_function.h" 
+#include "chprintf.h"
 //#include "driver/led_RGBTable.h"
 
 
@@ -76,14 +80,13 @@ extern led_config_t LED_NULL;
 extern bool adcTestToggle;
 //int8_t MultiUpdatelastLED = -1;
 bool ledUpdatingLock = false;
-static int32_t lastLED_Update = -1;
+int32_t lastLED_Update = -1;
 extern uint16_t keyMatrixTriggerLevel, keyMatrixReleaseLevel;
 
 extern const analogKey_Config_t matrixAnalogRelocate[6][15];
 
 //uint32_t spi_timer,spi_timer_last;
 
-extern uint32_t get_system_time_ticks();
 extern void adcOffsetCalc(bool findMax,bool update,uint16_t samples);
 extern void adcTravelCalc(uint8_t mode);
 extern uint8_t dynamaticReciveBuff[LAMP_ARRAY_EPSIZE];
@@ -122,9 +125,33 @@ bool autonomousMode = true;
 //const ledsPerRow[] = {LedNumbers, 21, 21, 16, 17, 13};
 
 #ifdef multiChannelARGB
-	const uint8_t ledsPerRow[] = {14, 15, 15, 14, 13, 10, 28};
-#else
-	const ledsPerRow[] = {LedNumbers};
+
+		static const uint8_t ledsPerRow[] = {
+				14, 15, 15, 14, 13, 10, 28
+		};
+
+		static const uint8_t ARGB_Port1[] = {
+				0, 4, 6
+		};
+
+		static const uint8_t ARGB_Port2[] = {
+				2
+		};
+
+		static const uint8_t ARGB_Port3[] = {
+				1, 3, 5
+		};
+
+		static const uint8_t ARGB_PortStart[] = {
+				ARGB_Port1[0],
+				ARGB_Port2[0],
+				ARGB_Port3[0]
+		};
+
+		static uint8_t port1_Index = 0;
+		static uint8_t port2_Index = 0;
+		static uint8_t port3_Index = 0;
+
 #endif
 	const uint8_t ARGB_Port1[] = {0, 4, 6};
 	const uint8_t ARGB_Port2[] = {2};
@@ -162,6 +189,7 @@ const uint8_t driverLocationRemap[] = {
 /*
  * CRC32 configuration
  */
+/*
 static const CRCConfig crc32_config = {
   .poly_size         = 32,
   .poly              = 0x04C11DB7,
@@ -170,7 +198,7 @@ static const CRCConfig crc32_config = {
   .reflect_data      = 1,
   .reflect_remainder = 1
 };
-
+*/
 /*
  * CRC16 configuration
  */
@@ -187,7 +215,7 @@ extern const uint8_t locationMax[7];
 
 typedef struct
  {
-     uint32_t driver;
+     SPIDriver *driver;
      ioportid_t port;
      uint8_t pad;
      uint8_t mux;
@@ -269,8 +297,6 @@ uint64_t ledArrayChannel = 0;
 
 
 bool LED_Effect(uint8_t effect, bool enable, uint32_t interval, uint8_t colorMode, uint8_t mode, led_config_t color, uint8_t brightness, uint8_t speed, bool direction);
-uint32_t get_system_time_ticks(void);
-
 
 bool LED_FadoutEffect(uint8_t End, uint8_t speed)
 {
@@ -516,7 +542,7 @@ void ledDriver_PatternConvert(uint8_t* data)
 {
 uint8_t postion = 0;
 uint16_t dataPostion = 0;
-const uint8_t brightness_limit = 120; // 鈭桀漲銝���隞交��� 160 ��隞�潘��
+//uint8_t brightness_limit = 120;
 
 	for (uint8_t i=0; i< sizeof(ledRows); i++){
 		for (uint8_t j=0; j<ledRows[i]; j++){
@@ -559,6 +585,7 @@ const uint8_t brightness_limit = 120; // 鈭桀漲銝���隞
 
 void led_init(uint8_t mode)
 {
+	(void)mode;
 #ifdef LED_ARGB
 	uprintf ("LED INIT Type:ARGB\r\n");
 	ledArrayChannel = mode;
@@ -649,16 +676,10 @@ static THD_FUNCTION(LEDUpdateThread, arg)
 {
 (void)arg;
 chRegSetThreadName("LED Update");
-uint16_t start = 0, length = 0;
-uint16_t LED_UpdateCount = 0;
-uint16_t currentLED_CRC, lastLED_CRC;
 chBSemObjectInit(&ledUpdateSem, true);
 chBSemObjectInit(&ledUpdateingSem, true);
 chBSemObjectInit(&rawSendSem, true);
-
-uint8_t data[16];
-
-
+	
 chVTObjectInit(&randColor_vt);
 #ifdef LED_ARGB
 memset(patternBuffer, 0x00, sizeof(patternBuffer));
@@ -854,7 +875,7 @@ void via_controlSet(uint8_t *data){
 
 void via_rapidValueSet(uint8_t *data){
 	rapidTrigger_config_t rapidTriggerKey;
-	uint8_t *rapidKeyTemp;
+	//uint8_t *rapidKeyTemp;
 	for (uint8_t i=0;i<15;i++){
 		uprintf ("%02X ",data[i]);
 	}
@@ -880,15 +901,16 @@ static THD_WORKING_AREA(waLED_DynamaticLighting, 512);
 static THD_FUNCTION(LED_DynamaticLighting, arg)
 {
     (void)arg;
-    static bool ledStatus;
-    uint16_t mode, data;
+    //static bool ledStatus;
+    //uint16_t mode, data;
+		uint16_t data;
     keypos_t key;
     uint16_t keycode = 0,triggerLevel,releaseLevel;
     chRegSetThreadName("LED Dynamatic Lighting");
     chBSemObjectInit(&ledDynamaticLightingSem, true);
     osalMutexObjectInit(&usbRecivedProcess);
     rapidTrigger_config_t rapidTriggerKey;
-    uint8_t *rapidKeyTemp;
+    //uint8_t *rapidKeyTemp;
     int16_t i;
 
     while (true)
@@ -915,7 +937,7 @@ static THD_FUNCTION(LED_DynamaticLighting, arg)
             	}
             	if (!lampArrayDisable){
 					// currentLED_RunMode.type = dynamticLightingMode;
-            		dynamaticLightingMultiUpdate(&lamp_array_data_report.data);
+            		dynamaticLightingMultiUpdate(lamp_array_data_report.data);
             	}
                 break;
             case 5:
@@ -927,7 +949,7 @@ static THD_FUNCTION(LED_DynamaticLighting, arg)
 				}
 				if (!lampArrayDisable){
 					// currentLED_RunMode.type = dynamticLightingMode; // last add
-					dynamaticLightingRangeUpdate(&lamp_array_data_report.data);
+					dynamaticLightingRangeUpdate(lamp_array_data_report.data);
 					// setLightRunMode(0x0);
 					// uprintf ("if 22222222\r\n");
 				}
@@ -940,7 +962,7 @@ static THD_FUNCTION(LED_DynamaticLighting, arg)
 				if (!lampArrayDisable){
 					currentLED_RunMode.type = dynamticLightingMode;
 					setRunMode(currentLED_RunMode);
-            		dynamaticLightingRangeUpdate(&lamp_array_data_report.data);
+            		dynamaticLightingRangeUpdate(lamp_array_data_report.data);
 					uprintf("!lampArrayDisable\r\n");
             	}
 				*/
@@ -1271,36 +1293,89 @@ static THD_FUNCTION(LED_DynamaticLighting, arg)
                         //uprintf ("row:%d col:%d trigger:%d\r\n",lamp_array_data_report.data[1],lamp_array_data_report.data[2],triggerLevel);
                     	break;
 
-					case apiRapidTrigger_GetValue:
-						rapidTriggerKey =  eeconfig_read_rapidTrigger(lamp_array_data_report.data[1]);
-						rapidKeyTemp = &rapidTriggerKey;
-						dynamaticReciveBuff[3] = lamp_array_data_report.data[1];
-						for (uint8_t i=0;i < sizeof(rapidTrigger_config_t);i++){
-							dynamaticReciveBuff[4+i]= *rapidKeyTemp++;
-						}
-						break;
+											case apiRapidTrigger_GetValue:
+											{
+													rapidTriggerKey =
+															eeconfig_read_rapidTrigger(lamp_array_data_report.data[1]);
 
-					case apiRapidTrigger_SetValue:
-						rapidTriggerKey.enable = lamp_array_data_report.data[2];
-						rapidTriggerKey.row = lamp_array_data_report.data[3];
-						rapidTriggerKey.col = lamp_array_data_report.data[4];
-						rapidTriggerKey.counts = lamp_array_data_report.data[5];
-						rapidTriggerKey.keycode[0] = lamp_array_data_report.data[6] | lamp_array_data_report.data[7]<<8;
-						rapidTriggerKey.keycode[1] = lamp_array_data_report.data[8] | lamp_array_data_report.data[9]<<8;
-						rapidTriggerKey.keycode[2] = lamp_array_data_report.data[10] | lamp_array_data_report.data[11]<<8;
-						rapidTriggerKey.keycode[3] = lamp_array_data_report.data[12] | lamp_array_data_report.data[13]<<8;
-						rapidTriggerKey.keycode[4] = lamp_array_data_report.data[14] | lamp_array_data_report.data[15]<<8;
-						rapidTriggerKey.keycode[5] = lamp_array_data_report.data[16] | lamp_array_data_report.data[17]<<8;
-						eeconfig_write_rapidTrigger(lamp_array_data_report.data[1],rapidTriggerKey);
-						//rapidTriggerKeyBuilder(lamp_array_data_report.data[1]);
-						rapidTriggerProcess(true,0);
-						if (rapidKeyEnable){rapidKeyIndicate();}
-						dynamaticReciveBuff[3] = lamp_array_data_report.data[1];
-						rapidKeyTemp = &rapidTriggerKey;
-						for (uint8_t i=0;i < sizeof(rapidTrigger_config_t);i++){
-							dynamaticReciveBuff[4+i]= *rapidKeyTemp++;
-						}
-					break;
+													const uint8_t *rapidKeyTemp =
+															(const uint8_t *)&rapidTriggerKey;
+
+													dynamaticReciveBuff[3] =
+															lamp_array_data_report.data[1];
+
+													for (uint8_t i = 0;
+															 i < sizeof(rapidTrigger_config_t);
+															 i++) {
+															dynamaticReciveBuff[4 + i] = rapidKeyTemp[i];
+													}
+
+													break;
+											}
+
+											case apiRapidTrigger_SetValue:
+											{
+													rapidTriggerKey.enable =
+															lamp_array_data_report.data[2];
+
+													rapidTriggerKey.row =
+															lamp_array_data_report.data[3];
+
+													rapidTriggerKey.col =
+															lamp_array_data_report.data[4];
+
+													rapidTriggerKey.counts =
+															lamp_array_data_report.data[5];
+
+													rapidTriggerKey.keycode[0] =
+															(uint16_t)lamp_array_data_report.data[6] |
+															((uint16_t)lamp_array_data_report.data[7] << 8);
+
+													rapidTriggerKey.keycode[1] =
+															(uint16_t)lamp_array_data_report.data[8] |
+															((uint16_t)lamp_array_data_report.data[9] << 8);
+
+													rapidTriggerKey.keycode[2] =
+															(uint16_t)lamp_array_data_report.data[10] |
+															((uint16_t)lamp_array_data_report.data[11] << 8);
+
+													rapidTriggerKey.keycode[3] =
+															(uint16_t)lamp_array_data_report.data[12] |
+															((uint16_t)lamp_array_data_report.data[13] << 8);
+
+													rapidTriggerKey.keycode[4] =
+															(uint16_t)lamp_array_data_report.data[14] |
+															((uint16_t)lamp_array_data_report.data[15] << 8);
+
+													rapidTriggerKey.keycode[5] =
+															(uint16_t)lamp_array_data_report.data[16] |
+															((uint16_t)lamp_array_data_report.data[17] << 8);
+
+													eeconfig_write_rapidTrigger(
+															lamp_array_data_report.data[1],
+															rapidTriggerKey
+													);
+
+													rapidTriggerProcess(true, 0);
+
+													if (rapidKeyEnable) {
+															rapidKeyIndicate();
+													}
+
+													dynamaticReciveBuff[3] =
+															lamp_array_data_report.data[1];
+
+													const uint8_t *rapidKeyTemp =
+															(const uint8_t *)&rapidTriggerKey;
+
+													for (uint8_t i = 0;
+															 i < sizeof(rapidTrigger_config_t);
+															 i++) {
+															dynamaticReciveBuff[4 + i] = rapidKeyTemp[i];
+													}
+
+													break;
+											}
 
                     case apiTrigger_SetValue:
                     case apiRelease_SetValue:
@@ -1707,11 +1782,12 @@ bool raw_hid_receive_kb(uint8_t *data, uint8_t length){
 				break;
 
 				case id_calibration_levels: {
-					uint8_t row,col,count,index;
+					//uint8_t row,col,count,index;
+					uint8_t row, col, index;
 					uint8_t *key_data = &(data[6]);
 					uint16_t keycode;
 					analogKey_Config_t keyLocation;
-					uint16_t testData[sizeof(ledsPerRow)][21];
+					//uint16_t testData[sizeof(ledsPerRow)][21];
 						for (row = 0;row<sizeof(ledsPerRow);row++){
 							command_data[2] = row;		//row
 							col = 0;
@@ -1788,6 +1864,7 @@ bool raw_hid_receive_kb(uint8_t *data, uint8_t length){
 
 void ledAllOff(bool mode)
 {
+		(void)mode;
     memset(LED_Datas, 0x00, sizeof(LED_Datas));
 //	if (mode){
 //		palClearLine(SPI_LED_SDB_PIN);
@@ -1838,6 +1915,7 @@ void dynamaticLightingRangeUpdate(uint8_t* lamp_array_data)
 
 void dynamaticLightingMultiUpdate(uint8_t* lamp_array_data)
 {
+		(void)lamp_array_data;
     uint8_t lampID;
     float intensity;
     led_config_t LED;
@@ -1922,7 +2000,7 @@ void led_cb(void)
 
 bool setKeymapLED(uint8_t row, uint8_t column, led_config_t color)
 {
-    int8_t number;
+    //int8_t number;
 //    const uint8_t LED_Remap[2][6]={ { 3, 55, 60, 62, 63, 95},{ 4, 56, 61, 64, 65, 96} };
 //    number = ledRemap[row][column];
 //    if (number > LedNumbers) { return false; }
@@ -1974,8 +2052,8 @@ bool setRemapLED(uint8_t row, uint8_t column, led_config_t color)
 //}
 
 
-uint8_t analogBtnFill(uint8_t group, uint8_t location, led_config_t color, uint16_t bright)
-{
+//uint8_t analogBtnFill(uint8_t group, uint8_t location, led_config_t color, uint16_t bright)
+//{
 //    led_config_t EffectranbowColor;
 //    analogKey_Config_t keyLocation = analogKeyRelocate[group][location];;
 //    uint8_t currentStep = 0;
@@ -2032,8 +2110,8 @@ uint8_t analogBtnFill(uint8_t group, uint8_t location, led_config_t color, uint1
 //    EffectranbowColor.green *= mult;
 //    EffectranbowColor.blue *= mult;
 //    setKeyMatrixLED(keyLocation.rowA, keyLocation.colA, EffectranbowColor);
-	return 0U;
-}
+//	return 0U;
+//}
 
 void leRemapLocationTest(uint16_t count)
 {

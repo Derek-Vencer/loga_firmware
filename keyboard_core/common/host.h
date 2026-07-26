@@ -50,6 +50,8 @@ void host_gamepad_send(report_gamepad_report *data);
 
 uint16_t host_last_sysytem_report(void);
 uint16_t host_last_consumer_report(void);
+void send_gamepad(report_gamepad_report data);
+uint8_t host_keyboard_leds(void);
 
 #ifdef __cplusplus
 }

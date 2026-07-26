@@ -46,7 +46,7 @@ uint16_t keymap_key_to_keycode(uint8_t layer, keypos_t key);
 
 /* translates Fn keycode to action */
 action_t keymap_fn_to_action(uint16_t keycode);
-
+uint16_t keymap_key_to_keycode(uint8_t layer, keypos_t key);
 
 
 #ifdef USE_LEGACY_KEYMAP

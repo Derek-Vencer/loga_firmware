@@ -33,7 +33,7 @@
 
 
 #ifndef NO_PRINT
-
+int uprintf(const char *fmt, ...);
 
 #if defined(__AVR__)
 

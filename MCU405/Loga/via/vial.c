@@ -15,15 +15,14 @@
  */
 
 #include "vial.h"
-
 #include <string.h>
-
 #include "dynamic_keymap.h"
 #include "quantum.h"
 #include "vial_generated_keyboard_definition.h"
-
 #include "vial_ensure_keycode.h"
 #include "timer.h"
+#include "action.h"
+
 
 #define VIAL_UNLOCK_COUNTER_MAX 50
 

@@ -292,13 +292,15 @@ typedef struct {
 
 typedef union {
     uint32_t raw;
-    struct{
-        uint8_t cmd : 4;
+
+    struct {
+        uint8_t cmd  : 4;
         uint8_t mode : 4;
+
         // uint8_t count : 8;
-        // uint8_t row : 8;
-        // uint8_t col : 8;
-    }
+        // uint8_t row   : 8;
+        // uint8_t col   : 8;
+    };
 
 } trm_calibration_t;
 
@@ -349,36 +351,6 @@ typedef struct
     (key == KC_SYSTEM_POWER ? SYSTEM_POWER_DOWN : \
     (key == KC_SYSTEM_SLEEP ? SYSTEM_SLEEP : \
     (key == KC_SYSTEM_WAKE  ? SYSTEM_WAKE_UP : 0)))
-
-// /* keycode to consumer usage */
-// #define KEYCODE2CONSUMER(key) \
-//     (key == KC_AUDIO_MUTE           ?  AUDIO_MUTE : \
-//     (key == KC_AUDIO_VOL_UP         ?  AUDIO_VOL_UP : \
-//     (key == KC_AUDIO_VOL_DOWN       ?  AUDIO_VOL_DOWN : \
-//     (key == KC_MEDIA_NEXT_TRACK     ?  TRANSPORT_NEXT_TRACK : \
-//     (key == KC_MEDIA_PREV_TRACK     ?  TRANSPORT_PREV_TRACK : \
-//     (key == KC_MEDIA_FAST_FORWARD   ?  TRANSPORT_FAST_FORWARD : \
-//     (key == KC_MEDIA_REWIND         ?  TRANSPORT_REWIND : \
-//     (key == KC_MEDIA_STOP           ?  TRANSPORT_STOP : \
-//     (key == KC_MEDIA_EJECT          ?  TRANSPORT_STOP_EJECT : \
-//     (key == KC_MEDIA_PLAY_PAUSE     ?  TRANSPORT_PLAY_PAUSE : \
-//     (key == KC_MEDIA_SELECT         ?  APPLAUNCH_CC_CONFIG : \
-//     (key == KC_MAIL                 ?  APPLAUNCH_EMAIL : \
-//     (key == KC_CALCULATOR           ?  APPLAUNCH_CALCULATOR : \
-//     (key == KC_MY_COMPUTER          ?  APPLAUNCH_LOCAL_BROWSER : \
-//     (key == KC_WWW_SEARCH           ?  APPCONTROL_SEARCH : \
-//     (key == KC_WWW_HOME             ?  APPCONTROL_HOME : \
-//     (key == KC_WWW_BACK             ?  APPCONTROL_BACK : \
-//     (key == KC_WWW_FORWARD          ?  APPCONTROL_FORWARD : \
-//     (key == KC_WWW_STOP             ?  APPCONTROL_STOP : \
-//     (key == KC_WWW_REFRESH          ?  APPCONTROL_REFRESH : \
-//     (key == KC_WWW_FAVORITES        ?  APPCONTROL_BOOKMARKS :  \
-//     (key == KC_MEDIA_FAST_FORWARD   ?  APPCONTROL_BOOKMARKS :  \
-//     (key == KC_MEDIA_REWIND         ?  APPCONTROL_BOOKMARKS :  \
-//     (key == KC_BRIGHTNESS_UP        ?  SCREEN_BRIGHT_UP :  \
-//     (key == KC_BRIGHTNESS_DOWN      ?  SCREEN_BRIGHT_DOWN :  \
-//     (key == KC_WWW_FAVORITES        ?  APPCONTROL_BOOKMARKS :
-//     0))))))))))))))))))))))))))
 
 static inline uint16_t KEYCODE2CONSUMER(uint8_t key) {
     switch (key) {

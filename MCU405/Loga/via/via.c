@@ -12,6 +12,10 @@
 #include "via.h"
 #include "rappy_snappy.h"
 #include "led/led_function.h"
+#include "rappy_snappy.h"
+#include "keymap_in_eeprom.h"
+# include "loga_function.h" 
+#include "led/led_effect.h"
 
 #define DYNAMIC_KEYMAP_MACRO_EEPROM_SIZE sizeof(dynamic_macro_t) * DYNAMIC_MACRO_COUNT
 

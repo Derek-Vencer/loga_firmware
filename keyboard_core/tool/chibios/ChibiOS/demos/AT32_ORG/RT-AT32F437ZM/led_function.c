@@ -21,7 +21,7 @@ extern uint8_t LED_DemoCurrentMode;
 
 binary_semaphore_t ledUpdateSem,ledRunmodeSem;
 
-static int32_t lastLED_Update = -1;
+int32_t lastLED_Update = -1;
 
 //uint32_t spi_timer,spi_timer_last;
 uint32_t LED_UpdateCount = 0;

@@ -7,12 +7,13 @@
 # include "main.h"
 # include "led_function.h"
 # include "led_effect.h"
-
+# include "driver/led_driver.h"
 #include "usb_main.h" // lyon fix reboot dynamic lighting 
 #include "matrix.h" // all the define lyon
 // wheel
 #include <math.h>
 #include <stdint.h>
+#include <stdbool.h>
 uint8_t wheel_base_hue[LED_MATRIX_ROWS][LED_MATRIX_COLS];
 static bool wheel_inited = false;
 
@@ -1048,96 +1049,205 @@ void setChangeProfileEffect(bool enable, uint8_t row, uint8_t column, led_config
 
 }
 
+bool EffectTypeChangeProfileProcess(void)
+{
+    static bool status = false;
 
-bool EffectTypeChangeProfileProcess (void){
-static uint16_t row,column,color;
-static status = false;
-	chVTReset(&randColor_vt);
-	if (status){
-		setKeymapLED(eProfile.row,eProfile.col, eProfile.color);
-	} else {
-		setKeymapLED(eProfile.row,eProfile.col, LED_NULL);
-	}
-	status = ~status;
-	chBSemSignal(&ledUpdateSem);
-	return true;
+    chVTReset(&randColor_vt);
+
+    if (status) {
+        setKeymapLED(
+            eProfile.row,
+            eProfile.col,
+            eProfile.color
+        );
+    } else {
+        setKeymapLED(
+            eProfile.row,
+            eProfile.col,
+            LED_NULL
+        );
+    }
+
+    status = !status;
+
+    chBSemSignal(&ledUpdateSem);
+
+    return true;
 }
-
 
 bool effectRandowColorProcess(void)
 {
-    float brightTemp;
     led_config_t ledTemp;
-//    brightTemp = (float)(randColor.bright * randColor.brightness) / 1000;
+    const led_config_t *sourceColor;
+
+    /*
+     * 先確保彩虹顏色索引合法，避免讀取陣列範圍之外。
+     */
+    if (randColor.ranbowIndex >=
+        (uint8_t)(sizeof(rainbowColor) / sizeof(rainbowColor[0])))
+    {
+        randColor.ranbowIndex = 0U;
+    }
+
+    /*
+     * 選擇目前要顯示的原始顏色。
+     */
     switch (randColor.colorMode)
     {
         case single:
-//            ledTemp.red = randColor.LED.red * brightTemp;
-//            ledTemp.green = randColor.LED.green * brightTemp;
-//            ledTemp.blue = randColor.LED.blue * brightTemp;
-            led_updateFrameBufferSingle(0, LedNumbers, &randColor.LED);
+            sourceColor = &randColor.LED;
             break;
-        case ranbow://
-//            ledTemp.red = rainbowColor[randColor.ranbowIndex].red * brightTemp;
-//            ledTemp.green = rainbowColor[randColor.ranbowIndex].green * brightTemp;
-//            ledTemp.blue = rainbowColor[randColor.ranbowIndex].blue * brightTemp;
-            led_updateFrameBufferSingle(0, LedNumbers, &rainbowColor[randColor.ranbowIndex]);
+
+        case ranbow:
+            sourceColor = &rainbowColor[randColor.ranbowIndex];
+            break;
+
+        default:
+            sourceColor = &randColor.LED;
             break;
     }
-//    led_updateFrameBufferSingle(0, LedNumbers, &ledTemp);
 
+    /*
+     * 恢復真正的呼吸亮度效果。
+     *
+     * 原始設計：
+     * brightTemp = bright * brightness / 1000
+     * output RGB = source RGB * brightTemp
+     *
+     * 使用 uint32_t 避免乘法溢位，並避免 float 運算。
+     */
+    ledTemp.red = (uint8_t)(
+        ((uint32_t)sourceColor->red *
+         (uint32_t)randColor.bright *
+         (uint32_t)randColor.brightness) / 1000U
+    );
+
+    ledTemp.green = (uint8_t)(
+        ((uint32_t)sourceColor->green *
+         (uint32_t)randColor.bright *
+         (uint32_t)randColor.brightness) / 1000U
+    );
+
+    ledTemp.blue = (uint8_t)(
+        ((uint32_t)sourceColor->blue *
+         (uint32_t)randColor.bright *
+         (uint32_t)randColor.brightness) / 1000U
+    );
+
+    /*
+     * 將計算後的呼吸亮度顏色更新到全部 LED。
+     */
+    led_updateFrameBufferSingle(
+        0,
+        LedNumbers,
+        &ledTemp
+    );
+
+    /*
+     * 呼吸變亮階段。
+     */
     if (randColor.direction)
     {
-        if (randColor.bright >= 100)
+        if (randColor.bright >= 100U)
         {
+            randColor.bright = 100U;
             randColor.direction = false;
         }
         else
         {
-            randColor.bright += 3;
+            if (randColor.bright <= 97U)
+            {
+                randColor.bright += 3U;
+            }
+            else
+            {
+                randColor.bright = 100U;
+            }
         }
     }
+    /*
+     * 呼吸變暗階段。
+     */
     else
     {
-        if (randColor.bright <= 0)
+        if (randColor.bright == 0U)
         {
-            if (randColor.colorMode)
+            /*
+             * 彩虹模式每完成一次呼吸後，
+             * 切換到下一個顏色。
+             */
+            if (randColor.colorMode == ranbow)
             {
                 randColor.ranbowIndex++;
+
+                if (randColor.ranbowIndex >=
+                    (uint8_t)(sizeof(rainbowColor) /
+                              sizeof(rainbowColor[0])))
+                {
+                    randColor.ranbowIndex = 0U;
+                }
             }
+
             if (randColor.enable)
             {
                 randColor.direction = true;
-                if (effectStatus.interval!=0 && (get_system_time_ticks()-effectStatus.timeStamp>effectStatus.interval)){
+
+                /*
+                 * 效果執行時間到期。
+                 */
+                if ((effectStatus.interval != 0U) &&
+                    ((get_system_time_ticks() -
+                      effectStatus.timeStamp) >
+                     effectStatus.interval))
+                {
                     chVTReset(&randColor_vt);
+
                     randColor.enable = false;
+
                     ledAllOff(false);
+
                     effectStatus.effect = EffectIdle;
-                    if (effectStatus.runMode == demoMode){
-                    	chBSemSignal(&ledRunmodeSem);
+
+                    if (effectStatus.runMode == demoMode)
+                    {
+                        chBSemSignal(&ledRunmodeSem);
                     }
+
                     return false;
                 }
             }
             else
             {
                 chVTReset(&randColor_vt);
+
                 randColor.enable = false;
+
                 ledAllOff(false);
+
                 effectStatus.effect = EffectIdle;
+
                 return false;
             }
         }
         else
         {
-            randColor.bright -= 3;
+            /*
+             * 避免 uint8_t 在 1 或 2 時減 3 發生下溢，
+             * 例如 1 - 3 變成 254。
+             */
+            if (randColor.bright >= 3U)
+            {
+                randColor.bright -= 3U;
+            }
+            else
+            {
+                randColor.bright = 0U;
+            }
         }
     }
-    if (randColor.bright > 100) { randColor.bright = 100; }
-    if (randColor.ranbowIndex > (uint8_t)(sizeof(sizeof(rainbowColor) / 3)+2)){
-    randColor.ranbowIndex = 0;
-}
-return true;
+
+    return true;
 }
 
 bool effectMosArtProcess(void)
@@ -1173,43 +1283,85 @@ bool effectMosArtProcess(void)
             case 2:
                 Calculate_Flashing_Volume(mosArt.Speed, mosArt.TimerBase, &bright);
                 break;
-            case 3:{//WAVE
-                // === ? ===
-                const uint8_t  WAVE_WAVELENGTH_COLS = 12;   // 撟暹?銝�?漁?�望?
-                const uint8_t  WAVE_WAVELENGTH_ROWS = 0;    // 0=銝???嚗?0 ?臬???
-                const uint16_t TIMEBASE_STEP        = 3;
-                uint16_t phase_step_col = WAVE_WAVELENGTH_COLS ? (256u / WAVE_WAVELENGTH_COLS) : 0;
-                uint16_t phase_step_row = WAVE_WAVELENGTH_ROWS ? (256u / WAVE_WAVELENGTH_ROWS) : 0;
+						case 3: // WAVE
+						{
+								/*
+								 * 橫向波長：每 12 column 完成一個波形週期。
+								 * 縱向波長設為 0，表示不同 row 不加入相位差。
+								 */
+								const uint8_t  WAVE_WAVELENGTH_COLS = 12U;
+								const uint16_t TIMEBASE_STEP        = 3U;
 
-                // ?株嚗 mosArt.LED嚗? mosArt.Rainbow 閮?0 ?喳?莎?
-                led_config_t base = mosArt.LED;
+								const uint16_t phase_step_col =
+										(uint16_t)(256U / WAVE_WAVELENGTH_COLS);
 
-                uint16_t t0 = mosArt.TimerBase;  // ?砍????箸?
-                for (uint8_t col = 0; col < LED_MATRIX_COLS; col++) {
-                    for (uint8_t row = 0; row < LED_MATRIX_ROWS; row++) {
-                        uint16_t local_tb = t0;
-                        if (phase_step_col) local_tb += (uint16_t)col * phase_step_col;
-                        if (phase_step_row) local_tb += (uint16_t)row * phase_step_row;
+								const uint16_t phase_step_row = 0U;
 
-                        uint8_t b;                                 // 0..255 銝?瘜Ｖ漁摨?
-                        calculate_breath_volume(effect_speed, local_tb, &b);  //:contentReference[oaicite:3]{index=3}
+								led_config_t baseColor = mosArt.LED;
 
-                        // 靘?b 憟?株
-                        led_config_t px;
-                        px.red   = (uint8_t)(((uint16_t)base.red   * b) / 255);
-                        px.green = (uint8_t)(((uint16_t)base.green * b) / 255);
-                        px.blue  = (uint8_t)(((uint16_t)base.blue  * b) / 255);
+								/*
+								 * 若啟用彩虹模式，先取得目前時間點的基礎顏色。
+								 */
+								if (mosArt.Rainbow != 0U) {
+										Calculate_Colorful_Color(
+												0U,
+												mosArt.TimerBase,
+												&baseColor
+										);
+								}
 
-                        setRemapLED(row, col, px);                // per-pixel 撖怠:contentReference[oaicite:4]{index=4}
-                    }
-                }
+								const uint16_t frameTimebase = mosArt.TimerBase;
 
-                chBSemSignal(&ledUpdateSem);                      // ???contentReference[oaicite:5]{index=5}
-                mosArt.TimerBase = t0 + 3u;
-                return true;                                      // <== ?蝯?嚗?◤?梁蝯偏閬?
-                // Calculate_Waving_Volumn(mosArt.Speed, mosArt.TimerBase, &bright); // lyon this is old one
-                // break;
-            }
+								for (uint8_t col = 0U; col < LED_MATRIX_COLS; col++) {
+										for (uint8_t row = 0U; row < LED_MATRIX_ROWS; row++) {
+												uint16_t localTimebase = frameTimebase;
+
+												localTimebase +=
+														(uint16_t)col * phase_step_col;
+
+												localTimebase +=
+														(uint16_t)row * phase_step_row;
+
+												uint8_t breathBrightness = 0U;
+
+												calculate_breath_volume(
+														effect_speed,
+														localTimebase,
+														&breathBrightness
+												);
+
+												led_config_t pixelColor;
+
+												/*
+												 * 使用整數運算套用 0～255 呼吸亮度，
+												 * 避免 MCU 執行 float 運算。
+												 */
+												pixelColor.red = (uint8_t)(
+														((uint32_t)baseColor.red *
+														 breathBrightness) / 255U
+												);
+
+												pixelColor.green = (uint8_t)(
+														((uint32_t)baseColor.green *
+														 breathBrightness) / 255U
+												);
+
+												pixelColor.blue = (uint8_t)(
+														((uint32_t)baseColor.blue *
+														 breathBrightness) / 255U
+												);
+
+												setRemapLED(row, col, pixelColor);
+										}
+								}
+
+								chBSemSignal(&ledUpdateSem);
+
+								mosArt.TimerBase =
+										(uint16_t)(frameTimebase + TIMEBASE_STEP);
+
+								return true;
+						}
         }
         tempmBright = (float)bright / 255;
         if (mosArt.Rainbow != 0)
@@ -1532,54 +1684,88 @@ void Calculate_Flashing_Volume(uint8_t speed, uint16_t timebase, uint8_t* bright
     }
 }
 
-void Calculate_Waving_Volumn(uint8_t speed, uint16_t timebase, uint8_t* bright){
-    // case mosArtWave: 
-    // === ?航矽? ===
-    // 撟整�??耦?????港漁?�望?嚗?撠?撖?
-    const uint8_t  WAVE_WAVELENGTH_COLS = 12;
-    // 撟整�??耦???�望?嚗?=銝窒??嚗?0 ?臬???/璉撘絲隡?
-    const uint8_t  WAVE_WAVELENGTH_ROWS = 0;    // 靘??單??閮?8
-    // 瘥????券�脤?嚗雁??雿隞?Mos Art ??銝�?湛?
-    const uint16_t TIMEBASE_STEP        = 10;
+void Calculate_Waving_Volumn(
+    uint8_t speed,
+    uint16_t timebase,
+    uint8_t *bright
+)
+{
+    /*
+     * 橫向波長：每 12 column 完成一個波形週期。
+     * 不使用 row 相位差，所以 phase_step_row 固定為 0。
+     */
+    const uint8_t  WAVE_WAVELENGTH_COLS = 12U;
+    const uint16_t TIMEBASE_STEP        = 10U;
 
-    uint16_t phase_step_col = WAVE_WAVELENGTH_COLS ? (256u / WAVE_WAVELENGTH_COLS) : 0;
-    uint16_t phase_step_row = WAVE_WAVELENGTH_ROWS ? (256u / WAVE_WAVELENGTH_ROWS) : 0;
+    const uint16_t phase_step_col =
+        (uint16_t)(256U / WAVE_WAVELENGTH_COLS);
 
-    // ?株?蔗?對?頝??嗆?銝�??
+    const uint16_t phase_step_row = 0U;
+
     led_config_t baseColor = mosArt.LED;
-    if (mosArt.Rainbow != 0) {
-        // ?亥?靽?敶抵摨?舫???嚗?雿??株嚗osArt.Rainbow=0 ?喳嚗?
-        Calculate_Colorful_Color(0, mosArt.TimerBase, &baseColor);  // ?暹??賢?
+
+    /*
+     * 彩虹模式下，依傳入的 timebase 計算基礎顏色。
+     */
+    if (mosArt.Rainbow != 0U) {
+        Calculate_Colorful_Color(
+            0U,
+            timebase,
+            &baseColor
+        );
     }
 
-    for (uint8_t col = 0; col < LED_MATRIX_COLS; col++) {
-        for (uint8_t row = 0; row < LED_MATRIX_ROWS; row++) {
-            // 蝛粹??訾?嚗誑甈???蝵桀?蝘?timebase嚗耦?郭??
-            uint16_t local_tb = mosArt.TimerBase;
-            if (phase_step_col) local_tb += (uint16_t)col * phase_step_col;
-            if (phase_step_row) local_tb += (uint16_t)row * phase_step_row;
+    uint8_t lastBrightness = 0U;
 
-            // 鈭桀漲銝?瘜ｇ??急香?�/蝮格嚗?瘝輻雿???賢?
-            uint8_t b;
-            calculate_breath_volume(mosArt.Speed, local_tb, &b);        // 0..255
-            float m = (float)b / 255.0f;
+    for (uint8_t col = 0U; col < LED_MATRIX_COLS; col++) {
+        for (uint8_t row = 0U; row < LED_MATRIX_ROWS; row++) {
+            uint16_t localTimebase = timebase;
 
-            // 憟鈭桀漲?圈???
-            led_config_t px;
-            px.red   = (uint8_t)((float)baseColor.red   * m);
-            px.green = (uint8_t)((float)baseColor.green * m);
-            px.blue  = (uint8_t)((float)baseColor.blue  * m);
+            localTimebase +=
+                (uint16_t)col * phase_step_col;
 
-            setRemapLED(row, col, px); // 撖怠 frame buffer嚗�?嚗?:contentReference[oaicite:1]{index=1}
+            localTimebase +=
+                (uint16_t)row * phase_step_row;
+
+            calculate_breath_volume(
+                speed,
+                localTimebase,
+                &lastBrightness
+            );
+
+            led_config_t pixelColor;
+
+            pixelColor.red = (uint8_t)(
+                ((uint32_t)baseColor.red *
+                 lastBrightness) / 255U
+            );
+
+            pixelColor.green = (uint8_t)(
+                ((uint32_t)baseColor.green *
+                 lastBrightness) / 255U
+            );
+
+            pixelColor.blue = (uint8_t)(
+                ((uint32_t)baseColor.blue *
+                 lastBrightness) / 255U
+            );
+
+            setRemapLED(row, col, pixelColor);
         }
     }
 
-    // ?車??撖急????�?�嚗?閬?????啁?
-    chBSemSignal(&ledUpdateSem);  // ??Ｗ撽??瑁?蝺頛?:contentReference[oaicite:2]{index=2}
+    /*
+     * 保留舊介面的輸出參數。
+     * 回傳最後一個 pixel 計算出的呼吸亮度。
+     */
+    if (bright != NULL) {
+        *bright = lastBrightness;
+    }
 
-    mosArt.TimerBase += TIMEBASE_STEP; // ????Mos Art ?見?�??券�?
-    // return true;
+    chBSemSignal(&ledUpdateSem);
 
+    mosArt.TimerBase =
+        (uint16_t)(timebase + TIMEBASE_STEP);
 }
 
 bool LED_ModesBuilder(uint8_t action,bool start,uint8_t effect, bool enable, uint32_t interval, uint8_t colorMode, uint8_t mode, led_config_t color, uint8_t brightness, uint8_t speed, bool direction){
