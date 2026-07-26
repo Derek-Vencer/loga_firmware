@@ -25,6 +25,7 @@ void buildDemoModes(void);
 void buildNormalModes(void);
 void LED_init(void);
 void setChangeProfileEffect(bool enable, uint8_t row, uint8_t column, led_config_t color);
+void LED_SetReactiveColor(uint8_t red, uint8_t green, uint8_t blue);
 
 hsv_t rgb_to_hsv(led_config_t rgb);
 led_config_t hsv_to_rgb(hsv_t hsv);

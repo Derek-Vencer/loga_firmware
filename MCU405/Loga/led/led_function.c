@@ -595,7 +595,7 @@ void led_init(uint8_t mode)
 }
 
 
-static THD_WORKING_AREA(waLED_ModesThread, 32);
+static THD_WORKING_AREA(waLED_ModesThread, 1024);
 static THD_FUNCTION(LED_ModesThread, arg)
 {
     (void)arg;

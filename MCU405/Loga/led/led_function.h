@@ -10,7 +10,7 @@ void uart_init(void);
 void setLightRunMode (uint8_t mode);
 void via_controlSet(uint8_t *data);
 void via_rapidValueSet(uint8_t * data);
-
+extern uint8_t LED_PresetModeIndex;
 
 #define LedNumbers 119+1
 //#define LedNumbers 33+1

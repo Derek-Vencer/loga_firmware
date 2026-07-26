@@ -13,6 +13,7 @@
 #include "hook.h"
 #include "keycode.h"
 #include "matrix.h"
+extern int uprintf(const char *fmt, ...);
 
 #define HID_COMMUNICATION_INTERFACE_CLASS 0x03U
 #define VENDOR_COMMUNICATION_INTERFACE_CLASS 0x0ffU
@@ -4672,22 +4673,61 @@ void raw_out_cb (USBDriver __attribute__ ((__unused__)) * usbp,
 
 void raw_hid_send(uint8_t *report)
 {
+    uint8_t i;
+    bool usb_active;
+
     osalSysLock();
-    if (usbGetDriverStateI(&USB_DRIVER) != USB_ACTIVE)
+
+    usb_active =
+        (usbGetDriverStateI(&USB_DRIVER) == USB_ACTIVE);
+
+    osalSysUnlock();
+
+    if (!usb_active)
     {
-        osalSysUnlock();
+        uprintf("[RAW TX] USB not active, packet dropped\r\n");
         return;
     }
-    osalSysUnlock();
 
-    /* TODO: LUFA manually waits for the endpoint to become ready
-     * for about 10ms for mouse, kbd, system; 1ms for nkro
-     * is this really needed?
+    /*
+     * 印出真正送回 APP 的 32-byte Raw HID 封包。
      */
+    uprintf("[RAW TX] ");
+
+    for (i = 0; i < sizeof(raw_report); i++)
+    {
+        uprintf("%02X ", report[i]);
+    }
+
+    uprintf("\r\n");
+
+    /*
+     * Loga API report ID 固定為 0x19。
+     * 不使用 id_loga_api，避免 usb_main.c 找不到 via.h 定義。
+     */
+    if (report[0] == 0x19U)
+    {
+        uprintf(
+            "[API TX] ID=%02X LEN=%u CMD=%02X%02X STATUS=%02X\r\n",
+            (unsigned int)report[0],
+            (unsigned int)report[2],
+            (unsigned int)report[3],
+            (unsigned int)report[4],
+            (unsigned int)report[5]
+        );
+    }
 
     osalSysLock();
-    usbStartTransmitI(&USB_DRIVER, RAW_IN_ENDPOINT, report, sizeof(raw_report));
+
+    usbStartTransmitI(
+        &USB_DRIVER,
+        RAW_IN_ENDPOINT,
+        report,
+        sizeof(raw_report)
+    );
+
     osalSysUnlock();
+
     chBSemWait(&rawSendSem);
 }
 

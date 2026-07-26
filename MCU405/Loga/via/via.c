@@ -11,6 +11,7 @@
 #include <string.h>
 #include "via.h"
 #include "rappy_snappy.h"
+#include "led/led_function.h"
 
 #define DYNAMIC_KEYMAP_MACRO_EEPROM_SIZE sizeof(dynamic_macro_t) * DYNAMIC_MACRO_COUNT
 
@@ -1493,31 +1494,93 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length)
                         LED_SpeedChange(currentLED_RunMode.brightness, currentLED_RunMode.speed);
                         setRunMode(currentLED_RunMode);
                     break;
-                    case 2:
-                        uprintf("API=>Effect:\r\n");
-                        currentLED_RunMode.mode = recive_payload[1];
-                        setRunMode(currentLED_RunMode);
-                        eeprom_update_byte(KB_COLOR_MODE_ADDR, recive_payload[1]);
-                    break;
+										case 2:
+										{
+												uint8_t requested_mode = recive_payload[1];
+
+												uprintf("API=>Effect: mode=%u\r\n", requested_mode);
+
+												if (requested_mode <= LED_PresetModeIndex)
+												{
+														currentLED_RunMode.mode = requested_mode;
+														setRunMode(currentLED_RunMode);
+
+														eeprom_update_byte(
+																KB_COLOR_MODE_ADDR,
+																requested_mode
+														);
+
+														*send_status = ione_api_status_success;
+												}
+												else
+												{
+														uprintf(
+																"API=>Effect invalid: mode=%u max=%u\r\n",
+																requested_mode,
+																LED_PresetModeIndex
+														);
+
+														*send_status = ione_api_status_fail;
+												}
+										}
+										break;
                     case 3:
                         uprintf("API=>Speed:\r\n");
                         currentLED_RunMode.speed = speed_percent_to_internal(recive_payload[1]);
                         setRunMode(currentLED_RunMode);
                     break;
-                    case 4:
-                        uprintf("API=>Color:\r\n");
-                        mosArt.LED.red = recive_payload[1];
-                        mosArt.LED.green = recive_payload[2];
-                        mosArt.LED.blue = recive_payload[3];
+										case 4:
+										{
+												uint8_t red;
+												uint8_t green;
+												uint8_t blue;
 
-                        eeprom_update_byte(KB_COLOR_RED_ADDR, recive_payload[1]);
-                        eeprom_update_byte(KB_COLOR_GREEN_ADDR, recive_payload[2]);
-                        eeprom_update_byte(KB_COLOR_BLUE_ADDR, recive_payload[3]);
+												uprintf("API=>Color:\r\n");
 
-                        effectStatus.effect = EffectTypeMosArt;
-                        effectStatus.mode = mosArtStatic;
-                        chBSemSignal(&ledEffetSem);  // 通知 LED_EffectThread 執行
-                    break;
+												if (*payload_length == 4U)
+												{
+														red   = recive_payload[1];
+														green = recive_payload[2];
+														blue  = recive_payload[3];
+
+														uprintf(
+																"API=>Color: R=%u G=%u B=%u current_mode=%u\r\n",
+																red,
+																green,
+																blue,
+																currentLED_RunMode.mode
+														);
+
+														if (currentLED_RunMode.mode == 5U)
+														{
+																LED_SetReactiveColor(red, green, blue);
+														}
+														else
+														{
+																mosArt.LED.red   = red;
+																mosArt.LED.green = green;
+																mosArt.LED.blue  = blue;
+														}
+
+														eeprom_update_byte(KB_COLOR_RED_ADDR, red);
+														eeprom_update_byte(KB_COLOR_GREEN_ADDR, green);
+														eeprom_update_byte(KB_COLOR_BLUE_ADDR, blue);
+
+														*send_status = ione_api_status_success;
+												}
+												else
+												{
+														uprintf(
+																"API=>Color: invalid payload length=%u\r\n",
+																*payload_length
+														);
+
+														*send_status = ione_api_status_fail;
+												}
+
+												*payload_length = 1;
+										}
+										break;
                 } 
             } else {
                 *send_status = ione_api_status_fail;

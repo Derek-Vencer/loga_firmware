@@ -491,6 +491,34 @@ EffectStruct_t	LED_DemoMode[LED_DemoModes], LED_PresetMode[LED_PresetModes];
 led_config_t LED_NULL;
 led_config_t c;
 
+/*
+ * 更新 Reactive 實際使用的顏色。
+ */
+void LED_SetReactiveColor(uint8_t red, uint8_t green, uint8_t blue)
+{
+    c.red   = red;
+    c.green = green;
+    c.blue  = blue;
+
+    /*
+     * mode 5 是 Reactive。
+     * 同步更新 preset，避免重新進入燈效後恢復原色。
+     */
+    if (LED_PresetModeIndex >= 5U)
+    {
+        LED_PresetMode[5].color.red   = red;
+        LED_PresetMode[5].color.green = green;
+        LED_PresetMode[5].color.blue  = blue;
+    }
+
+    uprintf(
+        "[LED] Reactive color R=%u G=%u B=%u\r\n",
+        red,
+        green,
+        blue
+    );
+}
+
 int8_t normalEffect;
 uint8_t normalBrightness = 30, normalSpeed = 100;
 
@@ -902,15 +930,32 @@ bool LED_Effect(uint8_t effect, bool enable, uint32_t interval, uint8_t colorMod
             }
             break;
 
-        case EffectTypeReactive:
-            if (enable) {
-                effectStatus.speed = led_speed_percent_to_interval(speed);
+						case EffectTypeReactive:
+								if (enable)
+								{
+										if (speed > 100 || brightness > 100)
+										{
+												return false;
+										}
 
-                chBSemSignal(&ledEffetSem);
+										/*
+										 * Reactive 執行函式實際使用全域 c。
+										 */
+										c = color;
 
-                chVTSet(&randColor_vt, TIME_MS2I(effectStatus.speed), (vtfunc_t)led_cb, NULL);
-            }
-            break;
+										effectStatus.speed =
+												led_speed_percent_to_interval(speed);
+
+										chBSemSignal(&ledEffetSem);
+
+										chVTSet(
+												&randColor_vt,
+												TIME_MS2I(effectStatus.speed),
+												(vtfunc_t)led_cb,
+												NULL
+										);
+								}
+								break;
         case EffectTypeStarlight:
             if (enable)
             {
@@ -1810,78 +1855,47 @@ bool setRunMode(led_runMode_t runMode){
 	}
 }
 
-void LED_init(void){//
+void LED_init(void)
+{
+    uint8_t saved_mode;
 
-
-    c.red = eeprom_read_byte(KB_COLOR_RED_ADDR);
+    c.red   = eeprom_read_byte(KB_COLOR_RED_ADDR);
     c.green = eeprom_read_byte(KB_COLOR_GREEN_ADDR);
-    c.blue = eeprom_read_byte(KB_COLOR_BLUE_ADDR);
-    // uprintf("c color red is %d, green is %d, blue is %d\r\n", c.red, c.green, c.blue);
+    c.blue  = eeprom_read_byte(KB_COLOR_BLUE_ADDR);
+
     led_creatTask();
 
-	buildDemoModes();
-	buildNormalModes();
-    led_pos_init_from_remap(); //
-    wheel_init_table();   //
-    wheel_inited = true;  //
-	chThdCreateStatic(waLED_EffectThread, sizeof(waLED_EffectThread), NORMALPRIO - 3, LED_EffectThread, NULL); //original -3 test +嚗?
-    currentLED_RunMode.mode = eeprom_read_byte(KB_COLOR_MODE_ADDR);//8;//
+    buildDemoModes();
+    buildNormalModes();
+
+    led_pos_init_from_remap();
+    wheel_init_table();
+    wheel_inited = true;
+
+    chThdCreateStatic(
+        waLED_EffectThread,
+        sizeof(waLED_EffectThread),
+        NORMALPRIO - 3,
+        LED_EffectThread,
+        NULL
+    );
+
+    saved_mode = eeprom_read_byte(KB_COLOR_MODE_ADDR);
+
+    /*
+     * LED_PresetModeIndex 是 buildNormalModes() 建立後的最大有效 index。
+     */
+    if (saved_mode > LED_PresetModeIndex)
+    {
+        saved_mode = 0;
+        eeprom_update_byte(KB_COLOR_MODE_ADDR, saved_mode);
+    }
+
+    currentLED_RunMode.mode       = saved_mode;
     currentLED_RunMode.brightness = normalBrightness;
-    currentLED_RunMode.speed = normalSpeed;
-	currentLED_RunMode.type = normalMode;
+    currentLED_RunMode.speed      = normalSpeed;
+    currentLED_RunMode.type       = normalMode;
+
     setRunMode(currentLED_RunMode);
-	//leRemapLocationTest(500);
-	//ledKeymatrixLocationTest(1);
-
-	//ledAnalogMatrixzlocationTest();
-
-	//setRunMode(demoMode, 0, 0, 0);
-//	setRunMode(normalMode, 4, 5, 2);
-//	chThdSleepMilliseconds(2000);
-//	setRunMode(normalMode, ++normalEffect, normalBrightness+1, normalSpeed+1);
-//	chThdSleepMilliseconds(1000);
-////	setRunMode(offMode, 0, 0, 0);
-////	chThdSleepMilliseconds(3000);
-////	setRunMode(normalMode, 8, 10, 1);
-////	chThdSleepMilliseconds(3000);
-////	setRunMode(normalMode, ++normalEffect, --normalBrightness, ++normalBrightness);
-////	chThdSleepMilliseconds(3000);
-//	setRunMode(normalMode, ++normalEffect, normalBrightness, normalBrightness);
-//	chThdSleepMilliseconds(3000);
-//	setRunMode(normalMode, --normalEffect, normalBrightness, normalBrightness);
-//	chThdSleepMilliseconds(3000);
-//	*((uint32_t *)(0x2000FFF0)) = 0xDEADBEEF;
-//	NVIC_SystemReset();
-
-
-//	setRunMode(demoMode, 0, 0, 0);
-////	chThdSleepMilliseconds(15000);
-////	//setRunMode(normalMode, 8, 4, 1);
-////
-////	*((uint32_t *)(0x2000FFF0)) = 0xDEADBEEF;
-////	NVIC_SystemReset();
-
-	//setRunMode(demoMode, 0, 0, 0);
-
-
-
-//	currentLED_RunMode.type = demoMode;
-//	currentLED_RunMode.mode = 0;
-//	currentLED_RunMode.brightness = 0;
-//	currentLED_RunMode.speed = 0;
-//	setRunMode(currentLED_RunMode);
-
-//	currentLED_RunMode.type = offMode;
-//	currentLED_RunMode.mode = 8;
-//	currentLED_RunMode.brightness = 5;
-//	currentLED_RunMode.speed = 1;
-//	setRunMode(currentLED_RunMode);
-
-
-
-//	chThdSleepMilliseconds(3000);
-//	setRunMode(offMode, 0, 0, 0);
-//	*((uint32_t *)(0x2000FFF0)) = 0xDEADBEEF;
-//	NVIC_SystemReset();
-
 }
+
