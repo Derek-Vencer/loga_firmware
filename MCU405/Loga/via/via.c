@@ -1233,65 +1233,141 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length)
             *payload_length = 1;
         break;
         case ione_api_cmd_get_macro_playback:
+        {
+            /*
+             * HID report 固定 32 bytes。
+             * send_data 在目前 API 架構中只剩 26 bytes 可使用。
+             *
+             * Payload：
+             *   [0] macro_index
+             *   [1] start
+             *   [2] count
+             *   [3..20] 最多 3 筆 step，每筆 6 bytes
+             *   [21..25] padding
+             */
+
             uprintf("API=>Get Macro Playback:\r\n");
 
-            uint8_t macro_index = recive_payload[0];
-            uint8_t start       = recive_payload[1];
-            uint8_t req_count   = recive_payload[2];
+            if (*payload_length < 3U) {
+                uprintf(
+                    "Get Macro Playback: invalid payload length=%u\r\n",
+                    (unsigned int)*payload_length
+                );
+
+                *send_status    = ione_api_status_fail;
+                *payload_length = 0;
+                break;
+            }
+
+            const uint8_t macro_index = recive_payload[0];
+            const uint8_t start       = recive_payload[1];
+            const uint8_t req_count   = recive_payload[2];
+
+            /*
+             * 編譯器已確認 send_data 後面只有 26 bytes。
+             */
+            memset(send_data, 0, 26U);
 
             if (macro_index >= MACRO_GROUP_COUNT) {
+                uprintf(
+                    "Get Macro Playback: invalid macro index=%u\r\n",
+                    (unsigned int)macro_index
+                );
+
+                *send_status    = ione_api_status_fail;
+                *payload_length = 0;
                 break;
             }
 
-            const macro_config_t *cfg = macro_engine_get_config(macro_index);
+            const macro_config_t *cfg =
+                macro_engine_get_config(macro_index);
+
             if (cfg == NULL) {
+                uprintf(
+                    "Get Macro Playback: config NULL, index=%u\r\n",
+                    (unsigned int)macro_index
+                );
+
+                *send_status    = ione_api_status_fail;
+                *payload_length = 0;
                 break;
             }
 
+            send_data[0] = macro_index;
+            send_data[1] = start;
+            send_data[2] = 0;
+
+            /*
+             * start 超過資料尾端時，正常回覆 count=0。
+             */
             if (start >= cfg->step_count) {
-                *send_status = ione_api_status_sending;
-                *send_data++ = macro_index;
-                *send_data++ = start;
-                *send_data++ = 0;
+                *send_status    = ione_api_status_sending;
+                *payload_length = 26U;
 
-                for (uint8_t i = 5; i < 32; i++) {
-                    *send_data++ = 0;
-                }
+                uprintf(
+                    "Get Macro Playback: index=%u start=%u "
+                    "total=%u return=0\r\n",
+                    (unsigned int)macro_index,
+                    (unsigned int)start,
+                    (unsigned int)cfg->step_count
+                );
 
-                raw_hid_send(send_data, 32);
+                raw_hid_send(data_start, 32U);
                 break;
             }
 
             uint8_t count = req_count;
-            if (count > 4) {
-                count = 4;
-            }
-            if ((uint16_t)start + count > cfg->step_count) {
-                count = cfg->step_count - start;
+
+            /*
+             * 26-byte payload 放不下 4 筆：
+             *
+             * 3 + 4 × 6 = 27 bytes
+             *
+             * 所以每包最多只能回覆 3 筆。
+             */
+            if (count > 3U) {
+                count = 3U;
             }
 
-            *send_status = ione_api_status_sending;
-            *send_data++ = macro_index;
-            *send_data++ = start;
-            *send_data++ = count;
+            const uint16_t remaining =
+                (uint16_t)cfg->step_count - (uint16_t)start;
+
+            if ((uint16_t)count > remaining) {
+                count = (uint8_t)remaining;
+            }
+
+            send_data[2] = count;
 
             for (uint8_t i = 0; i < count; i++) {
-                const macro_step_t *s = &cfg->step[start + i];
-                uint8_t *p = &send_data[5 + (i * 6)];
+                const macro_step_t *s =
+                    &cfg->step[(uint16_t)start + (uint16_t)i];
+
+                uint8_t *p =
+                    &send_data[3U + ((uint16_t)i * 6U)];
 
                 p[0] = s->delay_type;
-                p[1] = (uint8_t)(s->delay_ms & 0xFF);
-                p[2] = (uint8_t)(s->delay_ms >> 8);
+                p[1] = (uint8_t)(s->delay_ms & 0x00FFU);
+                p[2] = (uint8_t)((s->delay_ms >> 8) & 0x00FFU);
                 p[3] = s->action;
-                p[4] = (uint8_t)(s->keycode & 0xFF);
-                p[5] = (uint8_t)(s->keycode >> 8);
+                p[4] = (uint8_t)(s->keycode & 0x00FFU);
+                p[5] = (uint8_t)((s->keycode >> 8) & 0x00FFU);
             }
 
-            for (uint8_t i = 5 + count * 6; i < 32; i++) {
-                *send_data++ = 0;
-            }
+            *send_status    = ione_api_status_sending;
+            *payload_length = 26U;
 
-            raw_hid_send(send_data, 32);
+            uprintf(
+                "Get Macro Playback: index=%u start=%u "
+                "request=%u return=%u total=%u\r\n",
+                (unsigned int)macro_index,
+                (unsigned int)start,
+                (unsigned int)req_count,
+                (unsigned int)count,
+                (unsigned int)cfg->step_count
+            );
+
+            raw_hid_send(data_start, 32U);
+        }
         break;
         case ione_api_cmd_set_macro_data:
             uprintf("API=>Set Macro Data:\r\n");

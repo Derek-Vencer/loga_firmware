@@ -62,6 +62,13 @@ typedef struct __attribute__((packed))
 #define EEPROM_MACRO_REGION_END \
     ((uint8_t *)(uintptr_t)(EEPROM_MACRO_REGION_ADDR) + \
      EEPROM_MACRO_REGION_SIZE)
+		
+#define EXTERNAL_EEPROM_SIZE_BYTES 65536UL
+
+_Static_assert(
+    EEPROM_MACRO_REGION_SIZE <= EXTERNAL_EEPROM_SIZE_BYTES,
+    "Macro EEPROM region size is invalid"
+);
 
 void macro_engine_init(void);
 void macro_engine_task(void);

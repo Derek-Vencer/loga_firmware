@@ -420,11 +420,23 @@ bool macro_engine_start(uint8_t macro_index) {
 }
 
 void macro_engine_init(void) {
-    memset(&g_me, 0, sizeof(g_me));
-    g_me.macro_index = 0xFF;
+    uintptr_t start =
+        (uintptr_t)EEPROM_MACRO_REGION_ADDR;
 
-    memset(&g_macro_cfg, 0, sizeof(g_macro_cfg));
-    g_loaded_macro_index = 0xFF;
+    uintptr_t end =
+        (uintptr_t)EEPROM_MACRO_REGION_END;
+
+    uprintf(
+        "[MACRO] EEPROM start=0x%04lX end=0x%04lX size=%lu\r\n",
+        (unsigned long)start,
+        (unsigned long)end,
+        (unsigned long)(end - start)
+    );
+
+    if (end > 0x10000UL || end <= start) {
+        uprintf("[MACRO] ERROR: EEPROM range invalid\r\n");
+        return;
+    }
 
     // macro_eeprom_init_if_needed();
 }

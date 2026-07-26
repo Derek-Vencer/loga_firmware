@@ -9,6 +9,11 @@
 #include <stdlib.h>
 #include <stddef.h>
 
+
+_Static_assert(
+    sizeof(dynamic_macro_t) == DYNAMIC_MACRO_EEPROM_SLOT_SIZE,
+    "dynamic_macro_t size does not match EEPROM slot size"
+);
 dynamic_macro_t dynamic_macros[DYNAMIC_MACRO_COUNT];//
 uint32_t macro_timeStamp = 0;
 uint8_t macro_layer = 0;
