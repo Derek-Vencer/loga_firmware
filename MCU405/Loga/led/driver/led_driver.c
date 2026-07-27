@@ -6,9 +6,10 @@
 #include "led_driver.h"
 #include "pin_defs.h"
 #include "led_RGBTable.h"
+#include "../led_function.h"
 //#include "hal_spi_v2.h"
 
-void ledDriver_end(void);
+static void ledDriver_end(SPIDriver *spip);
 
 SPIConfig ledDriver_spiConfig[LED_DriverCount];
 
@@ -77,10 +78,12 @@ void ledDriver_init(void) {
 	}
 }
 
-void ledDriver_end(void) {
-	spiUnselect(&SPI_LED_DRIVER);
-	chBSemSignalI(&ledDriver_Sem);
+static void ledDriver_end(SPIDriver *spip)
+{
+    (void)spip;
 
+    spiUnselect(&SPI_LED_DRIVER);
+    chBSemSignalI(&ledDriver_Sem);
 }
 
 void SPI_W_3BYTE(uint8_t port, uint8_t bPage, uint8_t bAddr, uint8_t bData) {

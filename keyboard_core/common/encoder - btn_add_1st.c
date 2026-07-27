@@ -61,6 +61,8 @@ __attribute__((weak)) void encoder_wait_pullup_charge(void) {
 }
 
 __attribute__((weak)) bool encoder_update_user(uint8_t index, uint8_t clockwise) {
+	(void)index; 
+	(void)clockwise;
     return true;
 }
 

@@ -28,6 +28,7 @@ void hook_keyboard_loop(void) {}
 __attribute__((weak))
 bool hook_matrix_change(keyrecord_t record) {
     (void)record;
+	return true;
 }
 
 __attribute__((weak))

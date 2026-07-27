@@ -43,6 +43,8 @@ void send_remote_wakeup(USBDriver *usbp);
 
 void restart_usb_driver(USBDriver *usbp);
 
+uint8_t get_usb_poll_rate(void);
+
 /* ---------------
  * Keyboard header
  * ---------------

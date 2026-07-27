@@ -4926,8 +4926,9 @@ void raw_out_cb (USBDriver __attribute__ ((__unused__)) * usbp,
     chBSemSignalI(&VIA_ReciveSem);
 }
 
-void raw_hid_send(uint8_t *report)
+void raw_hid_send(uint8_t *report, uint8_t length)
 {
+    (void)length;
     uint8_t i;
     bool usb_active;
 

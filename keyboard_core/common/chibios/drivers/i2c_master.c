@@ -117,9 +117,22 @@ __attribute__((weak)) void i2c_init(void) {
     }
 }
 
-i2c_status_t i2c_abort(void){
-    i2cAbort(&I2C_DRIVER);
+i2c_status_t i2c_abort(void)
+{
+#if defined(I2C_USE_MUTUAL_EXCLUSION) && (I2C_USE_MUTUAL_EXCLUSION == TRUE)
+    i2cAcquireBus(&I2C_DRIVER);
+#endif
+
+    i2cStop(&I2C_DRIVER);
+    i2cStart(&I2C_DRIVER, &i2cconfig);
+
+#if defined(I2C_USE_MUTUAL_EXCLUSION) && (I2C_USE_MUTUAL_EXCLUSION == TRUE)
+    i2cReleaseBus(&I2C_DRIVER);
+#endif
+
+    return I2C_STATUS_SUCCESS;
 }
+
 
 i2c_status_t i2c_start(uint8_t address) {
     i2c_address = address;

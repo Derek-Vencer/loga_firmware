@@ -73,7 +73,7 @@ void process_record_nocache(keyrecord_t *record, bool delayEnable) {
 
 void process_action(keyrecord_t *record)
 {
-	uint16_t code;
+	//uint16_t code;
     keyevent_t event = record->event;
 #ifndef NO_ACTION_TAPPING
     uint8_t tap_count = record->tap.count;
@@ -82,7 +82,7 @@ void process_action(keyrecord_t *record)
     if (IS_NOEVENT(event)) { return; }
 
     action_t action = layer_switch_get_action(event.key);
-    code = action.key.code;
+    //code = action.key.code;
     //dprint ("action keycode:%X modes:%X kid_id:%X\r\n",code,action.key.mods,action.kind.id);
     dprintf("ACTION: "); debug_action(action);
 #ifndef NO_ACTION_LAYER
@@ -445,10 +445,10 @@ void register_code(uint8_t code)
     else if IS_CONSUMER(code) {
         host_consumer_send(KEYCODE2CONSUMER(code));
     }
-    else if IS_GAMEPAD(code){
+    //else if IS_GAMEPAD(code){
         //host_gamepad_send();
-        uprintf ("reg Gamepad keycode:04X\r\n", code);
-    }
+    //    uprintf ("reg Gamepad keycode:04X\r\n", code);
+    //}
 }
 
 void unregister_code(uint8_t code)
@@ -504,9 +504,9 @@ void unregister_code(uint8_t code)
     else if IS_CONSUMER(code) {
         host_consumer_send(0);
     }
-    else if IS_GAMEPAD(code){
-        uprintf ("unreg Gamepad keycode:04X\r\n", code);
-    }    
+    //else if IS_GAMEPAD(code){
+    //    uprintf ("unreg Gamepad keycode:04X\r\n", code);
+    //}    
 }
 
 uint8_t extract_mod_bits(uint16_t code) {
@@ -691,6 +691,7 @@ bool is_tap_key(keypos_t key)
  */
 void debug_event(keyevent_t event)
 {
+		(void)event;
     dprintf("%04X%c(%u)", (event.key.row<<8 | event.key.col), (event.pressed ? 'd' : 'u'), event.time);
 }
 

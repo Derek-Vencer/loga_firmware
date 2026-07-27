@@ -16,6 +16,7 @@
 #include "keymap_in_eeprom.h"
 # include "loga_function.h" 
 #include "led/led_effect.h"
+#include "timer.h"
 
 #define DYNAMIC_KEYMAP_MACRO_EEPROM_SIZE sizeof(dynamic_macro_t) * DYNAMIC_MACRO_COUNT
 
@@ -35,6 +36,8 @@ extern EffectMosArt_t mosArt;
 extern uint8_t knobState; // lyon for encoder in matrix.c
 
 extern uint8_t rapidKeyEnable; // test for rapid trigger state
+void eeconfig_modtap_clear(void);
+void eeconfig_clear_all_toggle_entry(void);
 
 static uint8_t clamp_percent_u8(uint8_t value) {
     return (value > 100u) ? 100u : value;
@@ -258,7 +261,8 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length)
         ((uint16_t)data[0] << 8) |
         (uint16_t)data[1];
     data += 2;
-
+		(void)hid_vid;
+		
     /*
      * Byte 2: payload length
      */
@@ -497,11 +501,11 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length)
             if (*payload_length == 8) {
                 *send_status = ione_api_status_success;
 
-                recive_payload[0];
+                //recive_payload[0];
                 mosArt.LED.red = recive_payload[1];
                 mosArt.LED.green = recive_payload[2];
                 mosArt.LED.blue = recive_payload[3];
-                recive_payload[4];
+                //recive_payload[4];
                 mosArt.LED.red = recive_payload[5];
                 mosArt.LED.green = recive_payload[6];
                 mosArt.LED.blue = recive_payload[7];

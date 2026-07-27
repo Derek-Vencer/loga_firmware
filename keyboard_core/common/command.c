@@ -59,11 +59,39 @@ static bool mousekey_console(uint8_t code);
 static void mousekey_console_help(void);
 #endif
 
-static uint8_t numkey2num(uint8_t code);
 static void switch_default_layer(uint8_t layer);
 
 
 command_state_t command_state = ONESHOT;
+
+
+/***********************************************************
+ * Utilities
+ ***********************************************************/
+/*
+static uint8_t numkey2num(uint8_t code)
+{
+    switch (code) {
+        case KC_1: return 1;
+        case KC_2: return 2;
+        case KC_3: return 3;
+        case KC_4: return 4;
+        case KC_5: return 5;
+        case KC_6: return 6;
+        case KC_7: return 7;
+        case KC_8: return 8;
+        case KC_9: return 9;
+        case KC_0: return 0;
+    }
+    return 0;
+}
+*/
+static void switch_default_layer(uint8_t layer)
+{
+    xprintf("L%d\n", layer);
+    default_layer_set(1UL<<layer);
+    clear_keyboard();
+}
 
 
 bool command_proc(uint8_t code)
@@ -617,30 +645,3 @@ static bool mousekey_console(uint8_t code)
 }
 #endif
 
-
-/***********************************************************
- * Utilities
- ***********************************************************/
-static uint8_t numkey2num(uint8_t code)
-{
-    switch (code) {
-        case KC_1: return 1;
-        case KC_2: return 2;
-        case KC_3: return 3;
-        case KC_4: return 4;
-        case KC_5: return 5;
-        case KC_6: return 6;
-        case KC_7: return 7;
-        case KC_8: return 8;
-        case KC_9: return 9;
-        case KC_0: return 0;
-    }
-    return 0;
-}
-
-static void switch_default_layer(uint8_t layer)
-{
-    xprintf("L%d\n", layer);
-    default_layer_set(1UL<<layer);
-    clear_keyboard();
-}

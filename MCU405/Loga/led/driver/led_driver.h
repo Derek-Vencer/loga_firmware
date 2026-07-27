@@ -5,6 +5,7 @@
 #define LED_DriverCount	3
 
 void ledDriver_init(void);
+void LED_SledInit(uint8_t port);
 void current_fineTune(int8_t adjRed, int8_t adjGreen,int8_t adjBlue);
 void LED_CurrentAdjuest(uint8_t current);
 void SPI_LevelShift_Test(void);

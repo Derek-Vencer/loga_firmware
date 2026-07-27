@@ -34,11 +34,11 @@ int16_t getCurrentKeyPostion(uint8_t col, uint8_t row,travelPostion_t *padTravel
 			padTravelPostion->postioMutl = 600.0f / range * 1.05f;
 		}
 		padTravelPostion->travelPostion = travelPostionLevel [keyLocation.colA][keyLocation.rowA];
-		uint16_t multInt = padTravelPostion->postioMutl*1000;
+		//uint16_t multInt = padTravelPostion->postioMutl*1000;
 ////		uprintf ("Travel:%d init:%d multi:%d.%d\r\n",travelPostionLevel [keyLocation.colA][keyLocation.rowA],initPostionLevel[keyLocation.colA][keyLocation.rowA],multInt/1000,multInt%1000);
 ////		uprintf ("multi:%d.%d\r\n",multInt/1000,multInt%1000);
 	}
-	uint16_t multInt = padTravelPostion->postioMutl*1000;
+	//uint16_t multInt = padTravelPostion->postioMutl*1000;
 	//uprintf ("read:%d Travel:%d init:%d multi:%d.%d\r\n",(samples2[keyLocation.colA][keyLocation.rowA] - initPostionLevel[keyLocation.colA][keyLocation.rowA]),travelPostionLevel [keyLocation.colA][keyLocation.rowA],initPostionLevel[keyLocation.colA][keyLocation.rowA],multInt/1000,multInt%1000);
 	float value = (float)(samples2[keyLocation.colA][keyLocation.rowA] - initPostionLevel[keyLocation.colA][keyLocation.rowA])* padTravelPostion->postioMutl;
 	//uprintf ("value:%d\r\n",(int16_t)value);
@@ -46,156 +46,297 @@ int16_t getCurrentKeyPostion(uint8_t col, uint8_t row,travelPostion_t *padTravel
 }
 
 static THD_WORKING_AREA(waGamepadAnalog_ProcessThread, 256);
-static THD_FUNCTION(GamepadAnalog_ProcessThread, arg){
-	static bool reportUpdate;
-	uint8_t *lengthAddress;
-	chRegSetThreadName("Gamepad Analog Control");
-	chBSemObjectInit(&gamepadAnalogSem, true);
-	osalMutexObjectInit(&analogStickMutex);
-	lengthAddress = &extra_game_report;
-	while (true){
-			chBSemWait(&gamepadAnalogSem);
-//			//uprintf ("gameAnalogStickStatus:%d\r\n",gameAnalogStickStatus);
-				if(gameAnalogStickStatus.x_plus){
-					gameAnalogValue.x_plus.value = getCurrentKeyPostion(gameAnalogValue.x_plus.event.key.col,gameAnalogValue.x_plus.event.key.row,&xTravelPostionLevelPlus);
-					if (gameAnalogValue.x_plus.value>0){
-						if (lastGameAnalogValue.x_plus.value != gameAnalogValue.x_plus.value){
-//							uprintf ("analog x plus changed value:%x\r\n",gameAnalogValue.x_plus.value);
-							analogX = 0x0258 + (uint16_t)gameAnalogValue.x_plus.value;
-//							uprintf ("analogx plus:%d\r\n",analogX);
-						}
-						lastGameAnalogValue.x_plus.value = gameAnalogValue.x_plus.value;
-					}
+static THD_FUNCTION(GamepadAnalog_ProcessThread, arg)
+{
+    static bool reportUpdate;
 
-				}
-				if(gameAnalogStickStatus.x_minus){
+    (void)arg;
 
-					gameAnalogValue.x_minus.value = getCurrentKeyPostion(gameAnalogValue.x_minus.event.key.col,gameAnalogValue.x_minus.event.key.row,&xTravelPostionLevelMinus);
-					if (gameAnalogValue.x_minus.value>0){
-						if (lastGameAnalogValue.x_minus.value != gameAnalogValue.x_minus.value){
-							if ((uint16_t)gameAnalogValue.x_minus.value < 0x0258){
-								analogX = 0x0258 - (uint16_t)gameAnalogValue.x_minus.value;
-							} else {
-								analogX = 0;
-							}
-//							uprintf ("analogx min:%d\r\n",analogX);
-						}
-						lastGameAnalogValue.x_minus.value = gameAnalogValue.x_minus.value;
-					}
-				}
-				if(gameAnalogStickStatus.y_plus){
-					gameAnalogValue.y_plus.value = getCurrentKeyPostion(gameAnalogValue.y_plus.event.key.col,gameAnalogValue.y_plus.event.key.row,&yTravelPostionLevelPlus);
-					if (gameAnalogValue.y_plus.value>0){
-						if (lastGameAnalogValue.y_plus.value != gameAnalogValue.y_plus.value){
-							if ((uint16_t)gameAnalogValue.y_plus.value < 0x0258){
-								analogY = 0x0258 - (uint16_t)gameAnalogValue.y_plus.value;
-							} else {
-								analogY = 0;
-							}
-						}
-						lastGameAnalogValue.y_plus.value = gameAnalogValue.y_plus.value;
-					}
+    chRegSetThreadName("Gamepad Analog Control");
+    chBSemObjectInit(&gamepadAnalogSem, true);
+    osalMutexObjectInit(&analogStickMutex);
 
-				}
+    while (true)
+    {
+        chBSemWait(&gamepadAnalogSem);
 
-				if(gameAnalogStickStatus.y_minus){
+        if (gameAnalogStickStatus.x_plus)
+        {
+            gameAnalogValue.x_plus.value =
+                getCurrentKeyPostion(
+                    gameAnalogValue.x_plus.event.key.col,
+                    gameAnalogValue.x_plus.event.key.row,
+                    &xTravelPostionLevelPlus
+                );
 
-					gameAnalogValue.y_minus.value = getCurrentKeyPostion(gameAnalogValue.y_minus.event.key.col,gameAnalogValue.y_minus.event.key.row,&yTravelPostionLevelMinus);
-					if (gameAnalogValue.y_minus.value>0){
-						if (lastGameAnalogValue.y_minus.value != gameAnalogValue.y_minus.value){
-							analogY = 0x0258 + (uint16_t)gameAnalogValue.y_minus.value;
-						}
-						lastGameAnalogValue.y_minus.value = gameAnalogValue.y_minus.value;
-					}
-				}
+            if (gameAnalogValue.x_plus.value > 0)
+            {
+                if (lastGameAnalogValue.x_plus.value !=
+                    gameAnalogValue.x_plus.value)
+                {
+                    analogX =
+                        0x0258U +
+                        (uint16_t)gameAnalogValue.x_plus.value;
+                }
 
-//====
-				if(gameAnalogStickStatus.z_plus){
-					gameAnalogValue.z_plus.value = getCurrentKeyPostion(gameAnalogValue.z_plus.event.key.col,gameAnalogValue.z_plus.event.key.row,&zTravelPostionLevelPlus);
-					if (gameAnalogValue.z_plus.value>0){
-						if (lastGameAnalogValue.z_plus.value != gameAnalogValue.z_plus.value){
+                lastGameAnalogValue.x_plus.value =
+                    gameAnalogValue.x_plus.value;
+            }
+        }
 
+        if (gameAnalogStickStatus.x_minus)
+        {
+            gameAnalogValue.x_minus.value =
+                getCurrentKeyPostion(
+                    gameAnalogValue.x_minus.event.key.col,
+                    gameAnalogValue.x_minus.event.key.row,
+                    &xTravelPostionLevelMinus
+                );
 
-							if ((uint16_t)(gameAnalogValue.z_plus.value) < 0x0258){
-								analogZ = 0x0258 - (uint16_t)(gameAnalogValue.z_plus.value);
-							} else {
-								analogZ = 0;
-							}
-							if (analogZ>512){analogZ = 512;}
-							//uprintf ("analogZ plus:%d\r\n",analogZ);
-						}
-						lastGameAnalogValue.z_plus.value = gameAnalogValue.z_plus.value;
-					}
+            if (gameAnalogValue.x_minus.value > 0)
+            {
+                if (lastGameAnalogValue.x_minus.value !=
+                    gameAnalogValue.x_minus.value)
+                {
+                    if ((uint16_t)gameAnalogValue.x_minus.value <
+                        0x0258U)
+                    {
+                        analogX =
+                            0x0258U -
+                            (uint16_t)gameAnalogValue.x_minus.value;
+                    }
+                    else
+                    {
+                        analogX = 0;
+                    }
+                }
 
-				}
-				if(gameAnalogStickStatus.z_minus){
+                lastGameAnalogValue.x_minus.value =
+                    gameAnalogValue.x_minus.value;
+            }
+        }
 
-					gameAnalogValue.z_minus.value = getCurrentKeyPostion(gameAnalogValue.z_minus.event.key.col,gameAnalogValue.z_minus.event.key.row,&zTravelPostionLevelMinus);
-					if (gameAnalogValue.z_minus.value>0){
-						if (lastGameAnalogValue.z_minus.value != gameAnalogValue.z_minus.value){
-							analogZ = 512 + (uint16_t)(gameAnalogValue.z_minus.value);
-							if (analogZ>1023){analogZ = 1023;}
-							//uprintf ("analogZ z_minus:%d def:%d\r\n",analogZ,gameAnalogValue.z_minus.value);
-						}
-						lastGameAnalogValue.z_minus.value = gameAnalogValue.z_minus.value;
-					}
-				}
-				if(gameAnalogStickStatus.Rz_plus){
-					gameAnalogValue.Rz_plus.value = getCurrentKeyPostion(gameAnalogValue.Rz_plus.event.key.col,gameAnalogValue.Rz_plus.event.key.row,&rzTravelPostionLevelPlus);
-					if (gameAnalogValue.Rz_plus.value>0){
+        if (gameAnalogStickStatus.y_plus)
+        {
+            gameAnalogValue.y_plus.value =
+                getCurrentKeyPostion(
+                    gameAnalogValue.y_plus.event.key.col,
+                    gameAnalogValue.y_plus.event.key.row,
+                    &yTravelPostionLevelPlus
+                );
 
-						if (lastGameAnalogValue.Rz_plus.value != gameAnalogValue.Rz_plus.value){
-							analogRz = 512 + (uint16_t)(gameAnalogValue.Rz_plus.value);
-							if (analogRz>1023){analogRz = 1023;}
-							//uprintf ("analogZ z_minus:%d def:%d\r\n",analogRz,gameAnalogValue.Rz_plus.value);
-						}
-						lastGameAnalogValue.Rz_plus.value = gameAnalogValue.Rz_plus.value;
-					}
+            if (gameAnalogValue.y_plus.value > 0)
+            {
+                if (lastGameAnalogValue.y_plus.value !=
+                    gameAnalogValue.y_plus.value)
+                {
+                    if ((uint16_t)gameAnalogValue.y_plus.value <
+                        0x0258U)
+                    {
+                        analogY =
+                            0x0258U -
+                            (uint16_t)gameAnalogValue.y_plus.value;
+                    }
+                    else
+                    {
+                        analogY = 0;
+                    }
+                }
 
-				}
+                lastGameAnalogValue.y_plus.value =
+                    gameAnalogValue.y_plus.value;
+            }
+        }
 
-				if(gameAnalogStickStatus.Rz_minus){
+        if (gameAnalogStickStatus.y_minus)
+        {
+            gameAnalogValue.y_minus.value =
+                getCurrentKeyPostion(
+                    gameAnalogValue.y_minus.event.key.col,
+                    gameAnalogValue.y_minus.event.key.row,
+                    &yTravelPostionLevelMinus
+                );
 
-					gameAnalogValue.Rz_minus.value = getCurrentKeyPostion(gameAnalogValue.Rz_minus.event.key.col,gameAnalogValue.Rz_minus.event.key.row,&rzTravelPostionLevelMinus);
-					if (gameAnalogValue.Rz_minus.value>0){
-						if (lastGameAnalogValue.Rz_minus.value != gameAnalogValue.Rz_minus.value){
+            if (gameAnalogValue.y_minus.value > 0)
+            {
+                if (lastGameAnalogValue.y_minus.value !=
+                    gameAnalogValue.y_minus.value)
+                {
+                    analogY =
+                        0x0258U +
+                        (uint16_t)gameAnalogValue.y_minus.value;
+                }
 
-							if ((uint16_t)(gameAnalogValue.Rz_minus.value) < 512){
-								analogRz = 512 - (uint16_t)(gameAnalogValue.Rz_minus.value);
-							} else {
-								analogRz = 0;
-							}
-							if (analogRz>512){analogRz=512;}
-							//uprintf ("analogRz min:%d\r\n",analogRz);
-						}
-						lastGameAnalogValue.Rz_minus.value = gameAnalogValue.Rz_minus.value;
-					}
-				}
+                lastGameAnalogValue.y_minus.value =
+                    gameAnalogValue.y_minus.value;
+            }
+        }
 
-				reportUpdate = false;
-				if (extra_game_report.GD_GamePadX !=analogX){
-					extra_game_report.GD_GamePadX = analogX;
-					reportUpdate = true;
-				}
-				if (extra_game_report.GD_GamePadY !=analogY){
-					extra_game_report.GD_GamePadY = analogY;
-					reportUpdate = true;
-				}
-//====
-				if (extra_game_report.GD_GamePadZ !=analogZ){
-					extra_game_report.GD_GamePadZ = analogZ;
-					reportUpdate = true;
-				}
-				if (extra_game_report.GD_GamePadRz !=analogRz){
-					extra_game_report.GD_GamePadRz = analogRz;
-					reportUpdate = true;
-				}
-				if (reportUpdate){
-					send_gamepad(extra_game_report);
-					chThdSleepMilliseconds(1);
-					send_gamepad(extra_game_report);
-				}
-	}
+        if (gameAnalogStickStatus.z_plus)
+        {
+            gameAnalogValue.z_plus.value =
+                getCurrentKeyPostion(
+                    gameAnalogValue.z_plus.event.key.col,
+                    gameAnalogValue.z_plus.event.key.row,
+                    &zTravelPostionLevelPlus
+                );
+
+            if (gameAnalogValue.z_plus.value > 0)
+            {
+                if (lastGameAnalogValue.z_plus.value !=
+                    gameAnalogValue.z_plus.value)
+                {
+                    if ((uint16_t)gameAnalogValue.z_plus.value <
+                        0x0258U)
+                    {
+                        analogZ =
+                            0x0258U -
+                            (uint16_t)gameAnalogValue.z_plus.value;
+                    }
+                    else
+                    {
+                        analogZ = 0;
+                    }
+
+                    if (analogZ > 512U)
+                    {
+                        analogZ = 512U;
+                    }
+                }
+
+                lastGameAnalogValue.z_plus.value =
+                    gameAnalogValue.z_plus.value;
+            }
+        }
+
+        if (gameAnalogStickStatus.z_minus)
+        {
+            gameAnalogValue.z_minus.value =
+                getCurrentKeyPostion(
+                    gameAnalogValue.z_minus.event.key.col,
+                    gameAnalogValue.z_minus.event.key.row,
+                    &zTravelPostionLevelMinus
+                );
+
+            if (gameAnalogValue.z_minus.value > 0)
+            {
+                if (lastGameAnalogValue.z_minus.value !=
+                    gameAnalogValue.z_minus.value)
+                {
+                    analogZ =
+                        512U +
+                        (uint16_t)gameAnalogValue.z_minus.value;
+
+                    if (analogZ > 1023U)
+                    {
+                        analogZ = 1023U;
+                    }
+                }
+
+                lastGameAnalogValue.z_minus.value =
+                    gameAnalogValue.z_minus.value;
+            }
+        }
+
+        if (gameAnalogStickStatus.Rz_plus)
+        {
+            gameAnalogValue.Rz_plus.value =
+                getCurrentKeyPostion(
+                    gameAnalogValue.Rz_plus.event.key.col,
+                    gameAnalogValue.Rz_plus.event.key.row,
+                    &rzTravelPostionLevelPlus
+                );
+
+            if (gameAnalogValue.Rz_plus.value > 0)
+            {
+                if (lastGameAnalogValue.Rz_plus.value !=
+                    gameAnalogValue.Rz_plus.value)
+                {
+                    analogRz =
+                        512U +
+                        (uint16_t)gameAnalogValue.Rz_plus.value;
+
+                    if (analogRz > 1023U)
+                    {
+                        analogRz = 1023U;
+                    }
+                }
+
+                lastGameAnalogValue.Rz_plus.value =
+                    gameAnalogValue.Rz_plus.value;
+            }
+        }
+
+        if (gameAnalogStickStatus.Rz_minus)
+        {
+            gameAnalogValue.Rz_minus.value =
+                getCurrentKeyPostion(
+                    gameAnalogValue.Rz_minus.event.key.col,
+                    gameAnalogValue.Rz_minus.event.key.row,
+                    &rzTravelPostionLevelMinus
+                );
+
+            if (gameAnalogValue.Rz_minus.value > 0)
+            {
+                if (lastGameAnalogValue.Rz_minus.value !=
+                    gameAnalogValue.Rz_minus.value)
+                {
+                    if ((uint16_t)gameAnalogValue.Rz_minus.value <
+                        512U)
+                    {
+                        analogRz =
+                            512U -
+                            (uint16_t)gameAnalogValue.Rz_minus.value;
+                    }
+                    else
+                    {
+                        analogRz = 0;
+                    }
+
+                    if (analogRz > 512U)
+                    {
+                        analogRz = 512U;
+                    }
+                }
+
+                lastGameAnalogValue.Rz_minus.value =
+                    gameAnalogValue.Rz_minus.value;
+            }
+        }
+
+        reportUpdate = false;
+
+        if (extra_game_report.GD_GamePadX != analogX)
+        {
+            extra_game_report.GD_GamePadX = analogX;
+            reportUpdate = true;
+        }
+
+        if (extra_game_report.GD_GamePadY != analogY)
+        {
+            extra_game_report.GD_GamePadY = analogY;
+            reportUpdate = true;
+        }
+
+        if (extra_game_report.GD_GamePadZ != analogZ)
+        {
+            extra_game_report.GD_GamePadZ = analogZ;
+            reportUpdate = true;
+        }
+
+        if (extra_game_report.GD_GamePadRz != analogRz)
+        {
+            extra_game_report.GD_GamePadRz = analogRz;
+            reportUpdate = true;
+        }
+
+        if (reportUpdate)
+        {
+            send_gamepad(extra_game_report);
+            chThdSleepMilliseconds(1);
+            send_gamepad(extra_game_report);
+        }
+    }
 }
 
 void gamePad_init(void){

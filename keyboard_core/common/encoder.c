@@ -16,9 +16,12 @@
  */
 
 #include "encoder.h"
-
+#include "wait.h"
 // for memcpy
 #include <string.h>
+
+
+
 
 #if !defined(ENCODER_RESOLUTIONS) && !defined(ENCODER_RESOLUTION)
 #    define ENCODER_RESOLUTION 4
@@ -43,13 +46,18 @@ static int8_t  encoder_pulses[NUMBER_OF_ENCODERS] = {0};
 static bool    btn_status[NUMBER_OF_ENCODERS] = {false};
 
 static uint8_t encoder_value[NUMBER_OF_ENCODERS] = {0};
-static uint8_t btn_value[NUMBER_OF_ENCODERS] = {0};
+static uint8_t btn_value[NUMBER_OF_ENCODERS] __attribute__((unused)) = {0};
 
 __attribute__((weak)) void encoder_wait_pullup_charge(void) {
     wait_us(100);
 }
 
-__attribute__((weak)) bool encoder_update_user(uint8_t index, uint8_t clockwise) {
+__attribute__((weak))
+bool encoder_update_user(uint8_t index, uint8_t clockwise)
+{
+    (void)index;
+    (void)clockwise;
+
     return true;
 }
 
@@ -59,13 +67,13 @@ __attribute__((weak)) bool encoder_update_kb(uint8_t index, uint8_t clockwise) {
 
 void encoder_init(void) {
 
-    for (int i = 0; i < NUMBER_OF_ENCODERS; i++) {
+    for (uint8_t i = 0; i < NUMBER_OF_ENCODERS; i++) {
         setPinInputHigh(encoders_pad_a[i]);
         setPinInputHigh(encoders_pad_b[i]);
         setPinInputHigh(encoders_pad_btn[i]);
     }
     encoder_wait_pullup_charge();
-    for (int i = 0; i < NUMBER_OF_ENCODERS; i++) {
+    for (uint8_t i = 0; i < NUMBER_OF_ENCODERS; i++) {
         encoder_state[i] = (readPin(encoders_pad_a[i]) << 0) | (readPin(encoders_pad_b[i]) << 1);
         btn_status [i] = readPin(encoders_pad_btn[i]);
     }
@@ -76,6 +84,7 @@ static bool button_update (uint8_t index, bool state){
     if (!state){
         encoder_update_kb(index, ENCODER_BUTTON);
     }
+		return true;
 }
 
 static bool encoder_update(uint8_t index, uint8_t state) {

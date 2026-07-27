@@ -152,12 +152,10 @@ void eeconfig_rapidTrigger_init(void){
     }
 }
 
-uint16_t eeconfig_read_keymap_key(uint8_t layer, uint8_t row, uint8_t col) {
-    // uint8_t keycode = eeprom_read_byte(EECONFIG_KEYMAP_KEYMAPS + KEY_OFFSET(layer, row, col));
-    // printf ("kemap read:%04X OFFSET:%04d layer:%d row:%d col:%d\r\n",keycode,KEY_OFFSET(layer, row, col),layer,row,col);    
-    // return keycode;
-    return eeprom_read_word(EECONFIG_KEYMAP_KEYMAPS + KEY_OFFSET(layer, row, col)*2);
-}
+uint16_t eeconfig_read_keymap_key( uint8_t layer, uint8_t row, uint8_t col) { 
+		const uint32_t byte_offset = (uint32_t)KEY_OFFSET(layer, row, col) * sizeof(uint16_t); 
+		const uint16_t *address = (const uint16_t *)(const void *) (EECONFIG_KEYMAP_KEYMAPS + byte_offset); 
+		return eeprom_read_word(address); }
 
 uint16_t eeconfig_read_keymapBuffer_key(uint8_t layer, uint8_t row, uint8_t col) {
     return eepromKeyBuffer[layer][row][col];
@@ -177,10 +175,9 @@ uint16_t eeconfig_read_Release( uint8_t row, uint8_t col){
     return eepromReleaseBuffer[row][col];
 }
 
-void eeconfig_write_Trigger( uint8_t row, uint8_t col, uint16_t triggerLevel){
-    eeprom_write_word(EECONFIG_TRIGGER_LEVEL + TRIGGER_OFFSET(row,col), triggerLevel);
-    eepromTriggerBuffer[row][col] = triggerLevel;
-    return eepromTriggerBuffer[row][col];
+void eeconfig_write_Trigger( uint8_t row, uint8_t col, uint16_t triggerLevel) { 
+		eepromTriggerBuffer[row][col] = triggerLevel; 
+		/* * ???????? void, * no return eepromTriggerBuffer[row][col]; */ 
 }
 
 void eeconfig_write_rapidTrigger( uint8_t key, rapidTrigger_config_t rapidTrigger){
@@ -188,23 +185,26 @@ void eeconfig_write_rapidTrigger( uint8_t key, rapidTrigger_config_t rapidTrigge
     return eeprom_update_block(&rapidTrigger, EECONFIG_RAPID_TRIGGER + sizeof(rapidTrigger) * key, sizeof(rapidTrigger_config_t));
 }
 
-void eeconfig_write_Release( uint8_t row, uint8_t col, uint16_t triggerLevel){
-    eeprom_write_word(EECONFIG_RELEASE_LEVEL + TRIGGER_OFFSET(row,col), triggerLevel);
-    eepromReleaseBuffer[row][col] = triggerLevel;
-    return eepromReleaseBuffer[row][col];
+void eeconfig_write_Release( uint8_t row, uint8_t col, uint16_t releaseLevel) { 
+		eepromReleaseBuffer[row][col] = releaseLevel; 
+		/* * ???????? void, * ?? return eepromReleaseBuffer[row][col]; */ 
 }
 
-void eeconfig_write_keymap_key(uint8_t layer, uint8_t row, uint8_t col, uint16_t key) {
-    eepromKeyBuffer[layer][row][col] = key;
-    return eeprom_write_word(EECONFIG_KEYMAP_KEYMAPS + KEY_OFFSET(layer, row, col)*2, key);
+void eeconfig_write_keymap_key( uint8_t layer, uint8_t row, uint8_t col, uint16_t key) { 
+		const uint32_t byte_offset = (uint32_t)KEY_OFFSET(layer, row, col) * sizeof(uint16_t); 
+		uint16_t *address = (uint16_t *)(void *) (EECONFIG_KEYMAP_KEYMAPS + byte_offset); 
+		eeprom_write_word(address, key); 
 }
 
-uint16_t eeconfig_read_keymap_key_by_index(uint16_t index) {
-    return eeprom_read_word(EECONFIG_KEYMAP_KEYMAPS + index*2);
+uint16_t eeconfig_read_keymap_key_by_index(uint16_t index) { 
+		const uint32_t byte_offset = (uint32_t)index * sizeof(uint16_t); 
+		const uint16_t *address = (const uint16_t *)(const void *) (EECONFIG_KEYMAP_KEYMAPS + byte_offset); 
+		return eeprom_read_word(address); 
 }
 
-void eeconfig_write_keymap_key_by_index(uint16_t index, uint16_t key) {
-    return eeprom_write_word(EECONFIG_KEYMAP_KEYMAPS + index*2, key);
+void eeconfig_write_keymap_key_by_index( uint16_t index, uint16_t key) { 
+		const uint32_t byte_offset = (uint32_t)index * sizeof(uint16_t); 
+		uint16_t *address = (uint16_t *)(void *) (EECONFIG_KEYMAP_KEYMAPS + byte_offset); 
+		eeprom_write_word(address, key); 
 }
-
 #endif

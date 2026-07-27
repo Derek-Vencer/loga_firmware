@@ -8,7 +8,11 @@
 #include "keycode.h"
 #include "wait.h"
 // #include "sleep_manager.h"
+
+#include "action_util.h"
+#include "timer.h"
 #include <string.h>
+#include "action.h"
 
 static uint16_t clamp_delay_by_mode(uint16_t delay_ms);
 
@@ -44,7 +48,7 @@ extern uint8_t current_wireless_mode;
 // -----------------------------
 // Wireless HID report bridge
 // -----------------------------
-
+#if 0
 typedef struct {
     uint8_t mods;
     uint8_t keys[6];
@@ -97,7 +101,6 @@ static void whid_send_if_changed(void) {
         return;
     }
 
-    bt_protocol_send_keycode(g_whid.mods, g_whid.keys);
     g_whid_last_sent = g_whid;
     whid_wait_one_interval();
 }
@@ -211,6 +214,7 @@ static void whid_release_all(void) {
     whid_send_if_changed();
 }
 
+#endif
 // -----------------------------
 // Internal state machine
 // -----------------------------

@@ -96,6 +96,8 @@ void debug_action(action_t action);
 void tap_code(uint8_t code);
 void tap_code16(uint16_t code);
 void tap_code_delay(uint8_t code, uint16_t delay);
+void register_code16(uint16_t code);
+void unregister_code16(uint16_t code);
 
 #ifdef __cplusplus
 }

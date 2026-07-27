@@ -14,6 +14,7 @@
 #include <math.h>
 #include <stdint.h>
 #include <stdbool.h>
+
 uint8_t wheel_base_hue[LED_MATRIX_ROWS][LED_MATRIX_COLS];
 static bool wheel_inited = false;
 
@@ -299,10 +300,14 @@ void ripple_add_event(uint8_t row, uint8_t col, led_config_t color)
 // ripple process
 extern led_config_t LED_Datas[LedNumbers];
 
-static uint8_t ripple_abs_u8(int16_t v)
-{
-    return (v < 0) ? (uint8_t)(-v) : (uint8_t)v;
-}
+/*
+ * 刪除以下未使用函式：
+ *
+ * static uint8_t ripple_abs_u8(int16_t v)
+ * {
+ *     return (v < 0) ? (uint8_t)(-v) : (uint8_t)v;
+ * }
+ */
 
 static uint16_t ripple_dist_approx(int16_t dx, int16_t dy)
 {
@@ -701,6 +706,7 @@ static uint8_t mosart_update_interval(uint8_t mode)
     return 33u;
 }
 
+/*
 static led_config_t wheel_apply_brightness(led_config_t in, uint8_t brightness)
 {
     led_config_t out;
@@ -711,6 +717,7 @@ static led_config_t wheel_apply_brightness(led_config_t in, uint8_t brightness)
     out.blue  = ((uint16_t)in.blue  * brightness) / 100u;
     return out;
 }
+*/
 // end wheel
 
 static THD_WORKING_AREA(waLED_EffectThread, 256);
@@ -1149,20 +1156,20 @@ bool effectRandowColorProcess(void)
      */
     if (randColor.direction)
     {
-        if (randColor.bright >= 100U)
+        if (randColor.bright >= 100)
         {
-            randColor.bright = 100U;
+            randColor.bright = 100;
             randColor.direction = false;
         }
         else
         {
-            if (randColor.bright <= 97U)
+            if (randColor.bright <= 97)
             {
-                randColor.bright += 3U;
+                randColor.bright += 3;
             }
             else
             {
-                randColor.bright = 100U;
+                randColor.bright = 100;
             }
         }
     }
@@ -1171,7 +1178,7 @@ bool effectRandowColorProcess(void)
      */
     else
     {
-        if (randColor.bright == 0U)
+        if (randColor.bright == 0)
         {
             /*
              * 彩虹模式每完成一次呼吸後，
@@ -1185,7 +1192,7 @@ bool effectRandowColorProcess(void)
                     (uint8_t)(sizeof(rainbowColor) /
                               sizeof(rainbowColor[0])))
                 {
-                    randColor.ranbowIndex = 0U;
+                    randColor.ranbowIndex = 0;
                 }
             }
 
@@ -1236,13 +1243,13 @@ bool effectRandowColorProcess(void)
              * 避免 uint8_t 在 1 或 2 時減 3 發生下溢，
              * 例如 1 - 3 變成 254。
              */
-            if (randColor.bright >= 3U)
+            if (randColor.bright >= 3)
             {
-                randColor.bright -= 3U;
+                randColor.bright -= 3;
             }
             else
             {
-                randColor.bright = 0U;
+                randColor.bright = 0;
             }
         }
     }
@@ -2064,69 +2071,94 @@ led_config_t hsv_to_rgb(hsv_t hsv)
     return rgb;
 }
 
-bool setRunMode(led_runMode_t runMode){
-	if (gameModeEnable){return false;}
-	else {
-		// uprintf ("set runmode:%d\r\n",runMode.type);
-        // uprintf ("%d\r\n",runMode.type); //
-	}
-	chVTReset(&randColor_vt);
+bool setRunMode(led_runMode_t runMode)
+{
+    if (gameModeEnable)
+    {
+        return false;
+    }
 
-	switch (runMode.type){
-		case	normalMode:
-			ledAllOff(false);
-			//chThdSleepMilliseconds(150);
-			LED_PresetCurrentMode = runMode.mode;
-			effectStatus.runMode = normalMode;
-			if (runMode.mode>LED_PresetModeIndex){
-				runMode.mode = 0;
-			}
-			if (runMode.mode<0){
-				runMode.mode = LED_PresetModeIndex;
-			}
-			runMode.brightness = led_clamp_percent(runMode.brightness);
-			if (runMode.brightness < 1){
-				runMode.brightness = 1;
-			}
-			runMode.speed = led_clamp_percent(runMode.speed);
-			normalEffect = runMode.mode;
-			normalBrightness = runMode.brightness;
-			normalSpeed = runMode.speed;
-			chBSemSignal(&ledRunmodeSem);
-			break;
-		case	demoMode:
-			ledAllOff(false);
-			LED_DemoCurrentMode = 0;
-			effectStatus.runMode = demoMode;
-			chBSemSignal(&ledRunmodeSem);
-			break;
-		case testMode:
-			break;
-		case dynamticLightingMode:
-            // if(!g_usb_configured_flag){ // add this to bypass reboot auto setting
-                effectStatus.effect = EffectIdle; //lyon eventually these two line cause reboot turn into dynamic mode and led_function
-			    ledAllOff(false);
-            // }
-			// effectStatus.effect = EffectIdle;
-			// ledAllOff(false);
-			break;
-		case offMode:
-			effectStatus.effect = EffectIdle;
-			ledAllOff(true);
-			break;
-		case powerOff:
-			ledAllOff(true);
-			break;
-	}
-	lastLED_RunMode = runMode;
+    chVTReset(&randColor_vt);
 
-	if (runMode.type==powerOff){
-		palClearLine(SPI_LED_SDB_PIN);
-		// uprintf ("led shutdown on\r\n");
-	} else {
-		palSetLine(SPI_LED_SDB_PIN);
-		// uprintf ("led shutdown off\r\n");
-	}
+    switch (runMode.type)
+    {
+        case normalMode:
+            ledAllOff(false);
+
+            /*
+             * uint8_t 從 0 往下減時會下溢成 255，
+             * 此時切換至最後一個燈效。
+             */
+            if (runMode.mode == UINT8_MAX)
+            {
+                runMode.mode = LED_PresetModeIndex;
+            }
+            else if (runMode.mode > LED_PresetModeIndex)
+            {
+                runMode.mode = 0;
+            }
+
+            runMode.brightness =
+                led_clamp_percent(runMode.brightness);
+
+            if (runMode.brightness < 1U)
+            {
+                runMode.brightness = 1U;
+            }
+
+            runMode.speed =
+                led_clamp_percent(runMode.speed);
+
+            LED_PresetCurrentMode = runMode.mode;
+            effectStatus.runMode = normalMode;
+
+            normalEffect = runMode.mode;
+            normalBrightness = runMode.brightness;
+            normalSpeed = runMode.speed;
+
+            chBSemSignal(&ledRunmodeSem);
+            break;
+
+        case demoMode:
+            ledAllOff(false);
+            LED_DemoCurrentMode = 0;
+            effectStatus.runMode = demoMode;
+            chBSemSignal(&ledRunmodeSem);
+            break;
+
+        case testMode:
+            break;
+
+        case dynamticLightingMode:
+            effectStatus.effect = EffectIdle;
+            ledAllOff(false);
+            break;
+
+        case offMode:
+            effectStatus.effect = EffectIdle;
+            ledAllOff(true);
+            break;
+
+        case powerOff:
+            ledAllOff(true);
+            break;
+
+        default:
+            return false;
+    }
+
+    lastLED_RunMode = runMode;
+
+    if (runMode.type == powerOff)
+    {
+        palClearLine(SPI_LED_SDB_PIN);
+    }
+    else
+    {
+        palSetLine(SPI_LED_SDB_PIN);
+    }
+
+    return true;
 }
 
 void LED_init(void)
