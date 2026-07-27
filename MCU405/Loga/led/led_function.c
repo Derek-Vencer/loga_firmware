@@ -2000,18 +2000,27 @@ void led_cb(void)
 
 bool setKeymapLED(uint8_t row, uint8_t column, led_config_t color)
 {
-    //int8_t number;
-//    const uint8_t LED_Remap[2][6]={ { 3, 55, 60, 62, 63, 95},{ 4, 56, 61, 64, 65, 96} };
-//    number = ledRemap[row][column];
-//    if (number > LedNumbers) { return false; }
-//    if (number != -1)
-//    {
-//        LED_Datas[number] = color;
-//        return true;
-//
-//    }
-    LED_Datas[ledKeyMatrix[row][column]] = color;
-    return false;
+    int16_t number;
+
+    if (row >= MATRIX_ROWS || column >= MATRIX_COLS)
+    {
+        return false;
+    }
+
+    number = (int16_t)ledKeyMatrix[row][column];
+
+    /*
+     * -1 代表這個矩陣位置沒有對應 LED。
+     * 有效 LED 編號必須是 0 ~ LedNumbers - 1。
+     */
+    if (number < 0 || number >= (int16_t)LedNumbers)
+    {
+        return false;
+    }
+
+    LED_Datas[number] = color;
+
+    return true;
 }
 
 bool setRemapLED(uint8_t row, uint8_t column, led_config_t color)

@@ -557,44 +557,41 @@ bool setRunMode(uint8_t runMode, int8_t mode, uint8_t brightness, uint8_t speed)
 	}
 }
 
-void LED_init(void){
-	led_creatTask();
+void LED_init(void)
+{
+    c.red   = eeprom_read_byte(KB_COLOR_RED_ADDR);
+    c.green = eeprom_read_byte(KB_COLOR_GREEN_ADDR);
+    c.blue  = eeprom_read_byte(KB_COLOR_BLUE_ADDR);
 
-	buildDemoModes();
-	buildNormalModes();
+    uprintf(
+        "[LED INIT] saved color R=%u G=%u B=%u\r\n",
+        c.red,
+        c.green,
+        c.blue
+    );
 
-	//leRemapLocationTest(500);
-	//ledKeymatrixLocationTest(1);
+    led_creatTask();
 
-	//setRunMode(demoMode, 0, 0, 0);
-	// setRunMode(normalMode, 4, 5, 2); //
-//	chThdSleepMilliseconds(2000);
-//	setRunMode(normalMode, ++normalEffect, normalBrightness+1, normalSpeed+1);
-//	chThdSleepMilliseconds(1000);
-////	setRunMode(offMode, 0, 0, 0);
-////	chThdSleepMilliseconds(3000);
-////	setRunMode(normalMode, 8, 10, 1);
-////	chThdSleepMilliseconds(3000);
-////	setRunMode(normalMode, ++normalEffect, --normalBrightness, ++normalBrightness);
-////	chThdSleepMilliseconds(3000);
-//	setRunMode(normalMode, ++normalEffect, normalBrightness, normalBrightness);
-//	chThdSleepMilliseconds(3000);
-//	setRunMode(normalMode, --normalEffect, normalBrightness, normalBrightness);
-//	chThdSleepMilliseconds(3000);
-//	*((uint32_t *)(0x2000FFF0)) = 0xDEADBEEF;
-//	NVIC_SystemReset();
+    buildDemoModes();
+    buildNormalModes();
+    led_pos_init_from_remap();
+    wheel_init_table();
+    wheel_inited = true;
 
+    chThdCreateStatic(
+        waLED_EffectThread,
+        sizeof(waLED_EffectThread),
+        NORMALPRIO - 3,
+        LED_EffectThread,
+        NULL
+    );
 
-//	setRunMode(demoMode, 0, 0, 0);
-////	chThdSleepMilliseconds(15000);
-////	//setRunMode(normalMode, 8, 4, 1);
-////
-////	*((uint32_t *)(0x2000FFF0)) = 0xDEADBEEF;
-////	NVIC_SystemReset();
+    currentLED_RunMode.mode =
+        eeprom_read_byte(KB_COLOR_MODE_ADDR);
 
-	// setRunMode(demoMode, 0, 0, 0);
-//	chThdSleepMilliseconds(15000);
-//	*((uint32_t *)(0x2000FFF0)) = 0xDEADBEEF;
-//	NVIC_SystemReset();
+    currentLED_RunMode.brightness = normalBrightness;
+    currentLED_RunMode.speed = normalSpeed;
+    currentLED_RunMode.type = normalMode;
 
+    setRunMode(currentLED_RunMode);
 }

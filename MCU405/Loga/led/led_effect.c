@@ -1964,8 +1964,10 @@ void buildNormalModes(void){
     LED_ModesBuilder(addPresetEffect , false,EffectTypeRainbowFlow, true, 5000, 0, 0,  LED_NULL, normalBrightness, normalSpeed, false);
 
 	LED_ModesBuilder(addPresetEffect , false,EffectTypeMosArt, true, 5000, single, mosArtWave,  c, normalBrightness, normalSpeed, 0);
-	LED_ModesBuilder(addPresetEffect , false,EffectTypeReactive,true,5000, single, mosArtStatic, rainbowColor[white], normalBrightness, normalSpeed, 0); //5
-    LED_ModesBuilder(addPresetEffect , false, EffectTypeStarlight, true, 5000, single, mosArtStatic, rainbowColor[orange], normalBrightness, normalSpeed, 0); //6
+	
+	LED_ModesBuilder(addPresetEffect, false,EffectTypeReactive, true, 5000, single, mosArtStatic, c, normalBrightness, normalSpeed, false); // 5 Reactive，使用 EEPROM 讀出的顏色
+    
+		LED_ModesBuilder(addPresetEffect , false, EffectTypeStarlight, true, 5000, single, mosArtStatic, rainbowColor[orange], normalBrightness, normalSpeed, 0); //6
 	LED_ModesBuilder(addPresetEffect , false, EffectTypeRipple, true, 5000, single, mosArtStatic,  c, normalBrightness, normalSpeed, 0);
     LED_ModesBuilder(addPresetEffect , false, EffectTypeWheel, true, 5000, single, mosArtStatic, rainbowColor[orange], normalBrightness, normalSpeed, 0); //8
 	LED_ModesBuilder(addPresetEffect , false,EffectTypeRainbowFlow, true, 5000, 0, 0,  LED_NULL, normalBrightness, normalSpeed, false);
@@ -2163,11 +2165,16 @@ bool setRunMode(led_runMode_t runMode)
 
 void LED_init(void)
 {
-    uint8_t saved_mode;
-
     c.red   = eeprom_read_byte(KB_COLOR_RED_ADDR);
     c.green = eeprom_read_byte(KB_COLOR_GREEN_ADDR);
     c.blue  = eeprom_read_byte(KB_COLOR_BLUE_ADDR);
+
+    uprintf(
+        "[LED INIT] EEPROM color R=%u G=%u B=%u\r\n",
+        c.red,
+        c.green,
+        c.blue
+    );
 
     led_creatTask();
 
@@ -2186,22 +2193,70 @@ void LED_init(void)
         NULL
     );
 
-    saved_mode = eeprom_read_byte(KB_COLOR_MODE_ADDR);
+    currentLED_RunMode.mode =
+        eeprom_read_byte(KB_COLOR_MODE_ADDR);
 
-    /*
-     * LED_PresetModeIndex 是 buildNormalModes() 建立後的最大有效 index。
-     */
-    if (saved_mode > LED_PresetModeIndex)
-    {
-        saved_mode = 0;
-        eeprom_update_byte(KB_COLOR_MODE_ADDR, saved_mode);
-    }
-
-    currentLED_RunMode.mode       = saved_mode;
     currentLED_RunMode.brightness = normalBrightness;
     currentLED_RunMode.speed      = normalSpeed;
     currentLED_RunMode.type       = normalMode;
 
+    uprintf(
+        "[LED INIT] mode=%u color=%u/%u/%u\r\n",
+        currentLED_RunMode.mode,
+        c.red,
+        c.green,
+        c.blue
+    );
+
     setRunMode(currentLED_RunMode);
 }
+
+void led_set_effect_color(uint8_t red, uint8_t green, uint8_t blue)
+{
+    uint8_t index;
+    led_config_t new_color;
+
+    new_color.red   = red;
+    new_color.green = green;
+    new_color.blue  = blue;
+
+    /*
+     * 更新共用燈效顏色。
+     */
+    c = new_color;
+
+    /*
+     * 同步 MosArt 顏色。
+     */
+    mosArt.LED = new_color;
+
+    /*
+     * 更新所有 Reactive preset 的顏色。
+     */
+    for (index = 0U; index <= LED_PresetModeIndex; index++)
+    {
+        if (LED_PresetMode[index].effect == EffectTypeReactive)
+        {
+            LED_PresetMode[index].color = new_color;
+
+            uprintf(
+                "[LED] Reactive preset index=%u color=%u/%u/%u\r\n",
+                index,
+                new_color.red,
+                new_color.green,
+                new_color.blue
+            );
+        }
+    }
+
+    uprintf(
+        "[LED COLOR RAM] R=%u G=%u B=%u\r\n",
+        c.red,
+        c.green,
+        c.blue
+    );
+}
+
+
+
 

@@ -1560,117 +1560,177 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length)
             }
         break;
         case ione_api_cmd_set_lighting_value:
+        {
             uprintf("API=>Set Lighting Value:\r\n");
-            
-            if (*payload_length == 4 && (recive_payload[0] < 5)) {
-                *send_status = ione_api_status_success;
-                switch(recive_payload[0]){
-                    case 1:
-                        uprintf("API=>Bright:\r\n");
-                        currentLED_RunMode.brightness = brightness_percent_to_internal(recive_payload[1]);
 
-                        if (currentLED_RunMode.brightness == 0) {
+            if ((*payload_length == 4U) &&
+                (recive_payload[0] > 0U) &&
+                (recive_payload[0] < 5U))
+            {
+                *send_status = ione_api_status_success;
+
+                switch (recive_payload[0])
+                {
+                    case 1:
+                    {
+                        uprintf("API=>Bright:\r\n");
+
+                        currentLED_RunMode.brightness =
+                            brightness_percent_to_internal(
+                                recive_payload[1]
+                            );
+
+                        if (currentLED_RunMode.brightness == 0U)
+                        {
                             currentLED_RunMode.type = offMode;
-                        } else if (currentLED_RunMode.type == offMode) {
+                        }
+                        else if (currentLED_RunMode.type == offMode)
+                        {
                             currentLED_RunMode.type = normalMode;
                         }
 
-                        LED_SpeedChange(currentLED_RunMode.brightness, currentLED_RunMode.speed);
+                        LED_SpeedChange(
+                            currentLED_RunMode.brightness,
+                            currentLED_RunMode.speed
+                        );
+
                         setRunMode(currentLED_RunMode);
+                    }
                     break;
-										case 2:
-										{
-												uint8_t requested_mode = recive_payload[1];
 
-												uprintf("API=>Effect: mode=%u\r\n", requested_mode);
+                    case 2:
+                    {
+                        uint8_t mode = recive_payload[1];
 
-												if (requested_mode <= LED_PresetModeIndex)
-												{
-														currentLED_RunMode.mode = requested_mode;
-														setRunMode(currentLED_RunMode);
+                        uprintf(
+                            "API=>Effect: mode=%u\r\n",
+                            mode
+                        );
 
-														eeprom_update_byte(
-																KB_COLOR_MODE_ADDR,
-																requested_mode
-														);
+                        currentLED_RunMode.mode = mode;
 
-														*send_status = ione_api_status_success;
-												}
-												else
-												{
-														uprintf(
-																"API=>Effect invalid: mode=%u max=%u\r\n",
-																requested_mode,
-																LED_PresetModeIndex
-														);
+                        eeprom_update_byte(
+                            KB_COLOR_MODE_ADDR,
+                            mode
+                        );
 
-														*send_status = ione_api_status_fail;
-												}
-										}
-										break;
+                        setRunMode(currentLED_RunMode);
+                    }
+                    break;
+
                     case 3:
+                    {
                         uprintf("API=>Speed:\r\n");
-                        currentLED_RunMode.speed = speed_percent_to_internal(recive_payload[1]);
+
+                        currentLED_RunMode.speed =
+                            speed_percent_to_internal(
+                                recive_payload[1]
+                            );
+
                         setRunMode(currentLED_RunMode);
+                    }
                     break;
-										case 4:
-										{
-												uint8_t red;
-												uint8_t green;
-												uint8_t blue;
 
-												uprintf("API=>Color:\r\n");
+                    case 4:
+                    {
+                        uint8_t red   = recive_payload[1];
+                        uint8_t green = recive_payload[2];
+                        uint8_t blue  = recive_payload[3];
 
-												if (*payload_length == 4U)
-												{
-														red   = recive_payload[1];
-														green = recive_payload[2];
-														blue  = recive_payload[3];
+                        uprintf("API=>Color:\r\n");
 
-														uprintf(
-																"API=>Color: R=%u G=%u B=%u current_mode=%u\r\n",
-																red,
-																green,
-																blue,
-																currentLED_RunMode.mode
-														);
+                        uprintf(
+                            "API=>Color: R=%u G=%u B=%u current_mode=%u\r\n",
+                            red,
+                            green,
+                            blue,
+                            currentLED_RunMode.mode
+                        );
 
-														if (currentLED_RunMode.mode == 5U)
-														{
-																LED_SetReactiveColor(red, green, blue);
-														}
-														else
-														{
-																mosArt.LED.red   = red;
-																mosArt.LED.green = green;
-																mosArt.LED.blue  = blue;
-														}
+                        /*
+                         * 更新 LED RAM 使用中的顏色：
+                         * c、mosArt.LED、Reactive preset。
+                         */
+                        led_set_effect_color(
+                            red,
+                            green,
+                            blue
+                        );
 
-														eeprom_update_byte(KB_COLOR_RED_ADDR, red);
-														eeprom_update_byte(KB_COLOR_GREEN_ADDR, green);
-														eeprom_update_byte(KB_COLOR_BLUE_ADDR, blue);
+                        /*
+                         * 保存顏色到 EEPROM。
+                         */
+                        eeprom_update_byte(
+                            KB_COLOR_RED_ADDR,
+                            red
+                        );
 
-														*send_status = ione_api_status_success;
-												}
-												else
-												{
-														uprintf(
-																"API=>Color: invalid payload length=%u\r\n",
-																*payload_length
-														);
+                        eeprom_update_byte(
+                            KB_COLOR_GREEN_ADDR,
+                            green
+                        );
 
-														*send_status = ione_api_status_fail;
-												}
+                        eeprom_update_byte(
+                            KB_COLOR_BLUE_ADDR,
+                            blue
+                        );
 
-												*payload_length = 1;
-										}
-										break;
-                } 
-            } else {
-                *send_status = ione_api_status_fail;
-                uprintf("Payload should be empty\r\n");
+                        /*
+                         * Reactive mode 5 正在使用時，
+                         * 重新載入目前模式，讓新顏色立即生效。
+                         */
+                        if (currentLED_RunMode.mode == 5U)
+                        {
+                            setRunMode(currentLED_RunMode);
+                        }
+
+                        uprintf(
+                            "[LED] Color saved R=%u G=%u B=%u mode=%u\r\n",
+                            red,
+                            green,
+                            blue,
+                            currentLED_RunMode.mode
+                        );
+
+                        uprintf(
+                            "[LED EEPROM] R=%u G=%u B=%u\r\n",
+                            eeprom_read_byte(
+                                KB_COLOR_RED_ADDR
+                            ),
+                            eeprom_read_byte(
+                                KB_COLOR_GREEN_ADDR
+                            ),
+                            eeprom_read_byte(
+                                KB_COLOR_BLUE_ADDR
+                            )
+                        );
+                    }
+                    break;
+
+                    default:
+                    {
+                        *send_status = ione_api_status_fail;
+                        uprintf(
+                            "API=>Lighting item invalid: %u\r\n",
+                            recive_payload[0]
+                        );
+                    }
+                    break;
+                }
             }
-            *payload_length = 1;
+            else
+            {
+                *send_status = ione_api_status_fail;
+
+                uprintf(
+                    "API=>Set Lighting invalid length=%u item=%u\r\n",
+                    *payload_length,
+                    recive_payload[0]
+                );
+            }
+
+            *payload_length = 1U;
+        }
         break;
         case ione_api_cmd_get_lighting_value:
             uprintf("API=>Get Lighting Value:\r\n");
