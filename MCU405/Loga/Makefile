@@ -13,6 +13,9 @@ CONFIG_H = config.h
 
 # GENERIC STM32F103C8T6 board - stm32duino bootloader
 OPT_DEFS = -DCORTEX_VTOR_INIT=0x6000
+
+OPT_DEFS += -DNO_PRINT
+
 MCU_LDSCRIPT = STM32F103x8_stm32duino_bootloader
 BOARD = AT_START_F405xx
 

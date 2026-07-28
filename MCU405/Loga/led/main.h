@@ -8,6 +8,7 @@
 #ifndef MAIN_H_
 #define MAIN_H_
 
+#include "print.h"
 
 //typedef unsigned char                         bool;
 typedef signed char                           int8_t;
@@ -19,8 +20,6 @@ typedef unsigned long int                     uint32_t;
 
 #define true	1
 #define false	0
-
-int uprintf(const char* fmt, ...);
 
 enum ADC_Status{
 	adcIdel,

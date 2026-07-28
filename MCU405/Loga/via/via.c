@@ -17,6 +17,7 @@
 # include "loga_function.h" 
 #include "led/led_effect.h"
 #include "timer.h"
+#include "config.h"
 
 #define DYNAMIC_KEYMAP_MACRO_EEPROM_SIZE sizeof(dynamic_macro_t) * DYNAMIC_MACRO_COUNT
 
@@ -246,13 +247,27 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length)
     uint8_t *send_payload;
     uint8_t *send_status;
     uint8_t *send_data;
-
+	
+		uprintf("\r\n========== RAW HID RX ==========\r\n");
+		uprintf("data=%p len=%d\r\n", data, length);
+	
     if ((data == NULL) || (length < 32U))
     {
+				uprintf("Invalid packet! data=%p len=%d\r\n", data, length);
         return false;
     }
 
+
     data_start = data;
+		
+		uprintf("RAW:");
+
+		for (uint8_t i = 0; i < length; i++)
+		{
+				uprintf(" %02X", data_start[i]);
+		}
+
+		uprintf("\r\n");
 
     /*
      * Byte 0~1: HID VID
@@ -276,6 +291,10 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length)
         ((uint16_t)data[0] << 8) |
         (uint16_t)data[1];
     data += 2;
+		
+		uprintf("VID      : %04X\r\n", hid_vid);
+		uprintf("Payload  : %d\r\n", *payload_length);
+		uprintf("Command  : 0x%04X\r\n", command_id);
 
     /*
      * Byte 5: status
@@ -293,7 +312,7 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length)
         *payload_length = 1U;
         *send_status = ione_api_status_fail;
         return true;
-    }
+    }		
 
     /*
      * Copy only the valid incoming payload.
@@ -308,11 +327,22 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length)
                *payload_length);
     }
 
+		uprintf("Payload Data:");
+
+		for (uint8_t i = 0; i < *payload_length; i++)
+		{
+				uprintf(" %02X", recive_payload[i]);
+		}
+
+		uprintf("\r\n");
+		
     /*
      * Clear response/status area, bytes 5~31.
      */
     memset(send_payload, 0, sizeof(recive_payload));
 
+		uprintf("Dispatch Command 0x%04X\r\n", command_id);
+		
     switch (command_id)
     {
         case ione_api_cmd_get_firmware_version:
@@ -606,84 +636,355 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length)
 		break;
 #endif // buttonLock
 		case ione_api_cmd_set_rapid_trigger_state:
-        uprintf("API=>Set Rapid Trigger State:\r\n");
-            if (*payload_length == 1) {             
-                *send_status = ione_api_status_success;
-                rapidKeyEnable = recive_payload[0]; //
-                eeprom_update_byte(RAPID_KEY_ENABLE_ADDR, rapidKeyEnable);
-            } else {
-                *send_status = ione_api_status_fail;
-                uprintf("Payload should be empty\r\n");
-            }
-            *payload_length = 1;
+		{
+				uint8_t rx_state;
+				uint8_t save_state;
+				uint8_t verify_state;
+
+				uprintf("API=>Set Rapid Trigger State:\r\n");
+
+				if (*payload_length != 1U)
+				{
+						uprintf("Set Rapid Trigger State Fail: invalid payload length=%u\r\n",
+										*payload_length);
+
+						*send_status = ione_api_status_fail;
+						*payload_length = 1U;
+						break;
+				}
+
+				rx_state = recive_payload[0];
+
+				/*
+				 * App protocol:
+				 *   0 = Disable
+				 *   1 = Enable
+				 *   2 = Enable
+				 *
+				 * Any non-zero value is normalized to 1 before saving.
+				 */
+				save_state = (rx_state == 0U) ? 0U : 1U;
+
+				uprintf("RX Rapid Trigger State: %u -> Save State: %u (%s)\r\n",
+								rx_state,
+								save_state,
+								save_state ? "Enable" : "Disable");
+
+				eeprom_update_byte(
+						(uint8_t *)RAPID_KEY_ENABLE_ADDR,
+						save_state);
+
+				verify_state =
+						eeprom_read_byte(
+								(const uint8_t *)RAPID_KEY_ENABLE_ADDR);
+
+				if (verify_state != save_state)
+				{
+						uprintf("Set Rapid Trigger State Fail: EEPROM verify=%u expected=%u\r\n",
+										verify_state,
+										save_state);
+
+						*send_status = ione_api_status_fail;
+				}
+				else
+				{
+						uprintf("Rapid Trigger State Saved: %u (%s)\r\n",
+										verify_state,
+										verify_state ? "Enable" : "Disable");
+
+						*send_status = ione_api_status_success;
+				}
+
+				*payload_length = 1U;
+		}
 		break;
+
+
 		case ione_api_cmd_get_rapid_trigger_state:
-            uprintf ("API=>Get Rapid Trigger State:\r\n");
-			if (*payload_length == 0){
-			*send_status = ione_api_status_success;
-			*send_data = eeprom_read_byte(RAPID_KEY_ENABLE_ADDR);//rapidKeyEnable; // test for rapid trigger state
-			uprintf ("Get Rapid Trigger State:%d\r\n",*send_data++);
-			} else {
-				*send_status = ione_api_status_fail;
-				uprintf ("Fail\r\n");
-			}
-			*payload_length = 2;
+		{
+				uint8_t stored_state;
+
+				uprintf("API=>Get Rapid Trigger State:\r\n");
+
+				if (*payload_length != 0U)
+				{
+						*send_status = ione_api_status_fail;
+						*payload_length = 1U;
+
+						uprintf("Get Rapid Trigger State Fail: "
+										"payload length=%u, expected=0\r\n",
+										*payload_length);
+						break;
+				}
+
+				stored_state =
+						eeprom_read_byte((const uint8_t *)RAPID_KEY_ENABLE_ADDR);
+
+				/*
+				 * EEPROM 未初始化通常是 0xFF。
+				 * Rapid Trigger State 合法值只有 0 或 1。
+				 * 其他值全部恢復成預設 Disable。
+				 */
+				if (stored_state > 1U)
+				{
+						uprintf("Rapid Trigger State invalid: 0x%02X, "
+										"initialize to Disable\r\n",
+										stored_state);
+
+						stored_state = 0U;
+
+						eeprom_update_byte((uint8_t *)RAPID_KEY_ENABLE_ADDR,
+															 stored_state);
+				}
+
+				rapidKeyEnable = stored_state;
+
+				*send_status = ione_api_status_success;
+
+				*send_data = rapidKeyEnable;
+
+				uprintf("Get Rapid Trigger State: %u (%s)\r\n",
+								rapidKeyEnable,
+								rapidKeyEnable ? "Enable" : "Disable");
+
+				*payload_length = 2U;
+		}
 		break;
-		// case ione_api_cmd_set_rapid_trigger_value:
-        case ione_api_cmd_set_rapid_trigger_value_mm:
-            uprintf("API=>Set rapid trigger value mm:\r\n");
-            if (*payload_length == 4) {             
-                *send_status = ione_api_status_success;              
-                uprintf ("recive_payload:%d\r\an",recive_payload[0]);
 
-                // uprintf("triggerlevel: %d\r\n", keyMatrixTriggerLevel);
-                keyMatrixTriggerLevel = ((uint16_t)recive_payload[0] << 8) | recive_payload[1];
-                keyMatrixReleaseLevel = ((uint16_t)recive_payload[2] << 8) | recive_payload[3]; 
-                uprintf("triggerlevel: %d\r\n", keyMatrixTriggerLevel); 
-                uprintf("ReleaseLevel: %d\r\n", keyMatrixReleaseLevel); 
 
-                // Trigger level
-                if (keyMatrixTriggerLevel>TriggerMax || keyMatrixTriggerLevel<TriggerMin){
-                    keyMatrixTriggerLevel = TriggerInitial;
-                    // eeprom_write_word(EECONFIG_KEYMAP_TRIGGER_LEVEL, keyMatrixTriggerLevel);
-                }
+		case ione_api_cmd_set_rapid_trigger_value_mm:
+		{
+				uint16_t new_trigger_level;
+				uint16_t new_release_level;
+				uint16_t verify_trigger_level;
+				uint16_t verify_release_level;
 
-                //Release level
-                if (keyMatrixReleaseLevel>ReleaseMax || keyMatrixReleaseLevel<ReleaseMin || keyMatrixReleaseLevel>=keyMatrixTriggerLevel){
-                    keyMatrixReleaseLevel = ReleaseInitial;
-                    // eeprom_write_word(EECONFIG_KEYMAP_RELEASE_LEVEL, keyMatrixReleaseLevel);
-                }
-                eeprom_write_word(EECONFIG_KEYMAP_TRIGGER_LEVEL, keyMatrixTriggerLevel);
-	            eeprom_write_word(EECONFIG_KEYMAP_RELEASE_LEVEL, keyMatrixReleaseLevel);
-                write_trigger_to_eeprom();
-	            write_Release_to_eeprom();
-            } else {
-                *send_status = ione_api_status_fail;
-                // uprintf("Payload should be 6\r\n");
-            }
-            *payload_length = 1;
+				uprintf("API=>Set Rapid Trigger Value mm:\r\n");
+
+				if (*payload_length != 4U)
+				{
+						*send_status = ione_api_status_fail;
+						*payload_length = 1U;
+
+						uprintf("Set Rapid Trigger Value Fail: "
+										"payload length=%u, expected=4\r\n",
+										*payload_length);
+						break;
+				}
+
+				new_trigger_level =
+						((uint16_t)recive_payload[0] << 8) |
+						(uint16_t)recive_payload[1];
+
+				new_release_level =
+						((uint16_t)recive_payload[2] << 8) |
+						(uint16_t)recive_payload[3];
+
+				uprintf("RX Trigger Level: %u.%02u mm (0x%04X)\r\n",
+								new_trigger_level / 100U,
+								new_trigger_level % 100U,
+								new_trigger_level);
+
+				uprintf("RX Release Level: %u.%02u mm (0x%04X)\r\n",
+								new_release_level / 100U,
+								new_release_level % 100U,
+								new_release_level);
+
+				/*
+				 * Trigger Level 合法範圍檢查。
+				 */
+				if ((new_trigger_level < TriggerMin) ||
+						(new_trigger_level > TriggerMax))
+				{
+						*send_status = ione_api_status_fail;
+						*payload_length = 1U;
+
+						uprintf("Set Rapid Trigger Value Fail: "
+										"trigger=%u, valid=%u~%u\r\n",
+										new_trigger_level,
+										TriggerMin,
+										TriggerMax);
+						break;
+				}
+
+				/*
+				 * Release Level 合法範圍檢查。
+				 *
+				 * 保留你原本的條件：
+				 * release 必須小於 trigger。
+				 *
+				 * 如果你的實際產品定義不是如此，
+				 * 再移除 new_release_level >= new_trigger_level 條件。
+				 */
+				if ((new_release_level > ReleaseMax) ||
+						(new_release_level >= new_trigger_level))
+				{
+						*send_status = ione_api_status_fail;
+						*payload_length = 1U;
+
+						uprintf("Set Rapid Trigger Value Fail: "
+										"release=%u, valid=%u~%u, trigger=%u\r\n",
+										new_release_level,
+										ReleaseMin,
+										ReleaseMax,
+										new_trigger_level);
+						break;
+				}
+
+				keyMatrixTriggerLevel = new_trigger_level;
+				keyMatrixReleaseLevel = new_release_level;
+
+				/*
+				 * 用 update_word，資料相同時不重複寫 EEPROM。
+				 */
+				eeprom_update_word(
+						(uint16_t *)EECONFIG_KEYMAP_TRIGGER_LEVEL,
+						keyMatrixTriggerLevel);
+
+				eeprom_update_word(
+						(uint16_t *)EECONFIG_KEYMAP_RELEASE_LEVEL,
+						keyMatrixReleaseLevel);
+
+				/*
+				 * 如果這兩個函數內部也會再次寫入同一組 EEPROM，
+				 * 建議刪除，避免重複寫入。
+				 *
+				 * write_trigger_to_eeprom();
+				 * write_Release_to_eeprom();
+				 */
+
+				verify_trigger_level =
+						eeprom_read_word(
+								(const uint16_t *)EECONFIG_KEYMAP_TRIGGER_LEVEL);
+
+				verify_release_level =
+						eeprom_read_word(
+								(const uint16_t *)EECONFIG_KEYMAP_RELEASE_LEVEL);
+
+				if ((verify_trigger_level != keyMatrixTriggerLevel) ||
+						(verify_release_level != keyMatrixReleaseLevel))
+				{
+						*send_status = ione_api_status_fail;
+						*payload_length = 1U;
+
+						uprintf("Set Rapid Trigger Value Fail: "
+										"EEPROM verify error\r\n");
+
+						uprintf("Trigger write=%u read=%u\r\n",
+										keyMatrixTriggerLevel,
+										verify_trigger_level);
+
+						uprintf("Release write=%u read=%u\r\n",
+										keyMatrixReleaseLevel,
+										verify_release_level);
+						break;
+				}
+
+				*send_status = ione_api_status_success;
+				*payload_length = 1U;
+
+				uprintf("Rapid Trigger Value Saved.\r\n");
+		}
 		break;
-		// case ione_api_cmd_get_Rapid_trigger_value:
-        case ione_api_cmd_get_rapid_trigger_value_mm:
-            uprintf ("API=>Get Rapid Trigger Value mm:\r\n");
-			if (*payload_length == 0){
-			*send_status = ione_api_status_success;
-			*send_data = (keyMatrixTriggerLevel >> 8) & 0xFF;// press high byte
-            // uprintf ("Get Rapid Trigger value 1:%d\r\n",*send_data);
-            send_data++;
-            *send_data = keyMatrixTriggerLevel & 0xFF;// press low byte
-            // uprintf ("Get Rapid Trigger value 2:%d\r\n",*send_data);
-            send_data++;
-            *send_data = (keyMatrixReleaseLevel >> 8) & 0xFF;// release high byte
-            // uprintf ("Get Rapid Trigger value 3:%d\r\n",*send_data);
-            send_data++;
-            *send_data = keyMatrixReleaseLevel & 0xFF;// release low byte
-			// uprintf ("Get Rapid Trigger value 4:%d\r\n",*send_data);
-            } else {
-				*send_status = ione_api_status_fail;
-				uprintf ("Fail\r\n");
-			}
-			*payload_length = 5;
+
+
+		case ione_api_cmd_get_rapid_trigger_value_mm:
+		{
+				uint16_t stored_trigger_level;
+				uint16_t stored_release_level;
+
+				uprintf("API=>Get Rapid Trigger Value mm:\r\n");
+
+				if (*payload_length != 0U)
+				{
+						*send_status = ione_api_status_fail;
+						*payload_length = 1U;
+
+						uprintf("Get Rapid Trigger Value Fail: "
+										"payload length=%u, expected=0\r\n",
+										*payload_length);
+						break;
+				}
+
+				stored_trigger_level =
+						eeprom_read_word(
+								(const uint16_t *)EECONFIG_KEYMAP_TRIGGER_LEVEL);
+
+				stored_release_level =
+						eeprom_read_word(
+								(const uint16_t *)EECONFIG_KEYMAP_RELEASE_LEVEL);
+
+				/*
+				 * EEPROM 尚未初始化或資料不合法時，
+				 * 載入預設值並寫回 EEPROM。
+				 */
+				if ((stored_trigger_level == 0xFFFFU) ||
+						(stored_trigger_level < TriggerMin) ||
+						(stored_trigger_level > TriggerMax))
+				{
+						uprintf("Trigger Level invalid: 0x%04X, "
+										"initialize to %u\r\n",
+										stored_trigger_level,
+										TriggerInitial);
+
+						stored_trigger_level = TriggerInitial;
+
+						eeprom_update_word(
+								(uint16_t *)EECONFIG_KEYMAP_TRIGGER_LEVEL,
+								stored_trigger_level);
+				}
+
+				if ((stored_release_level == 0xFFFFU) ||
+						(stored_release_level > ReleaseMax) ||
+						(stored_release_level >= stored_trigger_level))
+				{
+						uprintf("Release Level invalid: 0x%04X, "
+										"initialize to %u\r\n",
+										stored_release_level,
+										ReleaseInitial);
+
+						stored_release_level = ReleaseInitial;
+
+						eeprom_update_word(
+								(uint16_t *)EECONFIG_KEYMAP_RELEASE_LEVEL,
+								stored_release_level);
+				}
+
+				keyMatrixTriggerLevel = stored_trigger_level;
+				keyMatrixReleaseLevel = stored_release_level;
+
+				*send_status = ione_api_status_success;
+
+				/*
+				 * 回傳格式：
+				 * status
+				 * trigger high
+				 * trigger low
+				 * release high
+				 * release low
+				 */
+				*send_data++ =
+						(uint8_t)((keyMatrixTriggerLevel >> 8) & 0xFFU);
+
+				*send_data++ =
+						(uint8_t)(keyMatrixTriggerLevel & 0xFFU);
+
+				*send_data++ =
+						(uint8_t)((keyMatrixReleaseLevel >> 8) & 0xFFU);
+
+				*send_data =
+						(uint8_t)(keyMatrixReleaseLevel & 0xFFU);
+
+				*payload_length = 5U;
+
+				uprintf("Get Trigger Level: %u.%02u mm\r\n",
+								keyMatrixTriggerLevel / 100U,
+								keyMatrixTriggerLevel % 100U);
+
+				uprintf("Get Release Level: %u.%02u mm\r\n",
+								keyMatrixReleaseLevel / 100U,
+								keyMatrixReleaseLevel % 100U);
+		}
 		break;
 
 		case ione_api_cmd_set_tachyon_mode:
@@ -1513,10 +1814,289 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length)
 			}
 			*payload_length = 1;
         break;
-        // case ione_api_cmd_set_dead_zone_settings:
-        // break;
-        // case ione_api_cmd_get_dead_zone_settings:
-        // break;
+
+			case ione_api_cmd_get_dead_zone_settings:
+			{
+					uint16_t top_dead_zone;
+					uint16_t bottom_dead_zone;
+
+					uprintf("API=>Get Dead Zone Settings:\r\n");
+
+					if (*payload_length != 0U)
+					{
+							uprintf("Get Dead Zone Fail: invalid payload length=%u\r\n",
+											*payload_length);
+
+							*send_status = ione_api_status_fail;
+							*payload_length = 1U;
+							break;
+					}
+
+					top_dead_zone =
+							eeprom_read_word(
+									(const uint16_t *)DEAD_ZONE_TOP_ADDR);
+
+					bottom_dead_zone =
+							eeprom_read_word(
+									(const uint16_t *)DEAD_ZONE_BOTTOM_ADDR);
+
+					/*
+					 * EEPROM 尚未初始化時為 0xFFFF。
+					 * 使用預設值並寫回 EEPROM。
+					 */
+					if (top_dead_zone == 0xFFFFU)
+					{
+							top_dead_zone = DEAD_ZONE_TOP_DEFAULT;
+
+							eeprom_update_word(
+									(uint16_t *)DEAD_ZONE_TOP_ADDR,
+									top_dead_zone);
+
+							uprintf(
+									"Top Dead Zone uninitialized, "
+									"set default %u.%02u mm\r\n",
+									top_dead_zone / 100U,
+									top_dead_zone % 100U);
+					}
+					else if (top_dead_zone < DEAD_ZONE_MIN)
+					{
+							uprintf(
+									"Top Dead Zone below minimum: "
+									"%u.%02u mm -> %u.%02u mm\r\n",
+									top_dead_zone / 100U,
+									top_dead_zone % 100U,
+									DEAD_ZONE_MIN / 100U,
+									DEAD_ZONE_MIN % 100U);
+
+							top_dead_zone = DEAD_ZONE_MIN;
+
+							eeprom_update_word(
+									(uint16_t *)DEAD_ZONE_TOP_ADDR,
+									top_dead_zone);
+					}
+					else if (top_dead_zone > DEAD_ZONE_MAX)
+					{
+							uprintf(
+									"Top Dead Zone above maximum: "
+									"%u.%02u mm -> %u.%02u mm\r\n",
+									top_dead_zone / 100U,
+									top_dead_zone % 100U,
+									DEAD_ZONE_MAX / 100U,
+									DEAD_ZONE_MAX % 100U);
+
+							top_dead_zone = DEAD_ZONE_MAX;
+
+							eeprom_update_word(
+									(uint16_t *)DEAD_ZONE_TOP_ADDR,
+									top_dead_zone);
+					}
+
+					if (bottom_dead_zone == 0xFFFFU)
+					{
+							bottom_dead_zone = DEAD_ZONE_BOTTOM_DEFAULT;
+
+							eeprom_update_word(
+									(uint16_t *)DEAD_ZONE_BOTTOM_ADDR,
+									bottom_dead_zone);
+
+							uprintf(
+									"Bottom Dead Zone uninitialized, "
+									"set default %u.%02u mm\r\n",
+									bottom_dead_zone / 100U,
+									bottom_dead_zone % 100U);
+					}
+					else if (bottom_dead_zone < DEAD_ZONE_MIN)
+					{
+							uprintf(
+									"Bottom Dead Zone below minimum: "
+									"%u.%02u mm -> %u.%02u mm\r\n",
+									bottom_dead_zone / 100U,
+									bottom_dead_zone % 100U,
+									DEAD_ZONE_MIN / 100U,
+									DEAD_ZONE_MIN % 100U);
+
+							bottom_dead_zone = DEAD_ZONE_MIN;
+
+							eeprom_update_word(
+									(uint16_t *)DEAD_ZONE_BOTTOM_ADDR,
+									bottom_dead_zone);
+					}
+					else if (bottom_dead_zone > DEAD_ZONE_MAX)
+					{
+							uprintf(
+									"Bottom Dead Zone above maximum: "
+									"%u.%02u mm -> %u.%02u mm\r\n",
+									bottom_dead_zone / 100U,
+									bottom_dead_zone % 100U,
+									DEAD_ZONE_MAX / 100U,
+									DEAD_ZONE_MAX % 100U);
+
+							bottom_dead_zone = DEAD_ZONE_MAX;
+
+							eeprom_update_word(
+									(uint16_t *)DEAD_ZONE_BOTTOM_ADDR,
+									bottom_dead_zone);
+					}
+
+					uprintf("Top Dead Zone   : %u.%02u mm\r\n",
+									top_dead_zone / 100U,
+									top_dead_zone % 100U);
+
+					uprintf("Bottom Dead Zone: %u.%02u mm\r\n",
+									bottom_dead_zone / 100U,
+									bottom_dead_zone % 100U);
+
+					*send_status = ione_api_status_success;
+
+					*send_data++ = (uint8_t)(top_dead_zone >> 8);
+					*send_data++ = (uint8_t)(top_dead_zone & 0xFFU);
+
+					*send_data++ = (uint8_t)(bottom_dead_zone >> 8);
+					*send_data++ = (uint8_t)(bottom_dead_zone & 0xFFU);
+
+					/*
+					 * Payload:
+					 * status 1 byte
+					 * top    2 bytes
+					 * bottom 2 bytes
+					 */
+					*payload_length = 5U;
+			}
+			break;
+
+			case ione_api_cmd_set_dead_zone_settings:
+			{
+					uint16_t rx_top_dead_zone;
+					uint16_t rx_bottom_dead_zone;
+					uint16_t top_dead_zone;
+					uint16_t bottom_dead_zone;
+					uint16_t verify_top_dead_zone;
+					uint16_t verify_bottom_dead_zone;
+
+					uprintf("API=>Set Dead Zone Settings:\r\n");
+
+					if (*payload_length != 4U)
+					{
+							uprintf("Set Dead Zone Fail: invalid payload length=%u\r\n",
+											*payload_length);
+
+							*send_status = ione_api_status_fail;
+							*payload_length = 1U;
+							break;
+					}
+
+					rx_top_dead_zone =
+							((uint16_t)recive_payload[0] << 8) |
+							(uint16_t)recive_payload[1];
+
+					rx_bottom_dead_zone =
+							((uint16_t)recive_payload[2] << 8) |
+							(uint16_t)recive_payload[3];
+
+					top_dead_zone = rx_top_dead_zone;
+					bottom_dead_zone = rx_bottom_dead_zone;
+
+					uprintf("RX Top Dead Zone   : %u.%02u mm\r\n",
+									rx_top_dead_zone / 100U,
+									rx_top_dead_zone % 100U);
+
+					uprintf("RX Bottom Dead Zone: %u.%02u mm\r\n",
+									rx_bottom_dead_zone / 100U,
+									rx_bottom_dead_zone % 100U);
+
+					/*
+					 * 將 App 傳入值限制在合法範圍內。
+					 */
+					if (top_dead_zone < DEAD_ZONE_MIN)
+					{
+							top_dead_zone = DEAD_ZONE_MIN;
+					}
+					else if (top_dead_zone > DEAD_ZONE_MAX)
+					{
+							top_dead_zone = DEAD_ZONE_MAX;
+					}
+
+					if (bottom_dead_zone < DEAD_ZONE_MIN)
+					{
+							bottom_dead_zone = DEAD_ZONE_MIN;
+					}
+					else if (bottom_dead_zone > DEAD_ZONE_MAX)
+					{
+							bottom_dead_zone = DEAD_ZONE_MAX;
+					}
+
+					if (top_dead_zone != rx_top_dead_zone)
+					{
+							uprintf(
+									"Top Dead Zone adjusted: "
+									"%u.%02u mm -> %u.%02u mm\r\n",
+									rx_top_dead_zone / 100U,
+									rx_top_dead_zone % 100U,
+									top_dead_zone / 100U,
+									top_dead_zone % 100U);
+					}
+
+					if (bottom_dead_zone != rx_bottom_dead_zone)
+					{
+							uprintf(
+									"Bottom Dead Zone adjusted: "
+									"%u.%02u mm -> %u.%02u mm\r\n",
+									rx_bottom_dead_zone / 100U,
+									rx_bottom_dead_zone % 100U,
+									bottom_dead_zone / 100U,
+									bottom_dead_zone % 100U);
+					}
+
+					eeprom_update_word(
+							(uint16_t *)DEAD_ZONE_TOP_ADDR,
+							top_dead_zone);
+
+					eeprom_update_word(
+							(uint16_t *)DEAD_ZONE_BOTTOM_ADDR,
+							bottom_dead_zone);
+
+					/*
+					 * 寫入後讀回驗證。
+					 */
+					verify_top_dead_zone =
+							eeprom_read_word(
+									(const uint16_t *)DEAD_ZONE_TOP_ADDR);
+
+					verify_bottom_dead_zone =
+							eeprom_read_word(
+									(const uint16_t *)DEAD_ZONE_BOTTOM_ADDR);
+
+					if ((verify_top_dead_zone != top_dead_zone) ||
+							(verify_bottom_dead_zone != bottom_dead_zone))
+					{
+							uprintf(
+									"Dead Zone Save Fail: "
+									"top=%u/%u bottom=%u/%u\r\n",
+									verify_top_dead_zone,
+									top_dead_zone,
+									verify_bottom_dead_zone,
+									bottom_dead_zone);
+
+							*send_status = ione_api_status_fail;
+							*payload_length = 1U;
+							break;
+					}
+
+					uprintf("Top Dead Zone Saved   : %u.%02u mm\r\n",
+									verify_top_dead_zone / 100U,
+									verify_top_dead_zone % 100U);
+
+					uprintf("Bottom Dead Zone Saved: %u.%02u mm\r\n",
+									verify_bottom_dead_zone / 100U,
+									verify_bottom_dead_zone % 100U);
+
+					uprintf("Dead Zone Saved.\r\n");
+
+					*send_status = ione_api_status_success;
+					*payload_length = 1U;
+			}
+			break;
+
         case ione_api_cmd_system_reset:
             uprintf("API=>System Reset:\r\n");
             if (*payload_length == 0) {
@@ -1817,6 +2397,13 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length)
         break;
         
 		default:
+
+				uprintf("Unknown Command : 0x%04X\r\n", command_id);
+
+				*payload_length = 1;
+				*send_status = ione_api_status_fail;
+				break;
+		
 			return false;
 	}
 	//*payload_length = send_data-send_status;

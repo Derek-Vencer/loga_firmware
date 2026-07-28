@@ -159,7 +159,7 @@ include $(CHIBIOS)/os/oslib/oslib.mk
 
 LDSCRIPT= $(STARTUPLD)/AT32F405xC.ld
 
-OPT_DEFS = -DCORTEX_VTOR_INIT=0x6000
+OPT_DEFS += -DCORTEX_VTOR_INIT=0x6000
 
 # C sources that can be compiled in ARM or THUMB mode depending on the global
 # setting.

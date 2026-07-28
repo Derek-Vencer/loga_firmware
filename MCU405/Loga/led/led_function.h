@@ -1,11 +1,11 @@
 #ifndef LED_FUNCTION_H_
 #define LED_FUNCTION_H_
 
+#include "print.h"
 
 void led_cb(void);
 void led_creatTask(void);
 void led_init(uint8_t channel);
-int uprintf(const char* fmt, ...);
 void uart_init(void);
 void setLightRunMode (uint8_t mode);
 void via_controlSet(uint8_t *data);

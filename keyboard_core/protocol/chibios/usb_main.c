@@ -17,7 +17,7 @@
 #include "hook.h"
 #include "keycode.h"
 #include "matrix.h"
-extern int uprintf(const char *fmt, ...);
+#include "print.h"
 
 #define HID_COMMUNICATION_INTERFACE_CLASS 0x03U
 #define VENDOR_COMMUNICATION_INTERFACE_CLASS 0x0ffU

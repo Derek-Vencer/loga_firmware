@@ -937,7 +937,7 @@ void toggle_key_dump_eeprom(void)
 #define rapidShiftM 		-15
 
 extern void LED_init(void);
-extern int uprintf(const char* fmt, ...);
+
 //extern bool setRunMode(uint8_t runMode, int8_t mode, uint8_t brightness, uint8_t speed);
 void send_lamp_array(report_lamp_array_t* report);
 void adcOffsetGet(bool findMax);

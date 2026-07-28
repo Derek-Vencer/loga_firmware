@@ -23,9 +23,12 @@
 #include "led_effect.h"
 #include "loga_function.h" 
 #include "chprintf.h"
+#include "config.h"
+
+
 //#include "driver/led_RGBTable.h"
 
-
+#define NO_PRINT
 //#define multiChannelARGB
 
 #define LED_SPI_Port1					SPID1
@@ -2157,7 +2160,18 @@ void led_creatTask(void)
 
 }
 
-int uprintf(const char* fmt, ...)
+
+#ifdef NO_PRINT
+
+int uprintf(const char *fmt, ...)
+{
+    (void)fmt;
+    return 0;
+}
+
+#else
+
+int uprintf(const char *fmt, ...)
 {
     va_list ap;
     int formatted_bytes;
@@ -2168,6 +2182,9 @@ int uprintf(const char* fmt, ...)
 
     return formatted_bytes;
 }
+
+#endif /* NO_PRINT */
+
 
 void uart_init(void)
 {

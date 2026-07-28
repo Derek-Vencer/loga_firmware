@@ -8,7 +8,20 @@
 #define VENDOR_ID       0x195d
 #define PRODUCT_ID      0x2100//0x2092
 #define DEVICE_VER      0x000F//15//0x000E
-#define DEVICE_VER_FIX  0x05 // 05
+#define DEVICE_VER_FIX  0x07 // 07
+
+/*
+ * Dead Zone 單位：0.01 mm
+ *
+ * 5   = 0.05 mm
+ * 400 = 4.00 mm
+ */
+#define DEAD_ZONE_MIN             5U
+#define DEAD_ZONE_MAX             400U
+
+#define DEAD_ZONE_TOP_DEFAULT     20U  /* 0.20 mm */
+#define DEAD_ZONE_BOTTOM_DEFAULT  30U  /* 0.30 mm */
+
 /* in python2: list(u"whatever".encode('utf-16-le')) */
 /*   at most 32 characters or the ugly hack in usb_main.c borks */
 #define MANUFACTURER "iOne Innovation"
@@ -166,6 +179,19 @@
 
 #define EECONFIG_TOGGLE_KEY_ADDR_END \
     (EECONFIG_TOGGLE_KEY_ADDR + EECONFIG_TOGGLE_KEY_SIZE)
+
+/* Dead Zone */
+#define EECONFIG_DEAD_ZONE_ADDR \
+    ((uint16_t *)(uintptr_t)(EECONFIG_TOGGLE_KEY_ADDR_END))
+
+#define DEAD_ZONE_TOP_ADDR \
+    (EECONFIG_DEAD_ZONE_ADDR)
+
+#define DEAD_ZONE_BOTTOM_ADDR \
+    (EECONFIG_DEAD_ZONE_ADDR + 1)
+
+#define EECONFIG_DEAD_ZONE_ADDR_END \
+    (DEAD_ZONE_BOTTOM_ADDR + 1)
 
 /*
  * New macro EEPROM region.
