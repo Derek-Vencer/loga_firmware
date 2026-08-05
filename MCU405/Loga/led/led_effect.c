@@ -2165,16 +2165,26 @@ bool setRunMode(led_runMode_t runMode)
 
 void LED_init(void)
 {
+    uint8_t ee_mode;
+
     c.red   = eeprom_read_byte(KB_COLOR_RED_ADDR);
     c.green = eeprom_read_byte(KB_COLOR_GREEN_ADDR);
     c.blue  = eeprom_read_byte(KB_COLOR_BLUE_ADDR);
+    ee_mode = eeprom_read_byte(KB_COLOR_MODE_ADDR);
 
+    uprintf("\r\n");
+    uprintf("========== LED EEPROM ==========\r\n");
+    uprintf("Mode  : %3u (0x%02X)\r\n", ee_mode, ee_mode);
     uprintf(
-        "[LED INIT] EEPROM color R=%u G=%u B=%u\r\n",
+        "Color : R=%3u (0x%02X) G=%3u (0x%02X) B=%3u (0x%02X)\r\n",
+        c.red,
         c.red,
         c.green,
+        c.green,
+        c.blue,
         c.blue
     );
+    uprintf("================================\r\n");
 
     led_creatTask();
 
@@ -2193,19 +2203,25 @@ void LED_init(void)
         NULL
     );
 
-    currentLED_RunMode.mode =
-        eeprom_read_byte(KB_COLOR_MODE_ADDR);
+    /*
+     * Mode 0 is currently an off/black preset.
+     * Use mode 3 as the default when EEPROM is blank or stores mode 0.
+     */
+    if ((ee_mode == 0U) || (ee_mode == 0xFFU)) {
+        ee_mode = 3U;
+    }
 
+    currentLED_RunMode.mode       = ee_mode;
     currentLED_RunMode.brightness = normalBrightness;
     currentLED_RunMode.speed      = normalSpeed;
     currentLED_RunMode.type       = normalMode;
 
     uprintf(
-        "[LED INIT] mode=%u color=%u/%u/%u\r\n",
+        "[LED INIT] RunMode mode=%u brightness=%u speed=%u type=%u\r\n",
         currentLED_RunMode.mode,
-        c.red,
-        c.green,
-        c.blue
+        currentLED_RunMode.brightness,
+        currentLED_RunMode.speed,
+        currentLED_RunMode.type
     );
 
     setRunMode(currentLED_RunMode);

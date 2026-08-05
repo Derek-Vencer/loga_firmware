@@ -375,33 +375,74 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length)
             }
         }
         break;
-		case ione_api_cmd_Set_Profil:
-			uprintf ("API=>Set Profile:\r\n");
-			if (*payload_length == 1 && (recive_payload[0]<PROFILE_COUNT)){
-				*send_status = ione_api_status_success;
-				currentProfile = recive_payload[0];
-				layer_move(currentProfile*LAYERS_PER_PROFILE);
-				uprintf ("Profile:%d \r\n",recive_payload[0]);
-				clear_keyboard();
+			case ione_api_cmd_Set_Profil:
+			{
+					uint8_t profile;
+					uint8_t target_layer;
+
+					uprintf("API=>Set Profile:\r\n");
+
+					if (*payload_length != 1) {
+							*send_status = ione_api_status_fail;
+
+							uprintf("Fail: invalid length=%u\r\n",
+											(unsigned int)*payload_length);
+
+							*payload_length = 1;
+							break;
+					}
+
+					profile = recive_payload[0];
+
+					if ((profile < 1U) || (profile > PROFILE_COUNT)) {
+							*send_status = ione_api_status_fail;
+
+							uprintf("Fail: invalid profile=%u\r\n",
+											(unsigned int)profile);
+
+							*payload_length = 1;
+							break;
+					}
+
+					target_layer =
+							(uint8_t)((profile - 1U) * LAYERS_PER_PROFILE);
+
+					currentProfile = profile;
+
+					layer_move(target_layer);
+
+					uprintf("Profile:%u Layer:%u\r\n",
+									(unsigned int)currentProfile,
+									(unsigned int)target_layer);
+
+					clear_keyboard();
+
+					*send_status = ione_api_status_success;
+					*payload_length = 1;
 			}
-			else {
-				*send_status = ione_api_status_fail;
-				uprintf ("Fail\r\n");
-			}
-			*payload_length = 1;
-		break;
-		case ione_api_cmd_get_Profile_state:
-			uprintf ("API=>Get Profile:\r\n");
-			if (*payload_length == 0){
-			*send_status = ione_api_status_success;
-			*send_data = currentProfile;
-			uprintf ("Profile:%d\r\n",*send_data++);
-			} else {
-				*send_status = ione_api_status_fail;
-				uprintf ("Fail\r\n");
-			}
-			*payload_length = 2;
-		break;
+			break;
+
+			case ione_api_cmd_get_Profile_state:
+					uprintf("API=>Get Profile:\r\n");
+
+					if (*payload_length == 0) {
+							*send_status = ione_api_status_success;
+
+							*send_data = currentProfile;
+
+							uprintf("Profile:%u\r\n",
+											(unsigned int)*send_data);
+
+							send_data++;
+					} else {
+							*send_status = ione_api_status_fail;
+
+							uprintf("Fail: invalid length=%u\r\n",
+											(unsigned int)*payload_length);
+					}
+
+					*payload_length = 2;
+					break;
         case ione_api_cmd_set_key_mapping: // from here 
             uprintf ("API=>Set Key Mapping:\r\n");
             if (*payload_length == 5 && (recive_payload[0]<KEYMAPS_COUNT && recive_payload[1]<MATRIX_ROWS && recive_payload[2]<MATRIX_COLS)){

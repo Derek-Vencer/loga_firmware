@@ -92,14 +92,14 @@ void nkro_in_cb(USBDriver *usbp, usbep_t ep);
 #endif /* NKRO_ENABLE */
 
 #ifdef LAMP_ARRAY_ENABLE
-/* nkro IN callback hander */
+/* Lamp Array IN request callback handler */
 void lamp_array_in_cb(USBDriver *usbp, usbep_t ep);
-#endif /* LAMP_ARRAY_ENABLE */
+#endif
 
 #ifdef CONTROL_ENABLE
-/* controlcallback hander */
+/* Control IN request callback handler */
 void control_in_cb(USBDriver *usbp, usbep_t ep);
-#endif /* CONTROL_ENABLE */
+#endif
 
 /* ------------
  * Mouse header
@@ -186,9 +186,8 @@ void console_flush_output(void);
 void console_in_cb(USBDriver *usbp, usbep_t ep);
 #endif /* CONSOLE_ENABLE */
 
-#ifdef reboot
-extern volatile bool g_usb_configured_flag;   // ★ 全域旗標（非 static）lyon
-#endif
+extern volatile bool g_usb_configured_flag;
+
 // set rate
 void usb_update_polling_rate(uint16_t polling_rate);
 void usb_set_polling_rate(uint8_t idx);

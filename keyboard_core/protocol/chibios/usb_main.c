@@ -17,7 +17,7 @@
 #include "hook.h"
 #include "keycode.h"
 #include "matrix.h"
-#include "print.h"
+extern int uprintf(const char *fmt, ...);
 
 #define HID_COMMUNICATION_INTERFACE_CLASS 0x03U
 #define VENDOR_COMMUNICATION_INTERFACE_CLASS 0x0ffU
@@ -235,6 +235,7 @@ static void console_flush_cb(void *arg);
 /* HID specific constants */
 #define USB_DESCRIPTOR_HID 0x21
 #define USB_DESCRIPTOR_HID_REPORT 0x22
+
 #define HID_GET_REPORT 0x01
 #define HID_GET_IDLE 0x02
 #define HID_GET_PROTOCOL 0x03
@@ -244,24 +245,42 @@ static void console_flush_cb(void *arg);
 
 /* USB Device Descriptor */
 static const uint8_t usb_device_descriptor_data[] = {
-    USB_DESC_DEVICE(0x0200,     // bcdUSB (1.1)
-                    0xef,       // bDeviceClass (defined in later in interface)
-                    0x02,       // bDeviceSubClass
-                    0x01,       // bDeviceProtocol
-                    64,         // bMaxPacketSize (64 bytes) (the driver didn't work with 32)
-                    VENDOR_ID,  // idVendor
-                    PRODUCT_ID, // idProduct
-                    DEVICE_VER, // bcdDevice
-                    1,          // iManufacturer
-                    2,          // iProduct
-                    3,          // iSerialNumber
-                    1)          // bNumConfigurations
+    USB_DESC_DEVICE(0x0200,     // bcdUSB
+                    0x00,       // bDeviceClass: defined per interface
+                    0x00,       // bDeviceSubClass
+                    0x00,       // bDeviceProtocol
+                    64,         // bMaxPacketSize0
+                    VENDOR_ID,
+                    PRODUCT_ID,
+                    DEVICE_VER,
+                    1,
+                    2,
+                    3,
+                    1)
 };
 
 /* Device Descriptor wrapper */
 static const USBDescriptor usb_device_descriptor = {
     sizeof usb_device_descriptor_data,
     usb_device_descriptor_data};
+
+		/* USB 2.0 Device Qualifier Descriptor */
+static const uint8_t usb_device_qualifier_data[] = {
+    0x0A,       // bLength
+    0x06,       // bDescriptorType
+    0x00, 0x02, // bcdUSB 2.00
+    0x00,       // bDeviceClass: defined per interface
+    0x00,       // bDeviceSubClass
+    0x00,       // bDeviceProtocol
+    0x40,       // bMaxPacketSize0
+    0x01,       // bNumConfigurations
+    0x00        // bReserved
+};
+
+static const USBDescriptor usb_device_qualifier_descriptor = {
+    sizeof(usb_device_qualifier_data),
+    usb_device_qualifier_data
+};
 
 static const uint8_t usb_device_OS_descriptor_data[] =
     {0x12, 0x03, 'M', 0, 'S', 0, 'F', 0, 'T', 0, '1', 0, '0', 0, '0', 0, 0x34, 0};
@@ -1993,14 +2012,14 @@ static const USBDescriptor extra_hid_report_descriptor = {
 /***********************/
 static const uint8_t hid_configuration_descriptor_data_8000hz[] = { //_8000hz
     // Configuration Descriptor (9 bytes) USB spec 9.6.3, page 264-266, Table 9-10
-    USB_DESC_CONFIGURATION(CONFIG1_DESC_SIZE + USB_DESC_INTERFACE_ASSOCIATION_SIZE * 2, // wTotalLength
-                           NUM_INTERFACES,                                              // bNumInterfaces
-                           1,                                                           // bConfigurationValue
-                           0,                                                           // iConfiguration
-                           0xA0,                                                        // bmAttributes (RESERVED|REMOTEWAKEUP)
-                           0xFA),                                                       // bMaxPower (500mA)
+		USB_DESC_CONFIGURATION(CONFIG1_DESC_SIZE,
+													 NUM_INTERFACES,
+													 1,
+													 0,
+													 0xA0,
+													 0xFA),                                               // bMaxPower (500mA)
 
-    IAD_HID_IF_DESC_SET(0, 1, HID_COMMUNICATION_INTERFACE_CLASS)
+    //IAD_HID_IF_DESC_SET(0, 1, HID_COMMUNICATION_INTERFACE_CLASS)
 
     // Interface Descriptor (9 bytes) USB spec 9.6.5, page 267-269, Table 9-12
     USB_DESC_INTERFACE(KBD_INTERFACE, // bInterfaceNumber
@@ -2198,7 +2217,7 @@ static const uint8_t hid_configuration_descriptor_data_8000hz[] = { //_8000hz
 
 #ifdef CONTROL_ENABLE
     /* Interface Descriptor (9 bytes) USB spec 9.6.5, page 267-269, Table 9-12 */
-    IAD_HID_IF_DESC_SET(6, 1, VENDOR_COMMUNICATION_INTERFACE_CLASS)
+    //IAD_HID_IF_DESC_SET(6, 1, VENDOR_COMMUNICATION_INTERFACE_CLASS)
         USB_DESC_INTERFACE(CONTROL_INTERFACE, // bInterfaceNumber
                            0,                 // bAlternateSetting
                            1,                 // bNumEndpoints
@@ -2227,14 +2246,14 @@ static const uint8_t hid_configuration_descriptor_data_8000hz[] = { //_8000hz
 
 static const uint8_t hid_configuration_descriptor_data_4000hz[] = {
     /* Configuration Descriptor (9 bytes) USB spec 9.6.3, page 264-266, Table 9-10 */
-    USB_DESC_CONFIGURATION(CONFIG1_DESC_SIZE + USB_DESC_INTERFACE_ASSOCIATION_SIZE * 2, // wTotalLength
-                           NUM_INTERFACES,                                              // bNumInterfaces
-                           1,                                                           // bConfigurationValue
-                           0,                                                           // iConfiguration
-                           0xA0,                                                        // bmAttributes (RESERVED|REMOTEWAKEUP)
-                           0xFA),                                                       // bMaxPower (500mA)
+		USB_DESC_CONFIGURATION(CONFIG1_DESC_SIZE,
+													 NUM_INTERFACES,
+													 1,
+													 0,
+													 0xA0,
+													 0xFA),                                                  // bMaxPower (500mA)
 
-    IAD_HID_IF_DESC_SET(0, 1, HID_COMMUNICATION_INTERFACE_CLASS)
+    //IAD_HID_IF_DESC_SET(0, 1, HID_COMMUNICATION_INTERFACE_CLASS)
 
     /* Interface Descriptor (9 bytes) USB spec 9.6.5, page 267-269, Table 9-12 */
     USB_DESC_INTERFACE(KBD_INTERFACE, // bInterfaceNumber
@@ -2432,7 +2451,7 @@ static const uint8_t hid_configuration_descriptor_data_4000hz[] = {
 
 #ifdef CONTROL_ENABLE
     /* Interface Descriptor (9 bytes) USB spec 9.6.5, page 267-269, Table 9-12 */
-    IAD_HID_IF_DESC_SET(6, 1, VENDOR_COMMUNICATION_INTERFACE_CLASS)
+    //IAD_HID_IF_DESC_SET(6, 1, VENDOR_COMMUNICATION_INTERFACE_CLASS)
         USB_DESC_INTERFACE(CONTROL_INTERFACE, // bInterfaceNumber
                            0,                 // bAlternateSetting
                            1,                 // bNumEndpoints
@@ -2461,14 +2480,14 @@ static const uint8_t hid_configuration_descriptor_data_4000hz[] = {
 
 static const uint8_t hid_configuration_descriptor_data_2000hz[] = {
     /* Configuration Descriptor (9 bytes) USB spec 9.6.3, page 264-266, Table 9-10 */
-    USB_DESC_CONFIGURATION(CONFIG1_DESC_SIZE + USB_DESC_INTERFACE_ASSOCIATION_SIZE * 2, // wTotalLength
-                           NUM_INTERFACES,                                              // bNumInterfaces
-                           1,                                                           // bConfigurationValue
-                           0,                                                           // iConfiguration
-                           0xA0,                                                        // bmAttributes (RESERVED|REMOTEWAKEUP)
-                           0xFA),                                                       // bMaxPower (500mA)
+		USB_DESC_CONFIGURATION(CONFIG1_DESC_SIZE,
+													 NUM_INTERFACES,
+													 1,
+													 0,
+													 0xA0,
+													 0xFA),                                                    // bMaxPower (500mA)
 
-    IAD_HID_IF_DESC_SET(0, 1, HID_COMMUNICATION_INTERFACE_CLASS)
+    //IAD_HID_IF_DESC_SET(0, 1, HID_COMMUNICATION_INTERFACE_CLASS)
 
     /* Interface Descriptor (9 bytes) USB spec 9.6.5, page 267-269, Table 9-12 */
     USB_DESC_INTERFACE(KBD_INTERFACE, // bInterfaceNumber
@@ -2666,7 +2685,7 @@ static const uint8_t hid_configuration_descriptor_data_2000hz[] = {
 
 #ifdef CONTROL_ENABLE
     /* Interface Descriptor (9 bytes) USB spec 9.6.5, page 267-269, Table 9-12 */
-    IAD_HID_IF_DESC_SET(6, 1, VENDOR_COMMUNICATION_INTERFACE_CLASS)
+    //IAD_HID_IF_DESC_SET(6, 1, VENDOR_COMMUNICATION_INTERFACE_CLASS)
         USB_DESC_INTERFACE(CONTROL_INTERFACE, // bInterfaceNumber
                            0,                 // bAlternateSetting
                            1,                 // bNumEndpoints
@@ -2695,14 +2714,14 @@ static const uint8_t hid_configuration_descriptor_data_2000hz[] = {
 
 static const uint8_t hid_configuration_descriptor_data_1000hz[] = {
     /* Configuration Descriptor (9 bytes) USB spec 9.6.3, page 264-266, Table 9-10 */
-    USB_DESC_CONFIGURATION(CONFIG1_DESC_SIZE + USB_DESC_INTERFACE_ASSOCIATION_SIZE * 2, // wTotalLength
-                           NUM_INTERFACES,                                              // bNumInterfaces
-                           1,                                                           // bConfigurationValue
-                           0,                                                           // iConfiguration
-                           0xA0,                                                        // bmAttributes (RESERVED|REMOTEWAKEUP)
-                           0xFA),                                                       // bMaxPower (500mA)
+		USB_DESC_CONFIGURATION(CONFIG1_DESC_SIZE,
+													 NUM_INTERFACES,
+													 1,
+													 0,
+													 0xA0,
+													 0xFA),                                                  // bMaxPower (500mA)
 
-    IAD_HID_IF_DESC_SET(0, 1, HID_COMMUNICATION_INTERFACE_CLASS)
+    //IAD_HID_IF_DESC_SET(0, 1, HID_COMMUNICATION_INTERFACE_CLASS)
 
     /* Interface Descriptor (9 bytes) USB spec 9.6.5, page 267-269, Table 9-12 */
     USB_DESC_INTERFACE(KBD_INTERFACE, // bInterfaceNumber
@@ -2900,7 +2919,7 @@ static const uint8_t hid_configuration_descriptor_data_1000hz[] = {
 
 #ifdef CONTROL_ENABLE
     /* Interface Descriptor (9 bytes) USB spec 9.6.5, page 267-269, Table 9-12 */
-    IAD_HID_IF_DESC_SET(6, 1, VENDOR_COMMUNICATION_INTERFACE_CLASS)
+    //IAD_HID_IF_DESC_SET(6, 1, VENDOR_COMMUNICATION_INTERFACE_CLASS)
         USB_DESC_INTERFACE(CONTROL_INTERFACE, // bInterfaceNumber
                            0,                 // bAlternateSetting
                            1,                 // bNumEndpoints
@@ -3071,8 +3090,8 @@ static const uint8_t usb_string_description[] = {
 
 /* Serial Number string (will be filled by the function init_usb_serial_string) */
 static uint8_t usb_string_serial[] = {
-    USB_DESC_BYTE(22),                    // bLength
-    USB_DESC_BYTE(USB_DESCRIPTOR_STRING), // bDescriptorType
+    USB_DESC_BYTE(PP_NARG(USBSTR_SERIAL) + 2), // bLength
+    USB_DESC_BYTE(USB_DESCRIPTOR_STRING),      // bDescriptorType
     USBSTR_SERIAL};
 
 /* Strings wrappers array */
@@ -3101,6 +3120,9 @@ static const USBDescriptor *usb_get_descriptor_cb(
         /* Generic descriptors */
         case USB_DESCRIPTOR_DEVICE:
             return &usb_device_descriptor;
+				
+				case USB_DESCRIPTOR_DEVICE_QUALIFIER:
+						return &usb_device_qualifier_descriptor;
 
         case USB_DESCRIPTOR_CONFIGURATION:
             switch (g_usb_poll_mode)
@@ -3122,14 +3144,18 @@ static const USBDescriptor *usb_get_descriptor_cb(
             }
 
         case USB_DESCRIPTOR_STRING:
-            if (dindex < 4)
+            if (dindex < (sizeof(usb_strings) / sizeof(usb_strings[0])))
             {
                 return &usb_strings[dindex];
             }
-            else
+
+            /* Microsoft OS String Descriptor is only valid at index 0xEE. */
+            if (dindex == 0xEEU)
             {
                 return &usb_device_OSdescriptor;
             }
+
+            return NULL;
 
         /* HID specific descriptors */
         case USB_DESCRIPTOR_HID:
@@ -3554,26 +3580,26 @@ static const USBEndpointConfig lamp_array_ep_config = {
     NULL                   /* SETUP buffer (not a SETUP endpoint) */
 };
 #endif /* LAMP_ARRAY_ENABLE */
-#if 0
 #ifdef CONTROL_ENABLE
-/* lamp array endpoint state structure */
+
+/* Control endpoint state structure */
 static USBInEndpointState control_ep_state;
 
-/* lamp array endpoint initialization structure (IN) */
+/* Control endpoint initialization structure */
 static const USBEndpointConfig control_ep_config = {
-    USB_EP_MODE_TYPE_INTR, /* Interrupt EP */
-    NULL,                  /* SETUP packet notification callback */
-    control_in_cb,         /* IN notification callback */
-    NULL,                  /* OUT notification callback */
-    CONTROL_EPSIZE,        /* IN maximum packet size */
-    0,                     /* OUT maximum packet size */
-    &control_ep_state,     /* IN Endpoint state */
-    NULL,                  /* OUT endpoint state */
-    2,                     /* IN multiplier */
-    NULL                   /* SETUP buffer (not a SETUP endpoint) */
+    USB_EP_MODE_TYPE_INTR,
+    NULL,
+    control_in_cb,
+    NULL,
+    CONTROL_EPSIZE,
+    0,
+    &control_ep_state,
+    NULL,
+    2,
+    NULL
 };
+
 #endif /* CONTROL_ENABLE */
-#endif
 /* ---------------------------------------------------------
  *                  USB driver functions
  * ---------------------------------------------------------
@@ -3618,7 +3644,8 @@ static void usb_event_cb(USBDriver *usbp, usbevent_t event)
         usbInitEndpointI(usbp, LAMP_ARRAY_ENDPOINT, &lamp_array_ep_config);
 #endif /* LAMP_ARRAY_ENABLE */
 #ifdef CONTROL_ENABLE
-        usbInitEndpointI(usbp, CONTROL_ENDPOINT, &lamp_array_ep_config);
+        //usbInitEndpointI(usbp, CONTROL_ENDPOINT, &lamp_array_ep_config);
+				usbInitEndpointI(usbp, CONTROL_ENDPOINT, &control_ep_config);
 #endif /* CONTROL_ENABLE */
 #ifdef reboot
         g_usb_configured_flag = true;   // ★ 只設旗標，不做重活 lyon
