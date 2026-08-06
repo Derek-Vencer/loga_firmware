@@ -358,9 +358,16 @@ void macro_engine_stop(void) {
     g_me.deadline_ms = 0;
 }
 
-bool macro_engine_start(uint8_t macro_index) {
+bool macro_engine_start(uint8_t macro_index)
+{
+    macro_config_t *cfg;
+    bool has_executable_step = false;
+
     if (macro_index >= MACRO_GROUP_COUNT) {
-        uprintf("[MACRO] start fail: invalid index=%u\n", macro_index);
+        uprintf(
+            "[MACRO] start fail: invalid index=%u\r\n",
+            (unsigned int)macro_index
+        );
         return false;
     }
 
@@ -368,58 +375,66 @@ bool macro_engine_start(uint8_t macro_index) {
         macro_load_from_eeprom(macro_index);
     }
 
-    macro_config_t *cfg = &g_macro_cfg;
+    cfg = &g_macro_cfg;
 
-    uprintf("[MACRO] start idx=%u step_count=%u\n", macro_index, cfg->step_count);
+    if (cfg->step_count < MACRO_MIN_STEPS ||
+        cfg->step_count > MACRO_MAX_STEPS) {
+        uprintf(
+            "[MACRO] start fail: invalid step_count=%u\r\n",
+            (unsigned int)cfg->step_count
+        );
+        return false;
+    }
 
-    if (cfg->step_count < MACRO_MIN_STEPS || cfg->step_count > MACRO_MAX_STEPS) {
-        uprintf("[MACRO] start fail: invalid step_count=%u\n", cfg->step_count);
+    for (uint8_t i = 0U; i < cfg->step_count; i++) {
+        if ((cfg->step[i].action == MACRO_ACTION_PRESS ||
+             cfg->step[i].action == MACRO_ACTION_RELEASE) &&
+            cfg->step[i].keycode != KC_NO) {
+            has_executable_step = true;
+            break;
+        }
+    }
+
+    if (!has_executable_step) {
+        uprintf(
+            "[MACRO] start fail: no executable step idx=%u\r\n",
+            (unsigned int)macro_index
+        );
         return false;
     }
 
     if (g_me.running) {
-        uprintf("[MACRO] already running, stop first\n");
+        uprintf("[MACRO] already running, stop first\r\n");
         macro_engine_stop();
     }
 
     g_me.running = true;
     g_me.macro_index = macro_index;
-    g_me.step_index = 0;
-    g_me.state = ME_EXECUTE_STEP;
-    g_me.deadline_ms = 0;
+    g_me.step_index = 0U;
+    g_me.deadline_ms = 0U;
 
-    for (uint8_t i = 0; i < cfg->step_count; i++) {
-        macro_step_t *st = &cfg->step[i];
-        uint16_t delay_ms = get_effective_delay_ms(st);
+    /*
+     * The delay belongs to the current step, matching the previous
+     * synchronous implementation. The task executes the step after
+     * this delay expires.
+     */
+    {
+        uint16_t delay_ms = get_effective_delay_ms(&cfg->step[0]);
 
-        if (delay_ms > 0) {
-            wait_ms(delay_ms);
+        if (delay_ms > 0U) {
+            set_deadline_from_now(delay_ms);
+            g_me.state = ME_WAIT_DELAY;
+        } else {
+            g_me.state = ME_EXECUTE_STEP;
         }
-
-        switch (st->action) {
-            case MACRO_ACTION_PRESS:
-                if (st->keycode != KC_NO) {
-                    press_key(st->keycode);
-                }
-                break;
-
-            case MACRO_ACTION_RELEASE:
-                if (st->keycode != KC_NO) {
-                    release_key(st->keycode);
-                }
-                break;
-
-            case MACRO_ACTION_NONE:
-            default:
-                uprintf("[MACRO] skip action=%u at step=%u\n", st->action, i);
-                break;
-        }
-
-        g_me.step_index = (uint8_t)(i + 1);
     }
 
-    macro_engine_stop();
-    uprintf("[MACRO] start ok idx=%u executed=%u\n", macro_index, cfg->step_count);
+    uprintf(
+        "[MACRO] queued idx=%u step_count=%u\r\n",
+        (unsigned int)macro_index,
+        (unsigned int)cfg->step_count
+    );
+
     return true;
 }
 
@@ -445,13 +460,20 @@ void macro_engine_init(void) {
     // macro_eeprom_init_if_needed();
 }
 
-void macro_engine_task(void) {
-    if (!g_me.running) return;
+void macro_engine_task(void)
+{
+    macro_config_t *cfg;
 
-    macro_config_t *cfg = &g_macro_cfg;
+    if (!g_me.running) {
+        return;
+    }
 
-    if (cfg->step_count < MACRO_MIN_STEPS || cfg->step_count > MACRO_MAX_STEPS) {
-        uprintf("[MACRO] invalid step_count=%u\n", cfg->step_count);
+    cfg = &g_macro_cfg;
+
+    if (g_loaded_macro_index != g_me.macro_index ||
+        cfg->step_count < MACRO_MIN_STEPS ||
+        cfg->step_count > MACRO_MAX_STEPS) {
+        uprintf("[MACRO] runtime config invalid\r\n");
         macro_engine_stop();
         return;
     }
@@ -461,62 +483,87 @@ void macro_engine_task(void) {
     }
 
     switch (g_me.state) {
-        case ME_WAIT_DELAY: {
+        case ME_WAIT_DELAY:
+        {
             uint32_t now = timer_read32();
-            int32_t diff = (int32_t)(now - g_me.deadline_ms);
 
-            if (diff < 0) {
-                break;
+            if ((int32_t)(now - g_me.deadline_ms) < 0) {
+                return;
             }
 
             g_me.state = ME_EXECUTE_STEP;
-        } break;
+        }
+        break;
 
-        case ME_EXECUTE_STEP: {
-            macro_step_t *st = &cfg->step[g_me.step_index];
+        case ME_EXECUTE_STEP:
+        {
+            macro_step_t *step;
 
-            switch (st->action) {
+            if (g_me.step_index >= cfg->step_count) {
+                g_me.state = ME_DONE;
+                break;
+            }
+
+            step = &cfg->step[g_me.step_index];
+
+            switch (step->action) {
                 case MACRO_ACTION_PRESS:
-                    if (st->keycode != KC_NO) {
-                        press_key(st->keycode);
+                    if (step->keycode != KC_NO) {
+                        press_key(step->keycode);
                     }
                     break;
 
                 case MACRO_ACTION_RELEASE:
-                    if (st->keycode != KC_NO) {
-                        release_key(st->keycode);
+                    if (step->keycode != KC_NO) {
+                        release_key(step->keycode);
                     }
                     break;
 
                 case MACRO_ACTION_NONE:
+                    break;
+
                 default:
-                    uprintf("[MACRO] UNKNOWN action=%u\n", st->action);
+                    uprintf(
+                        "[MACRO] skip invalid action=%u step=%u\r\n",
+                        (unsigned int)step->action,
+                        (unsigned int)g_me.step_index
+                    );
                     break;
             }
 
             g_me.step_index++;
 
             if (g_me.step_index >= cfg->step_count) {
-                uprintf("[MACRO] DONE\n");
                 g_me.state = ME_DONE;
             } else {
-                uint16_t d = get_effective_delay_ms(&cfg->step[g_me.step_index]);
-                set_deadline_from_now(d);
-                g_me.state = ME_WAIT_DELAY;
+                uint16_t delay_ms =
+                    get_effective_delay_ms(&cfg->step[g_me.step_index]);
+
+                if (delay_ms > 0U) {
+                    set_deadline_from_now(delay_ms);
+                    g_me.state = ME_WAIT_DELAY;
+                } else {
+                    g_me.state = ME_EXECUTE_STEP;
+                }
             }
-        } break;
+        }
+        break;
 
         case ME_DONE:
-            uprintf("[MACRO] reset state\n");
-            g_me.running = false;
-            g_me.state = ME_IDLE;
-            g_me.step_index = 0;
-            g_me.macro_index = 0xFF;
-            g_me.deadline_ms = 0;
+            uprintf(
+                "[MACRO] done idx=%u executed=%u\r\n",
+                (unsigned int)g_me.macro_index,
+                (unsigned int)g_me.step_index
+            );
+            macro_engine_stop();
             break;
 
+        case ME_IDLE:
         default:
-            uprintf("[MACRO] invalid state=%u -> stop\n", g_me.state);
+            uprintf(
+                "[MACRO] invalid state=%u -> stop\r\n",
+                (unsigned int)g_me.state
+            );
             macro_engine_stop();
             break;
     }
@@ -526,12 +573,13 @@ void macro_load_from_eeprom(uint8_t index)
 {
     const uint8_t *slot_addr;
 
-    if (index >= MACRO_GROUP_COUNT)
-    {
+    if (index >= MACRO_GROUP_COUNT) {
         return;
     }
 
     slot_addr = EEPROM_MACRO_SLOT_ADDR(index);
+
+    memset(&g_macro_cfg, 0, sizeof(g_macro_cfg));
 
     eeprom_read_block(
         &g_macro_cfg,
@@ -539,14 +587,96 @@ void macro_load_from_eeprom(uint8_t index)
         sizeof(g_macro_cfg)
     );
 
+    uprintf(
+        "[MACRO] Load index=%u addr=%p step_count=%u\r\n",
+        (unsigned int)index,
+        slot_addr,
+        (unsigned int)g_macro_cfg.step_count
+    );
+
     /*
-     * 防止 EEPROM 未初始化或內容損壞，
-     * 導致 step_count 超過陣列範圍。
+     * Dump every step before sanitize.
      */
-    if (g_macro_cfg.step_count > MACRO_MAX_STEPS)
-    {
-        memset(&g_macro_cfg, 0, sizeof(g_macro_cfg));
+    for (uint8_t i = 0;
+         i < MACRO_MAX_STEPS;
+         i++) {
+
+        macro_step_t *step = &g_macro_cfg.step[i];
+
+        uprintf(
+            "[MACRO] RAW step=%u "
+            "type=%u delay=%u action=%u key=0x%04X\r\n",
+            (unsigned int)i,
+            (unsigned int)step->delay_type,
+            (unsigned int)step->delay_ms,
+            (unsigned int)step->action,
+            (unsigned int)step->keycode
+        );
     }
+
+    /*
+     * Erased EEPROM.
+     */
+    if (g_macro_cfg.step_count == 0xFFU ||
+        g_macro_cfg.step_count > MACRO_MAX_STEPS) {
+
+        uprintf(
+            "[MACRO] invalid EEPROM step_count=%u idx=%u\r\n",
+            (unsigned int)g_macro_cfg.step_count,
+            (unsigned int)index
+        );
+
+        memset(&g_macro_cfg, 0, sizeof(g_macro_cfg));
+        g_loaded_macro_index = index;
+        return;
+    }
+
+    for (uint8_t i = 0;
+         i < g_macro_cfg.step_count;
+         i++) {
+
+        macro_step_t *step = &g_macro_cfg.step[i];
+
+        if (step->delay_type != MACRO_DELAY_FIXED &&
+            step->delay_type != MACRO_DELAY_RANDOM) {
+
+            uprintf(
+                "[MACRO] Fix delay_type step=%u (%u->0)\r\n",
+                (unsigned int)i,
+                (unsigned int)step->delay_type
+            );
+
+            step->delay_type = MACRO_DELAY_FIXED;
+            step->delay_ms   = 0;
+        }
+
+        if (step->action > MACRO_ACTION_RELEASE) {
+
+            uprintf(
+                "[MACRO] Fix action step=%u (%u->NONE)\r\n",
+                (unsigned int)i,
+                (unsigned int)step->action
+            );
+
+            step->action  = MACRO_ACTION_NONE;
+            step->delay_ms = 0;
+            step->keycode = KC_NO;
+        }
+
+        if ((step->action == MACRO_ACTION_PRESS ||
+             step->action == MACRO_ACTION_RELEASE) &&
+            step->keycode == 0xFFFFU) {
+
+            uprintf(
+                "[MACRO] Fix keycode step=%u\r\n",
+                (unsigned int)i
+            );
+
+            step->keycode = KC_NO;
+        }
+    }
+
+    uprintf("[MACRO] Load finish\r\n");
 
     g_loaded_macro_index = index;
 }
@@ -557,38 +687,39 @@ void macro_save_to_eeprom(uint8_t index)
     uint8_t step_count;
     size_t used_size;
 
-    if (index >= MACRO_GROUP_COUNT)
-    {
+    if (index >= MACRO_GROUP_COUNT) {
+        uprintf(
+            "[MACRO] Save fail: invalid index=%u\r\n",
+            (unsigned int)index
+        );
         return;
     }
 
-    slot_addr = EEPROM_MACRO_SLOT_ADDR(index);
     step_count = g_macro_cfg.step_count;
 
-    /*
-     * 限制有效 macro step 數量，
-     * 避免寫出 macro_config_t 範圍。
-     */
-    if (step_count > MACRO_MAX_STEPS)
-    {
+    if (step_count > MACRO_MAX_STEPS) {
         step_count = MACRO_MAX_STEPS;
         g_macro_cfg.step_count = step_count;
     }
 
+    slot_addr = EEPROM_MACRO_SLOT_ADDR(index);
+
     /*
-     * macro_config_t 的第一個欄位是 step_count，
-     * 後面只寫入實際使用的 macro_step_t。
+     * Store step_count followed by all active macro steps.
      */
     used_size =
         sizeof(g_macro_cfg.step_count) +
         ((size_t)step_count * sizeof(macro_step_t));
 
-    /*
-     * 最後再做一次 slot 大小保護。
-     */
-    if (used_size > EEPROM_MACRO_SINGLE_SLOT_SIZE)
-    {
-        used_size = EEPROM_MACRO_SINGLE_SLOT_SIZE;
+    if (used_size > EEPROM_MACRO_SINGLE_SLOT_SIZE) {
+        uprintf(
+            "[MACRO] Save fail: size overflow "
+            "idx=%u size=%lu max=%lu\r\n",
+            (unsigned int)index,
+            (unsigned long)used_size,
+            (unsigned long)EEPROM_MACRO_SINGLE_SLOT_SIZE
+        );
+        return;
     }
 
     eeprom_update_block(
@@ -598,6 +729,15 @@ void macro_save_to_eeprom(uint8_t index)
     );
 
     g_loaded_macro_index = index;
+
+    uprintf(
+        "[MACRO] Save OK idx=%u steps=%u "
+        "size=%lu addr=0x%04lX\r\n",
+        (unsigned int)index,
+        (unsigned int)step_count,
+        (unsigned long)used_size,
+        (unsigned long)(uintptr_t)slot_addr
+    );
 }
 
 void macro_clear(uint8_t index)

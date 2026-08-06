@@ -419,69 +419,110 @@ void socd_thread_init(void)
     uprintf("[SOCD] INIT DONE\r\n");
 }
 
-uint8_t socd_fill_report(uint8_t *buf) {
-    uint8_t idx = buf[0];
-    if (idx >= SOCD_SLOT_COUNT) return 0;
-
-    socd_config_t *c = &socd_slots[idx];
-    buf[0] = c->a_layer;
-    buf[1] = c->a_row;
-    buf[2] = c->a_col;
-    buf[3] = c->b_layer;
-    buf[4] = c->b_row;
-    buf[5] = c->b_col;
-    buf[6] = c->mode;
-    buf[7] = idx;
-
-    // buf[0] = idx;
-    // buf[1] = c->kc_a & 0xFF;
-    // buf[2] = c->kc_a >> 8;
-    // buf[3] = c->kc_b & 0xFF;
-    // buf[4] = c->kc_b >> 8;
-    // buf[5] = c->mode;
-    // return 6;
-    return 8;
-}
-
-void socd_apply_report(const uint8_t *buf)
+uint8_t socd_fill_report(uint8_t *buf)
 {
+    uint8_t idx;
+    socd_config_t *c;
+
     if (buf == NULL) {
-        return;
+        return 0U;
     }
 
-    uint8_t idx = buf[7];
+    /*
+     * The caller places the requested slot in buf[0].
+     */
+    idx = buf[0];
+
+    if (idx >= SOCD_SLOT_COUNT) {
+        return 0U;
+    }
+
+    c = &socd_slots[idx];
+
+    /*
+     * Get report format:
+     * buf[0] = index
+     * buf[1] = primary layer
+     * buf[2] = primary row
+     * buf[3] = primary column
+     * buf[4] = secondary layer
+     * buf[5] = secondary row
+     * buf[6] = secondary column
+     * buf[7] = priority
+     * buf[8] = slot index
+     */
+    buf[0] = idx;
+    buf[1] = c->a_layer;
+    buf[2] = c->a_row;
+    buf[3] = c->a_col;
+    buf[4] = c->b_layer;
+    buf[5] = c->b_row;
+    buf[6] = c->b_col;
+    buf[7] = c->mode;
+    buf[8] = idx;
+
+    return 9U;
+}
+
+bool socd_apply_report(const uint8_t *buf)
+{
+    uint8_t idx;
+    uint8_t pri_layer;
+    uint8_t pri_row;
+    uint8_t pri_col;
+    uint8_t sec_layer;
+    uint8_t sec_row;
+    uint8_t sec_col;
+    uint8_t mode;
+    uint16_t kc_a;
+    uint16_t kc_b;
+    socd_config_t c;
+
+    if (buf == NULL) {
+        uprintf("[SOCD] SET null report\r\n");
+        return false;
+    }
+
+    pri_layer = buf[0];
+    pri_row   = buf[1];
+    pri_col   = buf[2];
+
+    sec_layer = buf[3];
+    sec_row   = buf[4];
+    sec_col   = buf[5];
+
+    mode = buf[6];
+    idx  = buf[7];
+
+    uprintf(
+        "[SOCD] RX slot=%u "
+        "A=%u/%u/%u B=%u/%u/%u mode=%u\r\n",
+        idx,
+        pri_layer,
+        pri_row,
+        pri_col,
+        sec_layer,
+        sec_row,
+        sec_col,
+        mode
+    );
 
     if (idx >= SOCD_SLOT_COUNT) {
         uprintf("[SOCD] SET invalid slot=%u\r\n", idx);
-        return;
+        return false;
     }
-
-    uint8_t pri_layer = buf[0];
-    uint8_t pri_row   = buf[1];
-    uint8_t pri_col   = buf[2];
-
-    uint8_t sec_layer = buf[3];
-    uint8_t sec_row   = buf[4];
-    uint8_t sec_col   = buf[5];
-
-    uint8_t mode      = buf[6];
 
     /*
-     * App 可透過 mode=SOCD_DISABLE 清除此 slot。
+     * SOCD_DISABLE is an internal value and is not defined
+     * in the current Set API payload specification.
      */
-    if (mode == SOCD_DISABLE) {
-        uprintf("[SOCD] disable slot=%u\r\n", idx);
-        eeconfig_socd_clear_slot(idx);
-        return;
-    }
-
     if (mode > SOCD_PRIORITY_NEUTRAL) {
         uprintf(
             "[SOCD] SET invalid mode=%u slot=%u\r\n",
             mode,
             idx
         );
-        return;
+        return false;
     }
 
     if (pri_layer >= KEYMAPS_COUNT ||
@@ -490,6 +531,7 @@ void socd_apply_report(const uint8_t *buf)
         sec_row >= MATRIX_ROWS ||
         pri_col >= MATRIX_COLS ||
         sec_col >= MATRIX_COLS) {
+
         uprintf(
             "[SOCD] SET range error slot=%u "
             "A=%u/%u/%u B=%u/%u/%u\r\n",
@@ -501,37 +543,47 @@ void socd_apply_report(const uint8_t *buf)
             sec_row,
             sec_col
         );
-        return;
+
+        return false;
     }
 
-    uint16_t kc_a = socd_resolve_keycode(
+    kc_a = socd_resolve_keycode(
         pri_layer,
         pri_row,
         pri_col
     );
 
-    uint16_t kc_b = socd_resolve_keycode(
+    kc_b = socd_resolve_keycode(
         sec_layer,
         sec_row,
         sec_col
     );
 
+    uprintf(
+        "[SOCD] Resolved slot=%u A=%04X B=%04X\r\n",
+        idx,
+        kc_a,
+        kc_b
+    );
+
     if (kc_a == KC_NO ||
         kc_b == KC_NO ||
         kc_a == kc_b) {
+
         uprintf(
-            "[SOCD] SET keycode error slot=%u A=%04X B=%04X\r\n",
+            "[SOCD] SET keycode error slot=%u "
+            "A=%04X B=%04X\r\n",
             idx,
             kc_a,
             kc_b
         );
-        return;
+
+        return false;
     }
 
-    socd_config_t c;
     memset(&c, 0, sizeof(c));
 
-    c.enable = 1;
+    c.enable = 1U;
 
     c.kc_a = kc_a;
     c.a_layer = pri_layer;
@@ -549,12 +601,15 @@ void socd_apply_report(const uint8_t *buf)
     socd_apply_config(idx, &c);
 
     uprintf(
-        "[SOCD] SET slot=%u A=%04X B=%04X mode=%u\r\n",
+        "[SOCD] SET success slot=%u "
+        "A=%04X B=%04X mode=%u\r\n",
         idx,
         kc_a,
         kc_b,
         mode
     );
+
+    return true;
 }
 
 void eeconfig_read_socd(uint8_t idx,socd_config_t *out)

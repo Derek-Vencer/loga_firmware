@@ -190,10 +190,30 @@ void eeconfig_write_Release( uint8_t row, uint8_t col, uint16_t releaseLevel) {
 		/* * ???????? void, * ?? return eepromReleaseBuffer[row][col]; */ 
 }
 
-void eeconfig_write_keymap_key( uint8_t layer, uint8_t row, uint8_t col, uint16_t key) { 
-		const uint32_t byte_offset = (uint32_t)KEY_OFFSET(layer, row, col) * sizeof(uint16_t); 
-		uint16_t *address = (uint16_t *)(void *) (EECONFIG_KEYMAP_KEYMAPS + byte_offset); 
-		eeprom_write_word(address, key); 
+void eeconfig_write_keymap_key(uint8_t layer,uint8_t row,uint8_t col,uint16_t key)
+{
+    uint32_t byte_offset;
+    uint16_t *address;
+
+    if (layer >= KEYMAPS_COUNT || row >= MATRIX_ROWS || col >= MATRIX_COLS) {
+        uprintf("[KEYMAP] Write fail: invalid position L=%u R=%u C=%u\r\n",(unsigned int)layer,(unsigned int)row,(unsigned int)col);
+        return;
+    }
+
+    byte_offset = (uint32_t)KEY_OFFSET(layer, row, col) * sizeof(uint16_t);
+    address = (uint16_t *)(void *)(EECONFIG_KEYMAP_KEYMAPS + byte_offset);
+    eeprom_write_word(address,key);
+    eepromKeyBuffer[layer][row][col] = key;
+    uprintf(
+        "[KEYMAP] Write OK "
+        "L=%u R=%u C=%u "
+        "Key=0x%04X Addr=0x%08lX\r\n",
+        (unsigned int)layer,
+        (unsigned int)row,
+        (unsigned int)col,
+        (unsigned int)key,
+        (unsigned long)(uintptr_t)address
+    );
 }
 
 uint16_t eeconfig_read_keymap_key_by_index(uint16_t index) { 

@@ -28,7 +28,7 @@
 # include "rappy_snappy.h"
 # include "via/via.h"
 # include "host.h"
-
+#include <stdbool.h>
 #include "action.h"
 #include "led/led_effect.h"
 #include "i2c_master.h"
@@ -618,144 +618,272 @@ void eeconfig_clear_toggle_entry(
 void eeconfig_clear_all_toggle_entry(void);
 
 // two api
-void toggle_key_set(uint8_t layer,uint8_t row,uint8_t col,uint8_t keycode)
+bool toggle_key_set(uint8_t layer,uint8_t row,uint8_t col,uint8_t keycode)
 {
+    toggle_key_slot_t new_config;
+
     if (layer >= KEYMAPS_COUNT ||
         row >= MATRIX_ROWS ||
-        col >= MATRIX_COLS)
-    {
-        return;
+        col >= MATRIX_COLS) {
+
+        uprintf(
+            "[TOGGLE] Invalid position L=%u R=%u C=%u\r\n",
+            (unsigned int)layer,
+            (unsigned int)row,
+            (unsigned int)col
+        );
+
+        return false;
     }
 
-    toggle_key_slot_t *tk = &toggle_keys[layer][row][col];
+    memset(&new_config, 0, sizeof(new_config));
+
+    new_config.layer   = layer;
+    new_config.row     = row;
+    new_config.col     = col;
+    new_config.keycode = keycode;
+    new_config.state   = false;
 
     /*
-     * keycode == 0:
-     * Disable this toggle key and clear the corresponding EEPROM entry.
+     * keycode == 0 disables the toggle key and clears
+     * the corresponding EEPROM entry.
      */
-    if (keycode == 0)
-    {
-        tk->enabled = false;
-        tk->state   = false;
-        tk->keycode = 0;
-        tk->layer   = layer;
-        tk->row     = row;
-        tk->col     = col;
+    if (keycode == 0U) {
+        bool entry_found = false;
 
-        for (uint8_t i = 0; i < toggle_key_pair_count; i++)
-        {
-            toggle_key_slot_t tmp = {0};
+        for (uint8_t i = 0U;
+             i < toggle_key_pair_count;
+             i++) {
 
-            eeconfig_read_toggle_entry(i, &tmp);
+            toggle_key_slot_t stored_config;
 
-            if (tmp.enabled == 0x01 &&
-                tmp.layer == tk->layer &&
-                tmp.row == tk->row &&
-                tmp.col == tk->col)
-            {
+            memset(
+                &stored_config,
+                0,
+                sizeof(stored_config)
+            );
+
+            eeconfig_read_toggle_entry(
+                i,
+                &stored_config
+            );
+
+            if (stored_config.enabled == 0x01U &&
+                stored_config.layer == layer &&
+                stored_config.row == row &&
+                stored_config.col == col) {
+
                 eeconfig_clear_toggle_entry(i);
+                entry_found = true;
 
                 uprintf(
-                    "clear toggle eeprom idx=%u\r\n",
-                    i
+                    "[TOGGLE] Cleared EEPROM index=%u "
+                    "L=%u R=%u C=%u\r\n",
+                    (unsigned int)i,
+                    (unsigned int)layer,
+                    (unsigned int)row,
+                    (unsigned int)col
                 );
 
                 break;
             }
+        }
+
+        /*
+         * The runtime configuration must also be cleared,
+         * even when no EEPROM entry exists.
+         */
+        toggle_keys[layer][row][col].enabled = false;
+        toggle_keys[layer][row][col].state   = false;
+        toggle_keys[layer][row][col].keycode = 0U;
+        toggle_keys[layer][row][col].layer   = layer;
+        toggle_keys[layer][row][col].row     = row;
+        toggle_keys[layer][row][col].col     = col;
+
+        toggle_last_pressed[layer][row][col] = false;
+
+        if (!entry_found) {
+            uprintf(
+                "[TOGGLE] No EEPROM entry to clear "
+                "L=%u R=%u C=%u\r\n",
+                (unsigned int)layer,
+                (unsigned int)row,
+                (unsigned int)col
+            );
+        }
+
+        return true;
+    }
+
+    new_config.enabled = true;
+
+    /*
+     * First, search for an existing EEPROM entry with
+     * the same layer, row and column.
+     */
+    for (uint8_t i = 0U;
+         i < toggle_key_pair_count;
+         i++) {
+
+        toggle_key_slot_t stored_config;
+
+        memset(
+            &stored_config,
+            0,
+            sizeof(stored_config)
+        );
+
+        eeconfig_read_toggle_entry(
+            i,
+            &stored_config
+        );
+
+        if (stored_config.enabled == 0x01U &&
+            stored_config.layer == layer &&
+            stored_config.row == row &&
+            stored_config.col == col) {
+
+            eeconfig_write_toggle_entry(
+                i,
+                &new_config
+            );
+
+            /*
+             * Update runtime RAM only after the EEPROM
+             * update operation has been issued.
+             */
+            toggle_keys[layer][row][col] =
+                new_config;
+
+            toggle_last_pressed[layer][row][col] =
+                false;
+
+            uprintf(
+                "[TOGGLE] Updated EEPROM index=%u "
+                "L=%u R=%u C=%u KC=0x%02X\r\n",
+                (unsigned int)i,
+                (unsigned int)layer,
+                (unsigned int)row,
+                (unsigned int)col,
+                (unsigned int)keycode
+            );
+
+            return true;
         }
     }
-    else
-    {
-        /*
-         * Enable or update this toggle key.
-         */
-        tk->enabled = true;
-        tk->state   = false;
-        tk->keycode = keycode;
-        tk->layer   = layer;
-        tk->row     = row;
-        tk->col     = col;
 
-        bool is_repeat = false;
+     /*
+     * No existing entry was found. Search for the first
+     * available EEPROM slot.
+     */
+    for (uint8_t i = 0U;
+         i < toggle_key_pair_count;
+         i++) {
 
-        /*
-         * Search for an existing EEPROM entry with the same
-         * layer/row/column. If found, update its keycode.
-         */
-        for (uint8_t i = 0; i < toggle_key_pair_count; i++)
-        {
-            toggle_key_slot_t tmp = {0};
+        toggle_key_slot_t stored_config;
 
-            eeconfig_read_toggle_entry(i, &tmp);
+        memset(
+            &stored_config,
+            0,
+            sizeof(stored_config)
+        );
 
-            if (tmp.enabled == 0x01 &&
-                tmp.layer == tk->layer &&
-                tmp.row == tk->row &&
-                tmp.col == tk->col)
-            {
-                is_repeat = true;
+        eeconfig_read_toggle_entry(
+            i,
+            &stored_config
+        );
 
-                uprintf(
-                    "isRepeat true idx=%u\r\n",
-                    i
-                );
+        uprintf(
+            "[TOGGLE] Scan idx=%u "
+            "EN=%02X "
+            "L=%u R=%u C=%u "
+            "KC=%02X\r\n",
+            (unsigned int)i,
+            (unsigned int)stored_config.enabled,
+            (unsigned int)stored_config.layer,
+            (unsigned int)stored_config.row,
+            (unsigned int)stored_config.col,
+            (unsigned int)stored_config.keycode
+        );
 
-                eeconfig_write_toggle_entry(i, tk);
+        if (stored_config.enabled != 0x01U) {
 
-                uprintf(
-                    "update toggle eeprom idx=%u\r\n",
-                    i
-                );
+            uprintf(
+                "[TOGGLE] Use free slot %u\r\n",
+                (unsigned int)i
+            );
 
-                break;
-            }
-        }
+            eeconfig_write_toggle_entry(
+                i,
+                &new_config
+            );
 
-        /*
-         * No existing entry was found. Write this key into the first
-         * available EEPROM slot.
-         */
-        if (!is_repeat)
-        {
-            bool slot_found = false;
+            toggle_keys[layer][row][col] =
+                new_config;
 
-            for (uint8_t i = 0; i < toggle_key_pair_count; i++)
-            {
-                toggle_key_slot_t tmp = {0};
+            toggle_last_pressed[layer][row][col] =
+                false;
 
-                eeconfig_read_toggle_entry(i, &tmp);
+            uprintf(
+                "[TOGGLE] Added EEPROM index=%u "
+                "L=%u R=%u C=%u KC=0x%02X\r\n",
+                (unsigned int)i,
+                (unsigned int)layer,
+                (unsigned int)row,
+                (unsigned int)col,
+                (unsigned int)keycode
+            );
 
-                if (tmp.enabled != 0x01)
-                {
-                    eeconfig_write_toggle_entry(i, tk);
-
-                    uprintf(
-                        "write toggle eeprom idx=%u\r\n",
-                        i
-                    );
-
-                    slot_found = true;
-                    break;
-                }
-            }
-
-            if (!slot_found)
-            {
-                uprintf(
-                    "[TOGGLE] EEPROM full, L=%u R=%u C=%u KC=0x%02X\r\n",
-                    layer,
-                    row,
-                    col,
-                    keycode
-                );
-            }
+            return true;
         }
     }
 
     /*
-     * Reset the runtime press-state whenever the configuration changes.
+     * EEPROM is full. Dump all entries.
      */
-    toggle_last_pressed[layer][row][col] = false;
+    uprintf("[TOGGLE] EEPROM FULL Dump\r\n");
+
+    for (uint8_t i = 0U;
+         i < toggle_key_pair_count;
+         i++) {
+
+        toggle_key_slot_t stored_config;
+
+        memset(
+            &stored_config,
+            0,
+            sizeof(stored_config)
+        );
+
+        eeconfig_read_toggle_entry(
+            i,
+            &stored_config
+        );
+
+        uprintf(
+            " idx=%u "
+            "EN=%02X "
+            "L=%u R=%u C=%u "
+            "KC=%02X\r\n",
+            (unsigned int)i,
+            (unsigned int)stored_config.enabled,
+            (unsigned int)stored_config.layer,
+            (unsigned int)stored_config.row,
+            (unsigned int)stored_config.col,
+            (unsigned int)stored_config.keycode
+        );
+    }
+
+    uprintf(
+        "[TOGGLE] EEPROM full, "
+        "L=%u R=%u C=%u KC=0x%02X\r\n",
+        (unsigned int)layer,
+        (unsigned int)row,
+        (unsigned int)col,
+        (unsigned int)keycode
+    );
+
+    return false;
 }
 
 void toggle_key_load_from_eeprom(void)
@@ -3716,9 +3844,10 @@ if (!eepromInitCheck) {
         chThdSleepMilliseconds(1000);
     }
 }
-    chThdCreateStatic(waADC_ProcessThread, sizeof(waADC_ProcessThread), NORMALPRIO - 4, ADC_ProcessThread, NULL);
-    LED_init();
-	knobState = eeprom_read_byte(KB_ENCODER_MODE_ADDR);
+		chThdCreateStatic(waADC_ProcessThread, sizeof(waADC_ProcessThread), NORMALPRIO - 4, ADC_ProcessThread, NULL);
+		LED_init();
+		factory_reset_init();
+		knobState = eeprom_read_byte(KB_ENCODER_MODE_ADDR);
 }
 
 

@@ -40,6 +40,11 @@ extern uint8_t rapidKeyEnable; // test for rapid trigger state
 void eeconfig_modtap_clear(void);
 void eeconfig_clear_all_toggle_entry(void);
 
+static uint8_t current_macro_playback_index = 0U;
+static uint8_t current_macro_playback_mode  = 0U;
+
+static volatile bool factory_reset_pending = false;
+
 static uint8_t clamp_percent_u8(uint8_t value) {
     return (value > 100u) ? 100u : value;
 }
@@ -86,7 +91,7 @@ extern void mt_schedule_set(uint8_t L,uint8_t R,uint8_t C,uint8_t h,uint8_t k);
 #endif //modTap
 
 #ifdef toggleKey
-void    toggle_key_set(uint8_t layer, uint8_t row, uint8_t col, uint8_t keycode);
+bool toggle_key_set(uint8_t layer, uint8_t row, uint8_t col, uint8_t keycode);
 uint8_t toggle_key_get(uint8_t layer, uint8_t row, uint8_t col);
 #endif // toggleKey
 
@@ -125,25 +130,106 @@ void via_init(void){
 	via_creatTask();
 }
 
-//void dynamic_keymap_get_buffer(uint16_t offset, uint16_t size, uint8_t *data) {
-//    uint16_t * source = (uint16_t *)(&eepromKeyBuffer[0][0][0] + offset/2);
-//    uint8_t *target = data;
-//    for (uint16_t i = 0; i < size/2; i++) {
-//        if (offset + i < sizeof(eepromKeyBuffer)) {
-//        	*target = (*source)>>8;
-//            target++;
-//            *target = (*source)&0xff;
-//
-//        } else {
-//            *target = 0x00;
-//            target++;
-//            *target = 0x00;
-//        }
-//        target++;
-//        source++;
-//
-//    }
-//}
+static void factory_reset_execute(void)
+{
+    uprintf("[FACTORY] Start\r\n");
+
+    knobState = 0U;
+
+    eeprom_update_byte(
+        KB_ENCODER_MODE_ADDR,
+        knobState
+    );
+
+    eeconfig_socd_clear();
+    eeconfig_rappy_snappy_clear();
+    eeconfig_modtap_clear();
+    eeconfig_clear_all_toggle_entry();
+
+    currentLED_RunMode.mode = 8U;
+    currentLED_RunMode.type = offMode;
+
+    setRunMode(currentLED_RunMode);
+
+    eeprom_update_byte(
+        KB_COLOR_MODE_ADDR,
+        currentLED_RunMode.mode
+    );
+
+    eeprom_update_byte(
+        (uint8_t *)EECONFIG_POLLING_RATE,
+        0x00U
+    );
+
+    keyMatrixTriggerLevel = DEFAULT_TRIGGER_LEVEL;
+    keyMatrixReleaseLevel = DEFAULT_RELEASE_LEVEL;
+
+    eeprom_write_word(
+        EECONFIG_KEYMAP_TRIGGER_LEVEL,
+        keyMatrixTriggerLevel
+    );
+
+    eeprom_write_word(
+        EECONFIG_KEYMAP_RELEASE_LEVEL,
+        keyMatrixReleaseLevel
+    );
+
+    write_trigger_to_eeprom();
+    write_Release_to_eeprom();
+
+    eeconfig_rapidTrigger_init();
+    write_keymap_to_eeprom();
+    dynamic_macro_reset_eeprom();
+
+    eeprom_update_byte(
+        (uint8_t *)EEPROM_FACTORY_INIT_FLAG_ADDR,
+        0xFAU
+    );
+
+    uprintf("[FACTORY] End, system reset\r\n");
+
+    chThdSleepMilliseconds(100U);
+
+    NVIC_SystemReset();
+
+    while (true) {
+        /*
+         * Wait for the system reset.
+         */
+    }
+}
+
+static THD_WORKING_AREA(waFactoryResetThread,512);
+static THD_FUNCTION(FactoryResetThread,arg)
+{
+    (void)arg;
+
+    chRegSetThreadName("FactoryReset");
+
+    uprintf("[FACTORY] Thread started\r\n");
+
+    while (true) {
+        if (factory_reset_pending) {
+            /*
+             * Allow the USB success ACK to be transmitted first.
+             */
+            chThdSleepMilliseconds(300U);
+
+            factory_reset_pending = false;
+
+            uprintf("[FACTORY] Pending request detected\r\n");
+
+            factory_reset_execute();
+        }
+
+        chThdSleepMilliseconds(10U);
+    }
+}
+
+void factory_reset_init(void)
+{
+    chThdCreateStatic(waFactoryResetThread,sizeof(waFactoryResetThread),NORMALPRIO,FactoryResetThread,NULL);
+}
 
 void dynamic_keymap_get_buffer(
     uint16_t offset,
@@ -235,10 +321,42 @@ bool raw_hid_receive_kb(uint8_t *data, uint8_t length)
 
     return true;
 }
+#ifndef IONE_RAW_HID_PACKET_SIZE
+#define IONE_RAW_HID_PACKET_SIZE 32U
+#endif
+
+static void ione_prepare_response_header(uint8_t *packet, uint16_t command_id)
+{
+    packet[3] = (uint8_t)(((command_id >> 8) & 0x7FU) | 0x80U);
+    packet[4] = (uint8_t)(command_id & 0xFFU);
+}
+
+static void ione_send_stream_packet(
+    uint8_t *tx_packet,
+    const uint8_t *source,
+    size_t tx_length,
+    uint16_t command_id)
+{
+    if ((tx_packet == NULL) || (source == NULL)) {
+        return;
+    }
+
+    if (tx_length > IONE_RAW_HID_PACKET_SIZE) {
+        tx_length = IONE_RAW_HID_PACKET_SIZE;
+    }
+
+    memset(tx_packet, 0, IONE_RAW_HID_PACKET_SIZE);
+    memcpy(tx_packet, source, tx_length);
+    ione_prepare_response_header(tx_packet, command_id);
+    raw_hid_send(tx_packet, (uint8_t)tx_length);
+    chThdSleepMilliseconds(1);
+}
+
 bool raw_hid_receive_ione(uint8_t *data, uint8_t length)
 {
     uint8_t *data_start;
-    uint8_t recive_payload[32U - 6U];
+    uint8_t tx_packet[IONE_RAW_HID_PACKET_SIZE];
+    uint8_t recive_payload[IONE_RAW_HID_PACKET_SIZE - 6U];
 
     uint16_t hid_vid;
     uint16_t command_id;
@@ -247,6 +365,12 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length)
     uint8_t *send_payload;
     uint8_t *send_status;
     uint8_t *send_data;
+
+    const size_t tx_length =
+        (length < IONE_RAW_HID_PACKET_SIZE) ?
+        (size_t)length :
+        (size_t)IONE_RAW_HID_PACKET_SIZE;
+		
 	
 		uprintf("\r\n========== RAW HID RX ==========\r\n");
 		uprintf("data=%p len=%d\r\n", data, length);
@@ -443,17 +567,84 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length)
 
 					*payload_length = 2;
 					break;
-        case ione_api_cmd_set_key_mapping: // from here 
-            uprintf ("API=>Set Key Mapping:\r\n");
-            if (*payload_length == 5 && (recive_payload[0]<KEYMAPS_COUNT && recive_payload[1]<MATRIX_ROWS && recive_payload[2]<MATRIX_COLS)){
-                *send_status = ione_api_status_success;
-                eeconfig_write_keymap_key(recive_payload[0], recive_payload[1], recive_payload[2], (recive_payload[3] << 8) | recive_payload[4]); //Add comment More actions
-            } else {
-                *send_status = ione_api_status_fail;
-				uprintf ("Fail\r\n");
-            }
-            *payload_length = 1;
-		break;
+					case ione_api_cmd_set_key_mapping:
+					{
+							uint8_t layer;
+							uint8_t row;
+							uint8_t col;
+							uint16_t keycode;
+
+							uprintf("API=>Set Key Mapping:\r\n");
+
+							if (*payload_length != 5U) {
+									*send_status = ione_api_status_fail;
+									*payload_length = 1U;
+
+									uprintf(
+											"Fail: invalid payload length=%u\r\n",
+											(unsigned int)*payload_length
+									);
+
+									break;
+							}
+
+							layer = recive_payload[0];
+							row   = recive_payload[1];
+							col   = recive_payload[2];
+
+							if (layer >= KEYMAPS_COUNT ||
+									row >= MATRIX_ROWS ||
+									col >= MATRIX_COLS) {
+
+									*send_status = ione_api_status_fail;
+									*payload_length = 1U;
+
+									uprintf(
+											"Fail: invalid position L=%u R=%u C=%u\r\n",
+											(unsigned int)layer,
+											(unsigned int)row,
+											(unsigned int)col
+									);
+
+									break;
+							}
+
+							keycode =
+									((uint16_t)recive_payload[3] << 8) |
+									(uint16_t)recive_payload[4];
+
+							eeconfig_write_keymap_key(
+									layer,
+									row,
+									col,
+									keycode
+							);
+
+							if (eepromKeyBuffer[layer][row][col] == keycode) {
+									*send_status = ione_api_status_success;
+
+									uprintf(
+											"Set Key Mapping OK "
+											"L=%u R=%u C=%u Key=0x%04X\r\n",
+											(unsigned int)layer,
+											(unsigned int)row,
+											(unsigned int)col,
+											(unsigned int)keycode
+									);
+							} else {
+									*send_status = ione_api_status_fail;
+
+									uprintf(
+											"Set Key Mapping verify fail "
+											"write=0x%04X read=0x%04X\r\n",
+											(unsigned int)keycode,
+											(unsigned int)eepromKeyBuffer[layer][row][col]
+									);
+							}
+
+							*payload_length = 1U;
+					}
+					break;
 		case ione_api_cmd_get_key_mapping: //ft
             uprintf ("API=>Get Key Mapping:\r\n");
             if (*payload_length == 3 && (recive_payload[0]<KEYMAPS_COUNT && recive_payload[1]<MATRIX_ROWS && recive_payload[2]<MATRIX_COLS)){
@@ -489,56 +680,117 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length)
             *payload_length = 6;
 		break;
 		case ione_api_cmd_get_all_key_mapping:
-            uprintf ("API=>Get All Key Mapping:\r\n");
+		{
+				uint8_t *w;
 
-            uint8_t payload_length_count = 0;
-            const size_t EP = LAMP_ARRAY_EPSIZE;   // 32 或 64，依你的端點大小
-            uint8_t *w;  
+				uprintf("API=>Get All Key Mapping:\r\n");
 
-            if(*payload_length == 0){
+				if (*payload_length != 0U) {
+						*send_status = ione_api_status_fail;
+						*payload_length = 1U;
 
-                for(uint8_t layerNum = 0; layerNum < KEYMAPS_COUNT; layerNum++){
-                    uprintf("=== layer number is %d ===\r\n",layerNum);
-                    for(uint8_t rowNum = 0; rowNum < MATRIX_ROWS; rowNum++){
-                        for(uint8_t colNum = 0; colNum < MATRIX_COLS; colNum++){
-                            *(data_start + 3) |= 0x80;
-                            w = send_data;
-                            *send_status = ione_api_status_sending;
+						uprintf(
+								"Fail: invalid payload length=%u\r\n",
+								(unsigned int)*payload_length
+						);
+						break;
+				}
 
-                            uint16_t keycode = eepromKeyBuffer[layerNum][rowNum][colNum];
+				for (uint8_t layer_num = 0U;
+						 layer_num < KEYMAPS_COUNT;
+						 layer_num++) {
 
-                            uint8_t modifier = (keycode >> 8) & 0xFF;
-                            uint8_t key_code = keycode & 0xFF;
+						uprintf(
+								"=== layer number is %u ===\r\n",
+								(unsigned int)layer_num
+						);
 
-                            uprintf("(%d,%d),modifier %u, keycode is %u\r\n",rowNum,colNum,modifier, key_code);
+						for (uint8_t row_num = 0U;
+								 row_num < MATRIX_ROWS;
+								 row_num++) {
 
-                            *w = layerNum;      // Layer
-                            w++;
-                            *w = rowNum;        // Row
-                            w++;
-                            *w = colNum;        // Column
-                            w++;
-                            *w = modifier;   // Modifier
-                            w++;
-                            *w = key_code;   // Key Code
-                            w++;
+								for (uint8_t col_num = 0U;
+										 col_num < MATRIX_COLS;
+										 col_num++) {
 
-                            *payload_length = (uint8_t)(1 + (w - send_data));  // 1 = status
-                            raw_hid_send(data_start, EP);
-                            payload_length_count+=5;   
-                        }
-                    }
-                }
+										uint16_t keycode;
+										uint8_t keycode_high;
+										uint8_t keycode_low;
 
-                *send_status = ione_api_status_success;
+										memset(
+												send_payload,
+												0,
+												sizeof(recive_payload)
+										);
 
-            } else {
-                *send_status = ione_api_status_fail;
-				uprintf ("Fail\r\n");
-            }
-            *payload_length = payload_length_count + 2;
+										w = send_data;
+										*send_status = ione_api_status_sending;
+
+										keycode =
+												eepromKeyBuffer
+														[layer_num]
+														[row_num]
+														[col_num];
+
+										keycode_high =
+												(uint8_t)((keycode >> 8) & 0xFFU);
+
+										keycode_low =
+												(uint8_t)(keycode & 0xFFU);
+
+										*w++ = layer_num;
+										*w++ = row_num;
+										*w++ = col_num;
+										*w++ = keycode_high;
+										*w++ = keycode_low;
+
+										/*
+										 * Payload:
+										 * status       1 byte
+										 * layer        1 byte
+										 * row          1 byte
+										 * column       1 byte
+										 * keycode high 1 byte
+										 * keycode low  1 byte
+										 */
+										*payload_length =
+												(uint8_t)(1U +
+												(uint8_t)(w - send_data));
+
+										uprintf(
+												"L%u R%u C%u keycode=0x%04X "
+												"high=0x%02X low=0x%02X\r\n",
+												(unsigned int)layer_num,
+												(unsigned int)row_num,
+												(unsigned int)col_num,
+												(unsigned int)keycode,
+												(unsigned int)keycode_high,
+												(unsigned int)keycode_low
+										);
+
+										ione_send_stream_packet(
+												tx_packet,
+												data_start,
+												tx_length,
+												ione_api_cmd_get_all_key_mapping
+										);
+								}
+						}
+				}
+
+				memset(
+						send_payload,
+						0,
+						sizeof(recive_payload)
+				);
+
+				*send_status = ione_api_status_success;
+				*payload_length = 1U;
+
+				uprintf("Get All Key Mapping completed.\r\n");
+		}
 		break;
-		case ione_api_cmd_set_ligthing_effect:
+        case ione_api_cmd_set_ligthing_effect:
             uprintf("API=>Set Lighting Effect:\r\n");
             
             if (*payload_length == 1) {
@@ -633,18 +885,52 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length)
             }
             *payload_length = 1;
         break;
-		case ione_api_cmd_konb_state:
-            uprintf ("API=>Get Konb state:\r\n");
-			if (*payload_length == 0){
-			*send_status = ione_api_status_success;
-			*send_data = eeprom_read_byte(KB_ENCODER_MODE_ADDR);//knobState;
-			uprintf ("Current knob state:%d\r\n",knobState);
-			} else {
-				*send_status = ione_api_status_fail;
-				uprintf ("Fail\r\n");
+			case ione_api_cmd_konb_state:
+			{
+					uint8_t knob_mode;
+
+					uprintf("API=>Get Knob State:\r\n");
+
+					if (*payload_length == 0) {
+
+							knob_mode = eeprom_read_byte(KB_ENCODER_MODE_ADDR);
+
+							*send_status = ione_api_status_success;
+							*send_data   = knob_mode;
+
+							uprintf("Knob mode:%u\r\n", knob_mode);
+
+							switch (knob_mode) {
+									case 0:
+											uprintf("Mode = Volume\r\n");
+											break;
+
+									case 1:
+											uprintf("Mode = Effect\r\n");
+											break;
+
+									case 2:
+											uprintf("Mode = Light Color\r\n");
+											break;
+
+									case 3:
+											uprintf("Mode = Multimedia\r\n");
+											break;
+
+									default:
+											uprintf("Mode = Unknown (%u)\r\n", knob_mode);
+											break;
+							}
+
+					} else {
+
+							*send_status = ione_api_status_fail;
+							uprintf("Fail\r\n");
+					}
+
+					*payload_length = 2;
 			}
-			*payload_length = 2;
-		break;
+			break;
 #ifdef buttonLock
         case ione_api_cmd_set_lock_state:
             uprintf("API=>Set Rapid Lock State:\r\n");
@@ -1029,107 +1315,207 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length)
 		break;
 
 		case ione_api_cmd_set_tachyon_mode:
-            uprintf("API=>Set tachyon_mode:\r\n");
-            if (*payload_length == 1) {             
-                *send_status = ione_api_status_success;     
-                if(recive_payload[0] == 0x01){
-                    currentLED_RunMode.mode = 0;
-                    eeprom_update_byte(KB_COLOR_MODE_ADDR, currentLED_RunMode.mode);
-                    eeprom_update_byte(TACHYON_MODE_ADD, 0x01);
-                    setRunMode(currentLED_RunMode);  
-                } else {
-                    currentLED_RunMode.mode = eeprom_read_byte(KB_COLOR_MODE_ADDR);//8;
-                    setRunMode(currentLED_RunMode);
-                    eeprom_update_byte(TACHYON_MODE_ADD, 0x00);
-                }
-            } else {
-                *send_status = ione_api_status_fail;
-                uprintf("Failed\r\n");
-            }
-            *payload_length = 1;
+		{
+				uint8_t tachyon_mode;
+				led_runMode_t tachyon_led_mode;
+
+				uprintf("API=>Set tachyon_mode:\r\n");
+
+				if (*payload_length != 1) {
+						*send_status = ione_api_status_fail;
+						*payload_length = 1;
+
+						uprintf(
+								"Tachyon failed: invalid payload length=%u\r\n",
+								*payload_length
+						);
+						break;
+				}
+
+				tachyon_mode = recive_payload[0];
+
+				if (tachyon_mode != 0x00 &&
+						tachyon_mode != 0x01) {
+						*send_status = ione_api_status_fail;
+						*payload_length = 1;
+
+						uprintf(
+								"Tachyon failed: invalid value=%02X\r\n",
+								tachyon_mode
+						);
+						break;
+				}
+
+				if (tachyon_mode == 0x01) {
+						/*
+						 * Enable Tachyon Mode.
+						 * Turn off LED output without changing the saved lighting mode.
+						 */
+						tachyon_led_mode = currentLED_RunMode;
+						tachyon_led_mode.type = offMode;
+
+						eeprom_update_byte(TACHYON_MODE_ADD, 0x01);
+						setRunMode(tachyon_led_mode);
+
+						uprintf(
+								"Tachyon enabled: LED off, saved mode=%d\r\n",
+								currentLED_RunMode.mode
+						);
+				} else {
+						/*
+						 * Disable Tachyon Mode.
+						 * Restore the current lighting configuration.
+						 */
+						eeprom_update_byte(TACHYON_MODE_ADD, 0x00);
+						setRunMode(currentLED_RunMode);
+
+						uprintf(
+								"Tachyon disabled: LED restored, mode=%d\r\n",
+								currentLED_RunMode.mode
+						);
+				}
+
+				*send_status = ione_api_status_success;
+				*payload_length = 1;
+		}
 		break;
+
 		case ione_api_cmd_tachyon_mode:
-            uprintf("API=>get tachyon_mode:\r\n");
-            if (*payload_length == 0) {             
-                *send_status = ione_api_status_success;     
-                if(eeprom_read_byte(TACHYON_MODE_ADD) == 0x01){
-                    *send_data = 0x01;
-                } else {
-                    *send_data = 0x00;
-                }
-                        
-            } else {
-                *send_status = ione_api_status_fail;
-                uprintf("Failed\r\n");
-            }
-            *payload_length = 2;
+		{
+				uint8_t tachyon_mode;
+
+				uprintf("API=>Get tachyon_mode:\r\n");
+
+				if (*payload_length != 0) {
+						*send_status = ione_api_status_fail;
+						*payload_length = 1;
+
+						uprintf(
+								"Get Tachyon failed: invalid payload length=%u\r\n",
+								*payload_length
+						);
+						break;
+				}
+
+				tachyon_mode =
+						(eeprom_read_byte(TACHYON_MODE_ADD) == 0x01)
+								? 0x01
+								: 0x00;
+
+				*send_status = ione_api_status_success;
+				*send_data = tachyon_mode;
+				*payload_length = 2;
+
+				uprintf(
+						"Tachyon mode=%02X\r\n",
+						tachyon_mode
+				);
+		}
 		break;
 #ifdef socd
 		case ione_api_cmd_set_snap_tap_SOCD_Binding:
-            uprintf("API=>Set Snap Tap SOCD Binding:\r\n");
-            uprintf("payload_length is %d", *payload_length);
-            if (*payload_length == 8) {//s
-                *send_status = ione_api_status_success;              
-                uprintf ("recive_payload:%d\r\n",recive_payload[0]);
-                socd_apply_report(&recive_payload[0]);
-            } else {
-                *send_status = ione_api_status_fail;
-                uprintf("Failed\r\n");
-            }
-            *payload_length = 1;
+		{
+				bool result;
+
+				uprintf("API=>Set Snap Tap SOCD Binding:\r\n");
+				uprintf(
+						"Payload length=%u\r\n",
+						(unsigned int)*payload_length
+				);
+
+				if (*payload_length != 8U) {
+						*send_status = ione_api_status_fail;
+						*payload_length = 1U;
+
+						uprintf("Failed: invalid payload length\r\n");
+						break;
+				}
+
+				uprintf(
+						"SOCD RX: %02X %02X %02X %02X "
+						"%02X %02X %02X %02X\r\n",
+						recive_payload[0],
+						recive_payload[1],
+						recive_payload[2],
+						recive_payload[3],
+						recive_payload[4],
+						recive_payload[5],
+						recive_payload[6],
+						recive_payload[7]
+				);
+
+				result = socd_apply_report(recive_payload);
+
+				if (result) {
+						*send_status = ione_api_status_success;
+						uprintf("SOCD binding saved successfully\r\n");
+				} else {
+						*send_status = ione_api_status_fail;
+						uprintf("SOCD binding save failed\r\n");
+				}
+
+				*payload_length = 1U;
+		}
 		break;
 		case ione_api_cmd_get_snap_tap_SOCD_Binding:
-            uprintf ("API=>Get Snap Tap SOCD Binding:\r\n");
-            if (*payload_length == 0){
-                const size_t EP = LAMP_ARRAY_EPSIZE;
-                bool sent = false;
+        {
+            bool sent = false;
 
-                for (uint8_t i = 0; i < SOCD_SLOT_COUNT; i++) {
+            uprintf("API=>Get Snap Tap SOCD Binding:\r\n");
+
+            if (*payload_length == 0U) {
+                for (uint8_t i = 0U; i < SOCD_SLOT_COUNT; i++) {
                     uint8_t report_len;
 
+                    memset(send_payload, 0, sizeof(recive_payload));
                     send_data[0] = i;
                     report_len = socd_fill_report(send_data);
-                    if (report_len == 0) {
+
+                    if (report_len == 0U) {
                         continue;
                     }
 
-                    *(data_start + 3) |= 0x80;
                     *send_status = ione_api_status_sending;
-                    *payload_length = (uint8_t)(1 + report_len);
-                    raw_hid_send(data_start, EP);
+                    *payload_length = (uint8_t)(1U + report_len);
+
+                    ione_send_stream_packet(
+                        tx_packet,
+                        data_start,
+                        tx_length,
+                        ione_api_cmd_get_snap_tap_SOCD_Binding);
                     sent = true;
                 }
 
-                if (sent) {
-                    *send_status = ione_api_status_success;
-                    *payload_length = 1;
-                } else {
-                    *send_status = ione_api_status_fail;
-                    *payload_length = 1;
-                    uprintf ("Fail: no SOCD slots\r\n");
+                memset(send_payload, 0, sizeof(recive_payload));
+                *send_status = sent ? ione_api_status_success : ione_api_status_fail;
+                *payload_length = 1U;
+
+                if (!sent) {
+                    uprintf("Fail: no SOCD slots\r\n");
                 }
-            } else if (*payload_length == 1){
+            } else if (*payload_length == 1U) {
                 uint8_t report_len;
 
+                memset(send_payload, 0, sizeof(recive_payload));
                 send_data[0] = recive_payload[0];
                 report_len = socd_fill_report(send_data);
 
-                if (report_len > 0) {
-			        *send_status = ione_api_status_success;
-                    *payload_length = (uint8_t)(1 + report_len);
+                if (report_len > 0U) {
+                    *send_status = ione_api_status_success;
+                    *payload_length = (uint8_t)(1U + report_len);
                 } else {
                     *send_status = ione_api_status_fail;
-                    *payload_length = 1;
-                    uprintf ("Fail: invalid SOCD slot\r\n");
+                    *payload_length = 1U;
+                    uprintf("Fail: invalid SOCD slot\r\n");
                 }
             } else {
-				*send_status = ione_api_status_fail;
-                *payload_length = 1;
-				uprintf ("Fail\r\n");
-			}
-            
-		break;
-		case ione_api_cmd_delete_snap_tap_SOCD_Binding:
+                *send_status = ione_api_status_fail;
+                *payload_length = 1U;
+                uprintf("Fail\r\n");
+            }
+        }
+        break;
+        case ione_api_cmd_delete_snap_tap_SOCD_Binding:
             uprintf ("API=>Delete Snap Tap SOCD Binding:\r\n");
             if (*payload_length == 0) {
                 eeconfig_socd_clear();
@@ -1161,171 +1547,389 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length)
             // socd_test_eeprom();
         break;
 #endif //socd
-		case ione_api_cmd_set_dynamic_keystroke: //
-        uprintf("API=>Set dynamic keystroke:\r\n");
-            if (*payload_length == 9) {             
-                *send_status = ione_api_status_success;              
-                // uprintf ("recive_payload:%d\r\n",recive_payload[0]);
+			case ione_api_cmd_set_dynamic_keystroke:
+			{
+					bool saved = false;
+					uint8_t layer;
+					uint8_t row;
+					uint8_t col;
+					uint8_t key_press;
+					uint8_t key_release;
 
-                // uprintf("triggerlevel: %d\r\n", keyMatrixTriggerLevel);
-                // keyMatrixTriggerLevel = ((uint16_t)recive_payload[0] << 8) | recive_payload[1];
-                // keyMatrixReleaseLevel = ((uint16_t)recive_payload[2] << 8) | recive_payload[3]; 
-                // uprintf("triggerlevel: %d\r\n", keyMatrixTriggerLevel); 
-                // uprintf("ReleaseLevel: %d\r\n", keyMatrixReleaseLevel); 
+					uprintf("API=>Set Dynamic Keystroke:\r\n");
 
-                for (uint8_t i=0;i<RAPID_TRIGGER_COUNT;i++){ //logic have some issue //
-                    if(rapidTriggerKey[i].key.row == recive_payload[1] && rapidTriggerKey[i].key.col == recive_payload[2]){
-                        rapidTriggerKey[i].key.enable = 0x01 ; 
-                        rapidTriggerKey[i].key.counts = 0x04 ; 
-                        rapidTriggerKey[i].key.keycode[0] = recive_payload[3];   // no.1
-                        rapidTriggerKey[i].key.keycode[1] = recive_payload[4];  // no.2
-                        rapidTriggerKey[i].key.keycode[2] = recive_payload[5];  // no.3
-                        rapidTriggerKey[i].key.keycode[3] = recive_payload[6];  // no.4
-                        eeconfig_write_rapidTrigger(i, rapidTriggerKey[i].key);
-                        rapidTriggerProcess(true, i);
-                        break;
-                    } else if (rapidTriggerKey[i].key.enable != 0x01){
-                        // *w++ = 0xaa;// = mt_map[i].L;      // layer
-                        // rapidTriggerKey[i].key.layer == recive_payload[0];      // layer
-                        rapidTriggerKey[i].key.enable = 0x01 ; 
-                        rapidTriggerKey[i].key.counts = 0x04 ; 
-                        rapidTriggerKey[i].key.row = recive_payload[1];      // row
-                        rapidTriggerKey[i].key.col = recive_payload[2];      // col
-                        rapidTriggerKey[i].key.keycode[0] = recive_payload[3];   // no.1
-                        rapidTriggerKey[i].key.keycode[1] = recive_payload[4];  // no.2
-                        rapidTriggerKey[i].key.keycode[2] = recive_payload[5];  // no.3
-                        rapidTriggerKey[i].key.keycode[3] = recive_payload[6];  // no.4
-                        eeconfig_write_rapidTrigger(i, rapidTriggerKey[i].key);
-                        rapidTriggerProcess(true, i);
-                        break;
-                    }
-                }
-                // rapidTriggerKey[0].key.enable = 1;
-                // rapidTriggerKey[0].key.layer  = recive_payload[0];
-                // rapidTriggerKey[0].key.row    = recive_payload[1];
-                // rapidTriggerKey[0].key.col    = recive_payload[2];
-                // rapidTriggerKey[0].key.counts = 4;
+					if (*payload_length != 9U) {
+							*send_status = ione_api_status_fail;
+							*payload_length = 1U;
 
-                // rapidTriggerKey[0].key.keycode[0] = recive_payload[3];
-                // rapidTriggerKey[0].key.keycode[1] = recive_payload[4];
-                // rapidTriggerKey[0].key.keycode[2] = recive_payload[5];
-                // rapidTriggerKey[0].key.keycode[3] = recive_payload[6];
-                // rapidTriggerKey[0].key.keycode[4] = KC_5;
-                // rapidTriggerKey[0].key.keycode[5] = KC_NO;
+							uprintf(
+									"Fail: invalid payload length=%u\r\n",
+									(unsigned int)*payload_length
+							);
+							break;
+					}
 
-            } else {
+					layer       = recive_payload[0];
+					row         = recive_payload[1];
+					col         = recive_payload[2];
+					key_press   = recive_payload[7];
+					key_release = recive_payload[8];
+
+					uprintf(
+							"DKS RX: layer=%u row=%u col=%u "
+							"keys=%02X %02X %02X %02X "
+							"press=%u release=%u\r\n",
+							(unsigned int)layer,
+							(unsigned int)row,
+							(unsigned int)col,
+							recive_payload[3],
+							recive_payload[4],
+							recive_payload[5],
+							recive_payload[6],
+							(unsigned int)key_press,
+							(unsigned int)key_release
+					);
+
+					/*
+					 * Current firmware does not store layer per DKS slot.
+					 */
+					if (layer != 0U) {
+							*send_status = ione_api_status_fail;
+							*payload_length = 1U;
+
+							uprintf("Fail: only layer 0 is currently supported\r\n");
+							break;
+					}
+
+					if (row >= MATRIX_ROWS || col >= MATRIX_COLS) {
+							*send_status = ione_api_status_fail;
+							*payload_length = 1U;
+
+							uprintf("Fail: invalid row or column\r\n");
+							break;
+					}
+
+					/*
+					 * Store global trigger and release levels.
+					 * These values are shared by all DKS entries.
+					 */
+					keyMatrixTriggerLevel = key_press;
+					keyMatrixReleaseLevel = key_release;
+
+					for (uint8_t i = 0U; i < RAPID_TRIGGER_COUNT; i++) {
+
+							if (rapidTriggerKey[i].key.enable == 0x01U &&
+									rapidTriggerKey[i].key.row == row &&
+									rapidTriggerKey[i].key.col == col) {
+
+									rapidTriggerKey[i].key.enable = 0x01U;
+									rapidTriggerKey[i].key.counts = 0x04U;
+
+									rapidTriggerKey[i].key.keycode[0] = recive_payload[3];
+									rapidTriggerKey[i].key.keycode[1] = recive_payload[4];
+									rapidTriggerKey[i].key.keycode[2] = recive_payload[5];
+									rapidTriggerKey[i].key.keycode[3] = recive_payload[6];
+
+									eeconfig_write_rapidTrigger(
+											i,
+											rapidTriggerKey[i].key
+									);
+
+									rapidTriggerProcess(true, i);
+
+									saved = true;
+
+									uprintf(
+											"DKS updated: index=%u row=%u col=%u\r\n",
+											(unsigned int)i,
+											(unsigned int)row,
+											(unsigned int)col
+									);
+
+									break;
+							}
+					}
+
+					if (!saved) {
+							for (uint8_t i = 0U; i < RAPID_TRIGGER_COUNT; i++) {
+
+									if (rapidTriggerKey[i].key.enable != 0x01U) {
+
+											memset(
+													&rapidTriggerKey[i],
+													0,
+													sizeof(rapidTriggerKey[i])
+											);
+
+											rapidTriggerKey[i].key.enable = 0x01U;
+											rapidTriggerKey[i].key.counts = 0x04U;
+											rapidTriggerKey[i].key.row = row;
+											rapidTriggerKey[i].key.col = col;
+
+											rapidTriggerKey[i].key.keycode[0] = recive_payload[3];
+											rapidTriggerKey[i].key.keycode[1] = recive_payload[4];
+											rapidTriggerKey[i].key.keycode[2] = recive_payload[5];
+											rapidTriggerKey[i].key.keycode[3] = recive_payload[6];
+
+											eeconfig_write_rapidTrigger(
+													i,
+													rapidTriggerKey[i].key
+											);
+
+											rapidTriggerProcess(true, i);
+
+											saved = true;
+
+											uprintf(
+													"DKS created: index=%u row=%u col=%u\r\n",
+													(unsigned int)i,
+													(unsigned int)row,
+													(unsigned int)col
+											);
+
+											break;
+									}
+							}
+					}
+
+					if (saved) {
+							*send_status = ione_api_status_success;
+
+							uprintf(
+									"DKS saved: press=%u release=%u\r\n",
+									(unsigned int)keyMatrixTriggerLevel,
+									(unsigned int)keyMatrixReleaseLevel
+							);
+					} else {
+							*send_status = ione_api_status_fail;
+							uprintf("Fail: no available DKS slot\r\n");
+					}
+
+					*payload_length = 1U;
+			}
+			break;
+			case ione_api_cmd_get_dynamic_keysytoke:
+			{
+					bool sent = false;
+					uint8_t *w;
+
+					uprintf("API=>Get Dynamic Keystroke:\r\n");
+
+					if (*payload_length != 0U) {
+							*send_status = ione_api_status_fail;
+							*payload_length = 1U;
+
+							uprintf("Fail: invalid payload length\r\n");
+							break;
+					}
+
+					for (uint8_t i = 0U; i < RAPID_TRIGGER_COUNT; i++) {
+
+							if (rapidTriggerKey[i].key.enable != 0x01U) {
+									continue;
+							}
+
+							memset(
+									send_payload,
+									0,
+									sizeof(recive_payload)
+							);
+
+							w = send_data;
+							*send_status = ione_api_status_sending;
+
+							*w++ = i;
+							*w++ = 0x00U;
+							*w++ = rapidTriggerKey[i].key.row;
+							*w++ = rapidTriggerKey[i].key.col;
+							*w++ = (uint8_t)rapidTriggerKey[i].key.keycode[0];
+							*w++ = (uint8_t)rapidTriggerKey[i].key.keycode[1];
+							*w++ = (uint8_t)rapidTriggerKey[i].key.keycode[2];
+							*w++ = (uint8_t)rapidTriggerKey[i].key.keycode[3];
+							*w++ = (uint8_t)keyMatrixTriggerLevel;
+							*w++ = (uint8_t)keyMatrixReleaseLevel;
+
+							*payload_length =
+									(uint8_t)(1U + (uint8_t)(w - send_data));
+
+							uprintf(
+									"DKS TX: index=%u layer=0 row=%u col=%u "
+									"keys=%02X %02X %02X %02X "
+									"press=%u release=%u\r\n",
+									(unsigned int)i,
+									(unsigned int)rapidTriggerKey[i].key.row,
+									(unsigned int)rapidTriggerKey[i].key.col,
+									(unsigned int)rapidTriggerKey[i].key.keycode[0],
+									(unsigned int)rapidTriggerKey[i].key.keycode[1],
+									(unsigned int)rapidTriggerKey[i].key.keycode[2],
+									(unsigned int)rapidTriggerKey[i].key.keycode[3],
+									(unsigned int)keyMatrixTriggerLevel,
+									(unsigned int)keyMatrixReleaseLevel
+							);
+
+							ione_send_stream_packet(
+									tx_packet,
+									data_start,
+									tx_length,
+									ione_api_cmd_get_dynamic_keysytoke
+							);
+
+							sent = true;
+					}
+
+					memset(
+							send_payload,
+							0,
+							sizeof(recive_payload)
+					);
+
+					*send_status =
+							sent
+									? ione_api_status_success
+									: ione_api_status_fail;
+
+					*payload_length = 1U;
+
+					if (!sent) {
+							uprintf("Fail: no enabled DKS entries\r\n");
+					}
+			}
+			break;
+#ifdef toggleKey
+        
+			case ione_api_cmd_set_toggle_key:
+			{
+					uint8_t request_length;
+					uint8_t layer;
+					uint8_t row;
+					uint8_t col;
+					uint8_t keycode;
+					bool result;
+
+					uprintf("API=>Set Toggle Key:\r\n");
+
+					request_length = *payload_length;
+
+					if (request_length != 4U) {
+							*send_status = ione_api_status_fail;
+							*payload_length = 1U;
+
+							uprintf(
+									"Fail: invalid payload length=%u\r\n",
+									(unsigned int)request_length
+							);
+
+							break;
+					}
+
+					layer   = recive_payload[0];
+					row     = recive_payload[1];
+					col     = recive_payload[2];
+					keycode = recive_payload[3];
+
+					if (layer >= KEYMAPS_COUNT ||
+							row >= MATRIX_ROWS ||
+							col >= MATRIX_COLS) {
+
+							*send_status = ione_api_status_fail;
+							*payload_length = 1U;
+
+							uprintf(
+									"Fail: invalid position "
+									"L=%u R=%u C=%u\r\n",
+									(unsigned int)layer,
+									(unsigned int)row,
+									(unsigned int)col
+							);
+
+							break;
+					}
+
+					result = toggle_key_set(
+							layer,
+							row,
+							col,
+							keycode
+					);
+
+					if (result) {
+							*send_status = ione_api_status_success;
+
+							uprintf(
+									"Toggle key saved: "
+									"L=%u R=%u C=%u KC=0x%02X\r\n",
+									(unsigned int)layer,
+									(unsigned int)row,
+									(unsigned int)col,
+									(unsigned int)keycode
+							);
+					} else {
+							*send_status = ione_api_status_fail;
+
+							uprintf(
+									"Toggle key save failed: "
+									"L=%u R=%u C=%u KC=0x%02X\r\n",
+									(unsigned int)layer,
+									(unsigned int)row,
+									(unsigned int)col,
+									(unsigned int)keycode
+							);
+					}
+
+					*payload_length = 1U;
+			}
+			break;
+		case ione_api_cmd_get_toggle_key:
+        {
+            uint8_t *w;
+
+            uprintf("API=>Get Toggle Key:\r\n");
+
+            if (*payload_length != 0U) {
                 *send_status = ione_api_status_fail;
-                // uprintf("Payload should be 6\r\n");
+                *payload_length = 1U;
+                uprintf("Fail: invalid payload length\r\n");
+                break;
             }
-            *payload_length = 1;
-		break;
-		case ione_api_cmd_get_dynamic_keysytoke:
-            if (*payload_length == 0) {
-                uprintf("layer 1\r\n");
-                uint8_t payload_length_count = 0;
-                const size_t EP = LAMP_ARRAY_EPSIZE;   // 32 或 64，依你的端點大小
-                uint8_t *w;                            // 寫入指標（每包都重設）
 
-                // rapidTrigger_config_t rapidTrigger;
+            for (uint8_t layer_num = 0U; layer_num < KEYMAPS_COUNT; layer_num++) {
+                for (uint8_t row_num = 0U; row_num < MATRIX_ROWS; row_num++) {
+                    for (uint8_t col_num = 0U; col_num < MATRIX_COLS; col_num++) {
+                        uint8_t key_code = toggle_key_get(layer_num, row_num, col_num);
 
-                for (uint8_t i=0;i<RAPID_TRIGGER_COUNT;i++){ // print dynamic keystroke example - lyon
-                    // uprintf("i = %d, enable status = %d\r\n",i,rapidTrigger.enable);
+                        if (key_code == 0U) {
+                            continue;
+                        }
 
-                    // uprintf ("enable:%d row:%d col:%d counts:%d code[0]:%x code[1]:%x code[2]:%x code[3]:%x code[4]:%x code[5]:%x\r\n",
-                    //     	rapidTrigger.enable,rapidTrigger.row,rapidTrigger.col,rapidTrigger.counts
-                    //     	,rapidTrigger.keycode[0],rapidTrigger.keycode[1],rapidTrigger.keycode[2],rapidTrigger.keycode[3],rapidTrigger.keycode[4],rapidTrigger.keycode[5]);
-                    
-                    // if(rapidTriggerKey[i].key.enable == TRUE){
-                        uprintf("layer 2\r\n");
-                        *(data_start + 3) |= 0x80;
+                        memset(send_payload, 0, sizeof(recive_payload));
+
                         w = send_data;
                         *send_status = ione_api_status_sending;
 
-                        *w++ = 0xaa;// = mt_map[i].L;      // layer
-                        *w++ = rapidTriggerKey[i].key.row;      // row
-                        *w++ = rapidTriggerKey[i].key.col;      // col
-                        *w++ = rapidTriggerKey[i].key.keycode[0];   // no.1
-                        *w++ = rapidTriggerKey[i].key.keycode[1];  // no.2
-                        *w++ = rapidTriggerKey[i].key.keycode[2];  // no.3
-                        *w++ = rapidTriggerKey[i].key.keycode[3];  // no.4
+                        *w++ = layer_num;
+                        *w++ = row_num;
+                        *w++ = col_num;
+                        *w++ = key_code;
 
-                        *payload_length = (uint8_t)(1 + (w - send_data));  // 1 = status
-                        raw_hid_send(data_start, EP);  
-                        payload_length_count+=7;  
+                        *payload_length = (uint8_t)(1U + (uint8_t)(w - send_data));
 
-                        // uprintf ("enable:%d row:%d col:%d counts:%d code[0]:%x code[1]:%x code[2]:%x code[3]:%x code[4]:%x code[5]:%x\r\n",
-                        // 	rapidTrigger.enable,rapidTrigger.row,rapidTrigger.col,rapidTrigger.counts
-                        // 	,rapidTrigger.keycode[0],rapidTrigger.keycode[1],rapidTrigger.keycode[2],rapidTrigger.keycode[3],rapidTrigger.keycode[4],rapidTrigger.keycode[5]);
-                    // }
-                }
-            } else {
-                *send_status = ione_api_status_fail;
-            }
-            *payload_length = payload_length_count;
-		break;
-#ifdef toggleKey
-		case ione_api_cmd_set_toggle_key:
-            uprintf("API=>Set Toggle Key:\r\n");
-            // payload: [0]=layer, [1]=row, [2]=col, [3]=keycode
-            if (*payload_length == 4 &&
-                recive_payload[0] < KEYMAPS_COUNT &&
-                recive_payload[1] < MATRIX_ROWS &&
-                recive_payload[2] < MATRIX_COLS) {
-
-                uint8_t layer   = recive_payload[0];
-                uint8_t row     = recive_payload[1];
-                uint8_t col     = recive_payload[2];
-                uint8_t keycode = recive_payload[3];
-
-                toggle_key_set(layer, row, col, keycode);
-
-                *send_status    = ione_api_status_success;
-                *payload_length = 1;
-
-                uprintf("  L:%u R:%u C:%u KC:0x%02X\r\n",
-                        layer, row, col, keycode);
-            } else {
-                *send_status    = ione_api_status_fail;
-                *payload_length = 1;
-                uprintf("  Fail (len=%u)\r\n", *payload_length);
-            }
-		break;
-		case ione_api_cmd_get_toggle_key:
-            uprintf("API=>Get Toggle Key:\r\n");
-            for(uint8_t layerNum = 0; layerNum < KEYMAPS_COUNT; layerNum++){
-                uprintf("=== layer number is %d ===\r\n",layerNum);
-                for(uint8_t rowNum = 0; rowNum < MATRIX_ROWS; rowNum++){
-                    for(uint8_t colNum = 0; colNum < MATRIX_COLS; colNum++){
-                        // toggle_key_slot_t *tk = &toggle_keys[layerNum][rowNum][colNum];
-                        if(toggle_key_get(layerNum, rowNum, colNum) != 0x00){
-                            *(data_start + 3) |= 0x80;
-                            w = send_data;
-                            *send_status = ione_api_status_sending;
-
-                            uint8_t key_code = toggle_key_get(layerNum, rowNum, colNum);// keycode & 0xFF;
-
-                            uprintf("(%d,%d), keycode is %u\r\n",rowNum,colNum, key_code);
-
-                            *w = layerNum;      // Layer
-                            w++;
-                            *w = rowNum;        // Row
-                            w++;
-                            *w = colNum;        // Column
-                            w++;
-                            *w = key_code;   // Key Code
-                            w++;
-
-                            *payload_length = (uint8_t)(1 + (w - send_data));  // 1 = status
-                            raw_hid_send(data_start, EP);
-                            payload_length_count+=4;   
-                        }
+                        ione_send_stream_packet(
+                            tx_packet,
+                            data_start,
+                            tx_length,
+                            ione_api_cmd_get_toggle_key);
                     }
                 }
             }
-		break;
+
+            memset(send_payload, 0, sizeof(recive_payload));
+            *send_status = ione_api_status_success;
+            *payload_length = 1U;
+        }
+        break;
 #endif // toggleKey
 #ifdef modTap
-		case ione_api_cmd_set_mod_tap:
+        case ione_api_cmd_set_mod_tap:
             uprintf("API=>Set mod Tap State:\r\n");
             if (*payload_length == 5) {             
                 *send_status = ione_api_status_success;
@@ -1343,37 +1947,62 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length)
             *payload_length = 1;
 		break;
 		case ione_api_cmd_get_mod_tap:
-            if (*payload_length == 0) {
-                const size_t EP = LAMP_ARRAY_EPSIZE;   // 32 或 64，依你的端點大小
-                uint8_t *w;                            // 寫入指標（每包都重設）
+		{
+				uint8_t *w;
 
-                uint8_t payload_length_count = 0;
+				uprintf("API=>Get Mod Tap:\r\n");
 
-                for (int i=0;i<MT_CAP_MAP;i++){
-                    if (mt_map[i].used){
-                        *(data_start + 3) |= 0x80;
-                        w = send_data;
-                        *send_status = ione_api_status_sending;
-                        *w++ = mt_map[i].L;      // layer
-                        *w++ = mt_map[i].R;      // row
-                        *w++ = mt_map[i].C;      // col
-                        *w++ = mt_map[i].hold;   // hold
-                        *w++ = mt_map[i].click;  // click
+				if (*payload_length != 0U) {
+						*send_status = ione_api_status_fail;
+						*payload_length = 1U;
+						uprintf("Fail: invalid payload length\r\n");
+						break;
+				}
 
-                        *payload_length = (uint8_t)(1 + (w - send_data));  // 1 = status
-                        raw_hid_send(data_start, EP);  
-                        payload_length_count+=5;  
-                    }
-                        // uprintf("[MT] MAP[%d]: L%u R%u C%u hold=0x%02X click=0x%02X\r\n",
-                        //         i, mt_map[i].L, mt_map[i].R, mt_map[i].C, mt_map[i].hold, mt_map[i].click);
-                }
-            } else {
-                *send_status = ione_api_status_fail;
-            }
-            *payload_length = payload_length_count;
-            break;
+				for (uint8_t i = 0; i < MT_CAP_MAP; i++) {
+
+						/* Skip invalid / unused entry */
+						if (mt_map[i].L == 0xFF &&
+								mt_map[i].R == 0xFF &&
+								mt_map[i].C == 0xFF) {
+								continue;
+						}
+
+						memset(send_payload, 0, sizeof(recive_payload));
+
+						w = send_data;
+						*send_status = ione_api_status_sending;
+
+						*w++ = mt_map[i].L;
+						*w++ = mt_map[i].R;
+						*w++ = mt_map[i].C;
+						*w++ = mt_map[i].hold;
+						*w++ = mt_map[i].click;
+
+						*payload_length = (uint8_t)(1U + (w - send_data));
+
+						uprintf("MT TX: L=%u R=%u C=%u Hold=0x%02X Click=0x%02X\r\n",
+										mt_map[i].L,
+										mt_map[i].R,
+										mt_map[i].C,
+										mt_map[i].hold,
+										mt_map[i].click);
+
+						ione_send_stream_packet(
+								tx_packet,
+								data_start,
+								tx_length,
+								ione_api_cmd_get_mod_tap);
+				}
+
+				memset(send_payload, 0, sizeof(recive_payload));
+
+				*send_status = ione_api_status_success;
+				*payload_length = 1U;
+		}
+		break;
 #endif // modTap
-#ifdef rappySnappy //
+#ifdef rappySnappy
         case ione_api_cmd_set_rappy_snappy:
         {
             uprintf("API=>Set Rappy Snappy (Analog Pair)\r\n");
@@ -1494,56 +2123,47 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length)
         break;
 
 #endif // rappySnappy
-		case ione_api_cmd_set_factory_reset:
-			uprintf("API=>Factory Reset:\r\n");
-			if (*payload_length == 0){
-				*payload_length = 1;
-				*send_status = ione_api_status_success;
-				uprintf("Start ");
-                knobState = 0;
-                eeprom_update_byte(KB_ENCODER_MODE_ADDR, knobState);
-                eeconfig_socd_clear();
-                eeconfig_rappy_snappy_clear();
-                eeconfig_modtap_clear();
-                eeconfig_clear_all_toggle_entry();
-				currentLED_RunMode.mode = 8;
-				currentLED_RunMode.type = offMode;
-				setRunMode(currentLED_RunMode);
-                eeprom_update_byte(KB_COLOR_MODE_ADDR, currentLED_RunMode.mode);
-                eeprom_update_byte((uint8_t *)EECONFIG_POLLING_RATE, 0x00);
-				uprintf (".");
-				*send_status = ione_api_status_success;
-				eeconfig_rapidTrigger_init();
-				keyMatrixTriggerLevel = DEFAULT_TRIGGER_LEVEL;
-				keyMatrixReleaseLevel = DEFAULT_RELEASE_LEVEL;
-				eeprom_write_word(EECONFIG_KEYMAP_TRIGGER_LEVEL, keyMatrixTriggerLevel);
-				uprintf (".");
-				eeprom_write_word(EECONFIG_KEYMAP_RELEASE_LEVEL, keyMatrixReleaseLevel);
-				uprintf (".");
-				write_trigger_to_eeprom();
-				uprintf (".");
-				write_Release_to_eeprom();
-				uprintf (".");
-				eeconfig_rapidTrigger_init();
-				uprintf (".");
-				write_keymap_to_eeprom();
-				uprintf (".");
-				dynamic_macro_reset_eeprom();
-				uprintf (".");
-				*(data_start+3) |= 0x80;
-				raw_hid_send(data_start, length);
-				uprintf (".");
-                eeprom_update_byte((uint8_t *)EEPROM_FACTORY_INIT_FLAG_ADDR, 0xFA);
-				uprintf("\r\nEnd\r\n");
-				chThdSleepMilliseconds(1000);
-				NVIC_SystemReset();
-				return false;
-			} else {
-				*send_status = ione_api_status_fail;
-				uprintf ("Fail\r\n");
-			}
-			*payload_length = 1;
-		break;
+				case ione_api_cmd_set_factory_reset:
+				{
+						uprintf("API=>Factory Reset:\r\n");
+
+						if (*payload_length != 0U) {
+								*send_status = ione_api_status_fail;
+								*payload_length = 1U;
+
+								uprintf(
+										"Factory Reset fail: invalid payload length=%u\r\n",
+										(unsigned int)*payload_length
+								);
+
+								break;
+						}
+
+						if (factory_reset_pending) {
+								*send_status = ione_api_status_fail;
+								*payload_length = 1U;
+
+								uprintf("Factory Reset fail: request already pending\r\n");
+
+								break;
+						}
+
+						factory_reset_pending = true;
+
+						/*
+						 * Return success immediately.
+						 * The reset thread performs the EEPROM reset later.
+						 */
+						*send_status = ione_api_status_success;
+						*payload_length = 1U;
+
+						uprintf(
+								"Factory Reset ACK queued pending=%u\r\n",
+								(unsigned int)factory_reset_pending
+						);
+				}
+				break;
+				
         case ione_api_set_polling_rate:
             uprintf("API=>Set Polling Rate:\r\n");
             if(*payload_length == 1 && (recive_payload[0] < 4)){
@@ -1568,157 +2188,212 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length)
                 *payload_length = 1;
             }
         break;
-        // case ione_api_cmd_set_macro_record: //
-        // break;
-        // case ione_api_cmd_set_stop_macro_record:
-        // break;
-        case ione_api_cmd_set_macro_playback:
-            uprintf("API=>Set Macro Playback:\r\n");
-            if (*payload_length == 1 && recive_payload[0] < MACRO_GROUP_COUNT) {
-                *send_status = macro_engine_start(recive_payload[0]) ? ione_api_status_success : ione_api_status_fail;
-            } else {
-                *send_status = ione_api_status_fail;
-                uprintf("Fail\r\n");
-            }
-            *payload_length = 1;
-        break;
-        case ione_api_cmd_get_macro_playback:
-        {
-            /*
-             * HID report 固定 32 bytes。
-             * send_data 在目前 API 架構中只剩 26 bytes 可使用。
-             *
-             * Payload：
-             *   [0] macro_index
-             *   [1] start
-             *   [2] count
-             *   [3..20] 最多 3 筆 step，每筆 6 bytes
-             *   [21..25] padding
-             */
+				case ione_api_cmd_set_macro_record:
+				{
+						uint8_t mode;
+						uint8_t macro_index;
 
-            uprintf("API=>Get Macro Playback:\r\n");
+						uprintf("API=>Set Macro Record:\r\n");
 
-            if (*payload_length < 3U) {
-                uprintf(
-                    "Get Macro Playback: invalid payload length=%u\r\n",
-                    (unsigned int)*payload_length
-                );
+						if (*payload_length != 2)
+						{
+								*send_status = ione_api_status_fail;
+								*payload_length = 1;
+								uprintf("Invalid payload length\r\n");
+								break;
+						}
 
-                *send_status    = ione_api_status_fail;
-                *payload_length = 0;
-                break;
-            }
+						mode        = recive_payload[0];
+						macro_index = recive_payload[1];
 
-            const uint8_t macro_index = recive_payload[0];
-            const uint8_t start       = recive_payload[1];
-            const uint8_t req_count   = recive_payload[2];
+						uprintf("Record Mode : %u\r\n", mode);
+						uprintf("Macro Index : %u\r\n", macro_index);
 
-            /*
-             * 編譯器已確認 send_data 後面只有 26 bytes。
-             */
-            memset(send_data, 0, 26U);
+						/* TODO:
+							 Real macro record engine will be implemented later.
+						*/
 
-            if (macro_index >= MACRO_GROUP_COUNT) {
-                uprintf(
-                    "Get Macro Playback: invalid macro index=%u\r\n",
-                    (unsigned int)macro_index
-                );
+						*send_status = ione_api_status_success;
+						*payload_length = 1;
+				}
+				break;
 
-                *send_status    = ione_api_status_fail;
-                *payload_length = 0;
-                break;
-            }
+				case ione_api_cmd_set_stop_macro_record:
+				{
+						uprintf("API=>Stop Macro Record:\r\n");
 
-            const macro_config_t *cfg =
-                macro_engine_get_config(macro_index);
+						/* TODO:
+							 Real macro record stop will be implemented later.
+						*/
 
-            if (cfg == NULL) {
-                uprintf(
-                    "Get Macro Playback: config NULL, index=%u\r\n",
-                    (unsigned int)macro_index
-                );
+						*send_status = ione_api_status_success;
+						*payload_length = 1;
+				}
+				break;
+				
+				case ione_api_cmd_set_macro_playback:
+				{
+						uint8_t request_length;
+						uint8_t macro_index;
+						uint8_t playback_mode;
+						bool start_result;
 
-                *send_status    = ione_api_status_fail;
-                *payload_length = 0;
-                break;
-            }
+						uprintf("API=>Set Macro Playback:\r\n");
 
-            send_data[0] = macro_index;
-            send_data[1] = start;
-            send_data[2] = 0;
+						request_length = *payload_length;
 
-            /*
-             * start 超過資料尾端時，正常回覆 count=0。
-             */
-            if (start >= cfg->step_count) {
-                *send_status    = ione_api_status_sending;
-                *payload_length = 26U;
+						if (request_length != 2U) {
+								*send_status = ione_api_status_fail;
+								*payload_length = 1U;
 
-                uprintf(
-                    "Get Macro Playback: index=%u start=%u "
-                    "total=%u return=0\r\n",
-                    (unsigned int)macro_index,
-                    (unsigned int)start,
-                    (unsigned int)cfg->step_count
-                );
+								uprintf(
+										"Fail: invalid payload length=%u\r\n",
+										(unsigned int)request_length
+								);
 
-                raw_hid_send(data_start, 32U);
-                break;
-            }
+								break;
+						}
 
-            uint8_t count = req_count;
+						macro_index  = recive_payload[0];
+						playback_mode = recive_payload[1];
 
-            /*
-             * 26-byte payload 放不下 4 筆：
-             *
-             * 3 + 4 × 6 = 27 bytes
-             *
-             * 所以每包最多只能回覆 3 筆。
-             */
-            if (count > 3U) {
-                count = 3U;
-            }
+						uprintf(
+								"Macro Index=%u Playback Mode=%u\r\n",
+								(unsigned int)macro_index,
+								(unsigned int)playback_mode
+						);
 
-            const uint16_t remaining =
-                (uint16_t)cfg->step_count - (uint16_t)start;
+						if (macro_index >= MACRO_GROUP_COUNT) {
+								*send_status = ione_api_status_fail;
+								*payload_length = 1U;
 
-            if ((uint16_t)count > remaining) {
-                count = (uint8_t)remaining;
-            }
+								uprintf(
+										"Fail: invalid macro index=%u\r\n",
+										(unsigned int)macro_index
+								);
 
-            send_data[2] = count;
+								break;
+						}
 
-            for (uint8_t i = 0; i < count; i++) {
-                const macro_step_t *s =
-                    &cfg->step[(uint16_t)start + (uint16_t)i];
+						if (playback_mode > 0x02U) {
+								*send_status = ione_api_status_fail;
+								*payload_length = 1U;
 
-                uint8_t *p =
-                    &send_data[3U + ((uint16_t)i * 6U)];
+								uprintf(
+										"Fail: invalid playback mode=%u\r\n",
+										(unsigned int)playback_mode
+								);
 
-                p[0] = s->delay_type;
-                p[1] = (uint8_t)(s->delay_ms & 0x00FFU);
-                p[2] = (uint8_t)((s->delay_ms >> 8) & 0x00FFU);
-                p[3] = s->action;
-                p[4] = (uint8_t)(s->keycode & 0x00FFU);
-                p[5] = (uint8_t)((s->keycode >> 8) & 0x00FFU);
-            }
+								break;
+						}
 
-            *send_status    = ione_api_status_sending;
-            *payload_length = 26U;
+					uprintf(
+							"[API] Before macro_engine_start index=%u\r\n",
+							(unsigned int)macro_index
+					);
 
-            uprintf(
-                "Get Macro Playback: index=%u start=%u "
-                "request=%u return=%u total=%u\r\n",
-                (unsigned int)macro_index,
-                (unsigned int)start,
-                (unsigned int)req_count,
-                (unsigned int)count,
-                (unsigned int)cfg->step_count
-            );
+					start_result = macro_engine_start(macro_index);
 
-            raw_hid_send(data_start, 32U);
-        }
-        break;
+					uprintf(
+							"[API] After macro_engine_start result=%u\r\n",
+							(unsigned int)start_result
+					);
+
+						if (!start_result) {
+								*send_status = ione_api_status_fail;
+								*payload_length = 1U;
+
+								uprintf(
+										"Fail: macro_engine_start index=%u\r\n",
+										(unsigned int)macro_index
+								);
+
+								break;
+						}
+
+						current_macro_playback_index = macro_index;
+						current_macro_playback_mode  = playback_mode;
+
+						*send_status = ione_api_status_success;
+						*payload_length = 1U;
+
+						switch (playback_mode) {
+								case 0x00U:
+										uprintf("Playback Mode: Play once\r\n");
+										break;
+
+								case 0x01U:
+										uprintf("Playback Mode: Click to toggle loop\r\n");
+										break;
+
+								case 0x02U:
+										uprintf("Playback Mode: While pressed\r\n");
+										break;
+
+								default:
+										break;
+						}
+
+						uprintf(
+								"Macro Playback saved: index=%u mode=%u\r\n",
+								(unsigned int)current_macro_playback_index,
+								(unsigned int)current_macro_playback_mode
+						);
+				}
+				break;
+
+				case ione_api_cmd_get_macro_playback:
+				{
+						uint8_t request_length;
+
+						uprintf("API=>Get Macro Playback:\r\n");
+
+						request_length = *payload_length;
+
+						if (request_length != 0U) {
+								*send_status = ione_api_status_fail;
+								*payload_length = 1U;
+
+								uprintf(
+										"Fail: invalid payload length=%u\r\n",
+										(unsigned int)request_length
+								);
+
+								break;
+						}
+
+						if (current_macro_playback_mode > 0x02U) {
+								current_macro_playback_mode = 0x00U;
+						}
+
+						*send_status = ione_api_status_success;
+						*send_data = current_macro_playback_mode;
+						*payload_length = 2U;
+
+						uprintf(
+								"Current Macro Playback: index=%u mode=%u\r\n",
+								(unsigned int)current_macro_playback_index,
+								(unsigned int)current_macro_playback_mode
+						);
+
+						switch (current_macro_playback_mode) {
+								case 0x00U:
+										uprintf("Playback Mode: Play once\r\n");
+										break;
+
+								case 0x01U:
+										uprintf("Playback Mode: Click to toggle loop\r\n");
+										break;
+
+								case 0x02U:
+										uprintf("Playback Mode: While pressed\r\n");
+										break;
+
+								default:
+										break;
+						}
+				}
+				break;
         case ione_api_cmd_set_macro_data:
             uprintf("API=>Set Macro Data:\r\n");
             /*
@@ -1760,75 +2435,73 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length)
             *payload_length = 1;
         break;
         case ione_api_cmd_get_macro_data:
+        {
             uprintf("API=>Get Macro Data:\r\n");
-            /*
-             * payload:
-             * [0] macro index
-             *
-             * sending response payload per packet:
-             * [0] macro index
-             * [1] step index
-             * [2] keycode low
-             * [3] keycode high
-             * [4] delay_type
-             * [5] delay_ms low
-             * [6] delay_ms high
-             * [7] action
-             *
-             * final response payload:
-             * [0] macro index
-             * [1] step_count
-             */
-            if (*payload_length == 1 && recive_payload[0] < MACRO_GROUP_COUNT) {
+
+            if ((*payload_length == 1U) &&
+                (recive_payload[0] < MACRO_GROUP_COUNT)) {
                 uint8_t macro_index = recive_payload[0];
                 macro_config_t *cfg = macro_engine_get_config(macro_index);
-                const size_t EP = LAMP_ARRAY_EPSIZE;
                 uint8_t *w;
 
-                if (cfg != NULL) {
-                    if (cfg->step_count < MACRO_MIN_STEPS || cfg->step_count > MACRO_MAX_STEPS) {
-                        *send_status = ione_api_status_fail;
-                        *payload_length = 1;
-                        uprintf("Fail: invalid macro step_count=%u for idx=%u\r\n", cfg->step_count, macro_index);
-                        break;
-                    }
-
-                    for (uint8_t step_index = 0; step_index < cfg->step_count; step_index++) {
-                        const macro_step_t *step = &cfg->step[step_index];
-
-                        *(data_start + 3) |= 0x80;
-                        w = send_data;
-                        *send_status = ione_api_status_sending;
-
-                        *w++ = macro_index;
-                        *w++ = step_index;
-                        *w++ = (uint8_t)(step->keycode & 0xFF);
-                        *w++ = (uint8_t)(step->keycode >> 8);
-                        *w++ = step->delay_type;
-                        *w++ = (uint8_t)(step->delay_ms & 0xFF);
-                        *w++ = (uint8_t)(step->delay_ms >> 8);
-                        *w++ = step->action;
-
-                        *payload_length = (uint8_t)(1 + (w - send_data));
-                        raw_hid_send(data_start, EP);
-                    }
-
-                    *send_status = ione_api_status_success;
-                    *send_data++ = macro_index;
-                    *send_data++ = cfg->step_count;
-                    *payload_length = 3;
-                } else {
+                if (cfg == NULL) {
                     *send_status = ione_api_status_fail;
-                    uprintf("Fail\r\n");
-                    *payload_length = 1;
+                    *payload_length = 1U;
+                    uprintf("Fail: config NULL\r\n");
+                    break;
                 }
+
+                if ((cfg->step_count < MACRO_MIN_STEPS) ||
+                    (cfg->step_count > MACRO_MAX_STEPS)) {
+                    *send_status = ione_api_status_fail;
+                    *payload_length = 1U;
+                    uprintf("Fail: invalid macro step_count=%u for idx=%u\r\n",
+                            (unsigned int)cfg->step_count,
+                            (unsigned int)macro_index);
+                    break;
+                }
+
+                for (uint8_t step_index = 0U;
+                     step_index < cfg->step_count;
+                     step_index++) {
+                    const macro_step_t *step = &cfg->step[step_index];
+
+                    memset(send_payload, 0, sizeof(recive_payload));
+
+                    w = send_data;
+                    *send_status = ione_api_status_sending;
+
+                    *w++ = macro_index;
+                    *w++ = step_index;
+                    *w++ = (uint8_t)(step->keycode & 0xFFU);
+                    *w++ = (uint8_t)((step->keycode >> 8) & 0xFFU);
+                    *w++ = step->delay_type;
+                    *w++ = (uint8_t)(step->delay_ms & 0xFFU);
+                    *w++ = (uint8_t)((step->delay_ms >> 8) & 0xFFU);
+                    *w++ = step->action;
+
+                    *payload_length = (uint8_t)(1U + (uint8_t)(w - send_data));
+
+                    ione_send_stream_packet(
+                        tx_packet,
+                        data_start,
+                        tx_length,
+                        ione_api_cmd_get_macro_data);
+                }
+
+                memset(send_payload, 0, sizeof(recive_payload));
+                *send_status = ione_api_status_success;
+                send_data[0] = macro_index;
+                send_data[1] = cfg->step_count;
+                *payload_length = 3U;
             } else {
                 *send_status = ione_api_status_fail;
+                *payload_length = 1U;
                 uprintf("Fail\r\n");
-                *payload_length = 1;
             }
+        }
         break;
-       case ione_api_cmd_clear_macro:
+        case ione_api_cmd_clear_macro:
             uprintf("API=>Clear Macro:\r\n");
             macro_engine_stop();
             if (*payload_length == 1 && recive_payload[0] < MACRO_GROUP_COUNT) {
@@ -2392,52 +3065,60 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length)
 		// break;
 
         case ione_api_cmd_get_eeprom_max_trigger_value:
+        {
+            uint16_t index = 0U;
+            uint8_t *w;
+
             uprintf("API=>Get EEPROM Max Trigger Value:\r\n");
-            if (*payload_length == 0){
-                uint8_t payload_length_count = 0;
-                const size_t EP = LAMP_ARRAY_EPSIZE;   // 32 或 64，依你的端點大小
-                uint8_t *w;  
-                uint16_t i = 0; // count
 
-                if(*payload_length == 0){
+            if (*payload_length != 0U) {
+                *send_status = ione_api_status_fail;
+                *payload_length = 1U;
+                uprintf("Fail: invalid payload length\r\n");
+                break;
+            }
 
-                    for(uint8_t rowNum = 0; rowNum < MATRIX_ROWS; rowNum++){
-                        for(uint8_t colNum = 0; colNum < MATRIX_COLS; colNum++){
-                            *(data_start + 3) |= 0x80;
-                            w = send_data;
-                            *send_status = ione_api_status_sending;
+            for (uint8_t row_num = 0U; row_num < MATRIX_ROWS; row_num++) {
+                for (uint8_t col_num = 0U; col_num < MATRIX_COLS; col_num++) {
+                    uint16_t value;
+                    uint8_t high;
+                    uint8_t low;
 
-                            uint16_t val = eeprom_read_word(EECONFIG_KEYMAP_TRAVEL_CALIBRATION + i * 2);
-                            uint8_t high = (val >> 8) & 0xFF;
-                            uint8_t low  = val & 0xFF;
-                            uprintf("number %d (%d,%d)value read is %u\r\n",i,rowNum,colNum,val);//
+                    memset(send_payload, 0, sizeof(recive_payload));
 
-                            *w = rowNum;        // Row
-                            w++;
-                            *w = colNum;        // Column
-                            w++;
-                            *w = high;   // level first byte
-                            w++;
-                            *w = low;   // level second byte
-                            w++;
+                    w = send_data;
+                    *send_status = ione_api_status_sending;
 
-                            i++;
+                    value = eeprom_read_word(
+                        EECONFIG_KEYMAP_TRAVEL_CALIBRATION +
+                        ((uint32_t)index * 2U));
 
-                            *payload_length = (uint8_t)(1 + (w - send_data));  // 1 = status
-                            raw_hid_send(data_start, EP);
-                            payload_length_count+=4;   
-                        }
-                    }
+                    high = (uint8_t)((value >> 8) & 0xFFU);
+                    low = (uint8_t)(value & 0xFFU);
 
-                *send_status = ione_api_status_success;
-                } else {
-                    *send_status = ione_api_status_fail;
-                    uprintf ("Fail\r\n");
+                    *w++ = row_num;
+                    *w++ = col_num;
+                    *w++ = high;
+                    *w++ = low;
+
+                    *payload_length = (uint8_t)(1U + (uint8_t)(w - send_data));
+
+                    ione_send_stream_packet(
+                        tx_packet,
+                        data_start,
+                        tx_length,
+                        ione_api_cmd_get_eeprom_max_trigger_value);
+
+                    index++;
                 }
             }
+
+            memset(send_payload, 0, sizeof(recive_payload));
+            *send_status = ione_api_status_success;
+            *payload_length = 1U;
+        }
         break;
-        
-		default:
+        		default:
 
 				uprintf("Unknown Command : 0x%04X\r\n", command_id);
 
@@ -2454,9 +3135,10 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length)
 //    	uprintf ("%02X ",send_payload[i]);
 //    }
 //    uprintf ("\r\n");
-	*(data_start+3) |= 0x80;
+    ione_prepare_response_header(data_start, command_id);
     return true;
 }
+
 
 void raw_hid_receive(uint8_t *data, uint8_t length) {
     uint8_t *command_id   = &(data[0]);

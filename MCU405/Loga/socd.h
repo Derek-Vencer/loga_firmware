@@ -81,7 +81,7 @@ void eeconfig_write_socd(
  * buf[7] = slot index
  */
 uint8_t socd_fill_report(uint8_t *buf);
-void socd_apply_report(const uint8_t *buf);
+bool socd_apply_report(const uint8_t *buf);
 
 /* ´ú¸Õ¥Î */
 void socd_test_write_eeprom_once(void);

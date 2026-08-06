@@ -16,7 +16,7 @@
 // #define socd_new
 
 #ifdef toggleKey
-void    toggle_key_set(uint8_t layer, uint8_t row, uint8_t col, uint8_t keycode);
+bool toggle_key_set(uint8_t layer, uint8_t row, uint8_t col, uint8_t keycode);
 uint8_t toggle_key_get(uint8_t layer, uint8_t row, uint8_t col);
 #endif // toggleKey
 
@@ -112,12 +112,12 @@ extern mt_entry_t mt_map[MT_CAP_MAP];   // 只有宣告，沒有初始化
 #define toggle_key_pair_count 10
 
 typedef struct {
-    bool    enabled;
-    bool    state;
-    uint8_t keycode;
+    uint8_t enabled;
+    uint8_t state;
     uint8_t layer;
     uint8_t row;
     uint8_t col;
+    uint8_t keycode;
 } toggle_key_slot_t;
 #endif // toggleKey
 
