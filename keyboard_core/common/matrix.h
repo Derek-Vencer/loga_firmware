@@ -122,11 +122,11 @@ typedef struct {
 #endif // toggleKey
 
 // move from matrix.c because i want to use these in via.c (lyon)
-#define TriggerMax	1500
-#define TriggerMin  3
+#define TriggerMax	400
+#define TriggerMin  1
 #define TriggerInitial DEFAULT_TRIGGER_LEVEL
 
-#define ReleaseMax	100
+#define ReleaseMax	400
 #define ReleaseMin	DEFAULT_RELEASE_LEVEL
 #define ReleaseInitial 5
 

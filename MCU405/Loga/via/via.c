@@ -18,6 +18,7 @@
 #include "led/led_effect.h"
 #include "timer.h"
 #include "config.h"
+#include <stdbool.h>
 
 #define DYNAMIC_KEYMAP_MACRO_EEPROM_SIZE sizeof(dynamic_macro_t) * DYNAMIC_MACRO_COUNT
 
@@ -37,6 +38,8 @@ extern EffectMosArt_t mosArt;
 extern uint8_t knobState; // lyon for encoder in matrix.c
 
 extern uint8_t rapidKeyEnable; // test for rapid trigger state
+extern bool globleTrigger;
+
 void eeconfig_modtap_clear(void);
 void eeconfig_clear_all_toggle_entry(void);
 
@@ -1090,32 +1093,28 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length)
 						*payload_length = 1U;
 
 						uprintf(
-								"Set Rapid Trigger State Fail: "
-								"invalid payload length=%u\r\n",
+								"Set Rapid Trigger State Fail: invalid payload length=%u\r\n",
 								(unsigned int)invalid_length
 						);
-
 						break;
 				}
 
 				rx_state = recive_payload[0];
 
 				/*
-				 * Valid protocol values:
-				 * 0x00: Disable
-				 * 0x01: Enable mode 1
-				 * 0x02: Enable mode 2
+				 * Protocol
+				 * 0x00 : Disable
+				 * 0x01 : Enable Mode 1
+				 * 0x02 : Enable Mode 2
 				 */
 				if (rx_state > 2U) {
 						*send_status = ione_api_status_fail;
 						*payload_length = 1U;
 
 						uprintf(
-								"Set Rapid Trigger State Fail: "
-								"invalid state=0x%02X\r\n",
+								"Set Rapid Trigger State Fail: invalid state=0x%02X\r\n",
 								(unsigned int)rx_state
 						);
-
 						break;
 				}
 
@@ -1124,6 +1123,7 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length)
 						(unsigned int)rx_state
 				);
 
+				/* Save EEPROM */
 				eeprom_update_byte(
 						(uint8_t *)RAPID_KEY_ENABLE_ADDR,
 						rx_state
@@ -1134,21 +1134,28 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length)
 				);
 
 				if (verify_state != rx_state) {
+
 						*send_status = ione_api_status_fail;
 
 						uprintf(
-								"Set Rapid Trigger State Fail: "
-								"EEPROM verify=%u expected=%u\r\n",
+								"EEPROM Verify Fail (%u != %u)\r\n",
 								(unsigned int)verify_state,
 								(unsigned int)rx_state
 						);
-				} else {
+				}
+				else {
+
 						rapidKeyEnable = verify_state;
+
+						/* Enable Trigger Level only when RT is enabled */
+						globleTrigger = (verify_state != 0U);
+
 						*send_status = ione_api_status_success;
 
 						uprintf(
-								"Rapid Trigger State Saved: %u\r\n",
-								(unsigned int)verify_state
+								"Rapid Trigger Saved=%u  GlobalTrigger=%u\r\n",
+								(unsigned int)rapidKeyEnable,
+								(unsigned int)globleTrigger
 						);
 				}
 
@@ -1164,17 +1171,16 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length)
 				uprintf("API=>Get Rapid Trigger State:\r\n");
 
 				if (*payload_length != 0U) {
+
 						uint8_t invalid_length = *payload_length;
 
 						*send_status = ione_api_status_fail;
 						*payload_length = 1U;
 
 						uprintf(
-								"Get Rapid Trigger State Fail: "
-								"payload length=%u, expected=0\r\n",
+								"Get Rapid Trigger State Fail: payload length=%u\r\n",
 								(unsigned int)invalid_length
 						);
-
 						break;
 				}
 
@@ -1183,13 +1189,15 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length)
 				);
 
 				/*
-				 * Valid stored values are 0x00, 0x01 and 0x02.
-				 * Erased or invalid EEPROM data is restored to 0x00.
+				 * Valid:
+				 * 0x00 Disable
+				 * 0x01 Enable
+				 * 0x02 Enable
 				 */
 				if (stored_state > 2U) {
+
 						uprintf(
-								"Rapid Trigger State invalid: 0x%02X, "
-								"initialize to Disable\r\n",
+								"Rapid Trigger EEPROM invalid=0x%02X -> reset to 0\r\n",
 								(unsigned int)stored_state
 						);
 
@@ -1203,13 +1211,18 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length)
 
 				rapidKeyEnable = stored_state;
 
+				/* Keep runtime synchronized */
+				globleTrigger = (stored_state != 0U);
+
 				*send_status = ione_api_status_success;
-				*send_data = rapidKeyEnable;
+
+				*send_data = stored_state;
 				*payload_length = 2U;
 
 				uprintf(
-						"Get Rapid Trigger State: %u\r\n",
-						(unsigned int)rapidKeyEnable
+						"Rapid Trigger=%u  GlobalTrigger=%u\r\n",
+						(unsigned int)rapidKeyEnable,
+						(unsigned int)globleTrigger
 				);
 		}
 		break;
