@@ -3847,6 +3847,8 @@ if (!eepromInitCheck) {
 		chThdCreateStatic(waADC_ProcessThread, sizeof(waADC_ProcessThread), NORMALPRIO - 4, ADC_ProcessThread, NULL);
 		LED_init();
 		factory_reset_init();
+		reset_all_key_init();
+		factory_system_reset_init();
 		knobState = eeprom_read_byte(KB_ENCODER_MODE_ADDR);
 }
 

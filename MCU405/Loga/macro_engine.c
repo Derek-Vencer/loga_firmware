@@ -740,6 +740,8 @@ void macro_save_to_eeprom(uint8_t index)
     );
 }
 
+#define MACRO_INVALID_INDEX 0xFFU
+
 void macro_clear(uint8_t index)
 {
     uint8_t *slot_addr;
@@ -747,21 +749,24 @@ void macro_clear(uint8_t index)
 
     if (index >= MACRO_GROUP_COUNT)
     {
+        uprintf(
+            "[MACRO] Clear fail: invalid index=%u\r\n",
+            (unsigned int)index
+        );
+
         return;
     }
 
     slot_addr = EEPROM_MACRO_SLOT_ADDR(index);
 
-    /*
-     * 建議清除整個 macro slot，而不是只根據 EEPROM 中的
-     * step_count 清除部分內容。
-     *
-     * 原因：
-     * 1. EEPROM 內容可能損壞。
-     * 2. step_count 可能不正確。
-     * 3. 舊 macro 尾端資料可能殘留。
-     */
-    for (size_t offset = 0;
+    uprintf(
+        "[MACRO] Clear start idx=%u addr=0x%04lX size=%lu\r\n",
+        (unsigned int)index,
+        (unsigned long)(uintptr_t)slot_addr,
+        (unsigned long)EEPROM_MACRO_SINGLE_SLOT_SIZE
+    );
+
+    for (size_t offset = 0U;
          offset < EEPROM_MACRO_SINGLE_SLOT_SIZE;
          offset += sizeof(zero_chunk))
     {
@@ -782,15 +787,19 @@ void macro_clear(uint8_t index)
 
     if (g_loaded_macro_index == index)
     {
-        memset(&g_macro_cfg, 0, sizeof(g_macro_cfg));
+        memset(
+            &g_macro_cfg,
+            0,
+            sizeof(g_macro_cfg)
+        );
 
-        /*
-         * 如果有無效 index 定義，建議改成該值。
-         * 例如：
-         *
-         * g_loaded_macro_index = MACRO_INVALID_INDEX;
-         */
+        g_loaded_macro_index = MACRO_INVALID_INDEX;
     }
+
+    uprintf(
+        "[MACRO] Clear done idx=%u\r\n",
+        (unsigned int)index
+    );
 }
 
 void macro_delete(void)

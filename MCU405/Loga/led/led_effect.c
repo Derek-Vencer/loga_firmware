@@ -2207,7 +2207,7 @@ void LED_init(void)
      * Mode 0 is currently an off/black preset.
      * Use mode 3 as the default when EEPROM is blank or stores mode 0.
      */
-    if ((ee_mode == 0U) || (ee_mode == 0xFFU)) {
+    if (ee_mode == 0xFFU) {
         ee_mode = 3U;
     }
 

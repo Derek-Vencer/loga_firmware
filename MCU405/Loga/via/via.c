@@ -44,6 +44,9 @@ static uint8_t current_macro_playback_index = 0U;
 static uint8_t current_macro_playback_mode  = 0U;
 
 static volatile bool factory_reset_pending = false;
+static volatile bool reset_all_key_pending = false;
+static volatile bool factory_system_reset_pending = false;
+static volatile bool test_mode_enabled = false;
 
 static uint8_t clamp_percent_u8(uint8_t value) {
     return (value > 100u) ? 100u : value;
@@ -199,6 +202,40 @@ static void factory_reset_execute(void)
     }
 }
 
+static THD_WORKING_AREA(waResetAllKeyThread,512);
+static THD_FUNCTION(ResetAllKeyThread,arg)
+{
+    (void)arg;
+
+    chRegSetThreadName("ResetAllKey");
+
+    uprintf("[RESET KEY] Thread started\r\n");
+
+    while (true) {
+        if (reset_all_key_pending) {
+            /*
+             * Allow the USB ACK to finish transmitting first.
+             */
+            chThdSleepMilliseconds(300U);
+
+            reset_all_key_pending = false;
+
+            uprintf("[RESET KEY] Start\r\n");
+
+            write_keymap_to_eeprom();
+
+            uprintf("[RESET KEY] End\r\n");
+        }
+
+        chThdSleepMilliseconds(10U);
+    }
+}
+
+void reset_all_key_init(void)
+{
+    chThdCreateStatic(waResetAllKeyThread,sizeof(waResetAllKeyThread),NORMALPRIO,ResetAllKeyThread,NULL);
+}
+
 static THD_WORKING_AREA(waFactoryResetThread,512);
 static THD_FUNCTION(FactoryResetThread,arg)
 {
@@ -229,6 +266,83 @@ static THD_FUNCTION(FactoryResetThread,arg)
 void factory_reset_init(void)
 {
     chThdCreateStatic(waFactoryResetThread,sizeof(waFactoryResetThread),NORMALPRIO,FactoryResetThread,NULL);
+}
+
+static void factory_system_reset_execute(void)
+{
+    uprintf("[FACTORY SYS] Start\r\n");
+
+    macro_engine_stop();
+
+    knobState = 0U;
+
+    eeprom_update_byte(
+        KB_ENCODER_MODE_ADDR,
+        knobState
+    );
+
+    eeconfig_socd_clear();
+    eeconfig_rappy_snappy_clear();
+    eeconfig_modtap_clear();
+    eeconfig_clear_all_toggle_entry();
+
+    write_keymap_to_eeprom();
+
+    dynamic_macro_reset_eeprom();
+    macro_delete();
+
+    eeconfig_rapidTrigger_init();
+
+    eeprom_update_byte(
+        (uint8_t *)EEPROM_FACTORY_INIT_FLAG_ADDR,
+        0xFAU
+    );
+
+    uprintf("[FACTORY SYS] End, system reset\r\n");
+
+    chThdSleepMilliseconds(100U);
+
+    NVIC_SystemReset();
+
+    while (true) {
+        /*
+         * Wait for system reset.
+         */
+    }
+}
+
+static THD_WORKING_AREA(waFactorySystemResetThread,512);
+static THD_FUNCTION(FactorySystemResetThread,arg)
+{
+    (void)arg;
+
+    chRegSetThreadName("FactorySysReset");
+
+    uprintf("[FACTORY SYS] Thread started\r\n");
+
+    while (true) {
+        if (factory_system_reset_pending) {
+            /*
+             * Allow the USB ACK to finish transmitting.
+             */
+            chThdSleepMilliseconds(300U);
+
+            factory_system_reset_pending = false;
+
+            uprintf(
+                "[FACTORY SYS] Pending request detected\r\n"
+            );
+
+            factory_system_reset_execute();
+        }
+
+        chThdSleepMilliseconds(10U);
+    }
+}
+
+void factory_system_reset_init(void)
+{
+    chThdCreateStatic(waFactorySystemResetThread,sizeof(waFactorySystemResetThread),NORMALPRIO,FactorySystemResetThread,NULL);
 }
 
 void dynamic_keymap_get_buffer(
@@ -965,61 +1079,77 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length)
 		case ione_api_cmd_set_rapid_trigger_state:
 		{
 				uint8_t rx_state;
-				uint8_t save_state;
 				uint8_t verify_state;
 
 				uprintf("API=>Set Rapid Trigger State:\r\n");
 
-				if (*payload_length != 1U)
-				{
-						uprintf("Set Rapid Trigger State Fail: invalid payload length=%u\r\n",
-										*payload_length);
+				if (*payload_length != 1U) {
+						uint8_t invalid_length = *payload_length;
 
 						*send_status = ione_api_status_fail;
 						*payload_length = 1U;
+
+						uprintf(
+								"Set Rapid Trigger State Fail: "
+								"invalid payload length=%u\r\n",
+								(unsigned int)invalid_length
+						);
+
 						break;
 				}
 
 				rx_state = recive_payload[0];
 
 				/*
-				 * App protocol:
-				 *   0 = Disable
-				 *   1 = Enable
-				 *   2 = Enable
-				 *
-				 * Any non-zero value is normalized to 1 before saving.
+				 * Valid protocol values:
+				 * 0x00: Disable
+				 * 0x01: Enable mode 1
+				 * 0x02: Enable mode 2
 				 */
-				save_state = (rx_state == 0U) ? 0U : 1U;
+				if (rx_state > 2U) {
+						*send_status = ione_api_status_fail;
+						*payload_length = 1U;
 
-				uprintf("RX Rapid Trigger State: %u -> Save State: %u (%s)\r\n",
-								rx_state,
-								save_state,
-								save_state ? "Enable" : "Disable");
+						uprintf(
+								"Set Rapid Trigger State Fail: "
+								"invalid state=0x%02X\r\n",
+								(unsigned int)rx_state
+						);
+
+						break;
+				}
+
+				uprintf(
+						"RX Rapid Trigger State: %u\r\n",
+						(unsigned int)rx_state
+				);
 
 				eeprom_update_byte(
 						(uint8_t *)RAPID_KEY_ENABLE_ADDR,
-						save_state);
+						rx_state
+				);
 
-				verify_state =
-						eeprom_read_byte(
-								(const uint8_t *)RAPID_KEY_ENABLE_ADDR);
+				verify_state = eeprom_read_byte(
+						(const uint8_t *)RAPID_KEY_ENABLE_ADDR
+				);
 
-				if (verify_state != save_state)
-				{
-						uprintf("Set Rapid Trigger State Fail: EEPROM verify=%u expected=%u\r\n",
-										verify_state,
-										save_state);
-
+				if (verify_state != rx_state) {
 						*send_status = ione_api_status_fail;
-				}
-				else
-				{
-						uprintf("Rapid Trigger State Saved: %u (%s)\r\n",
-										verify_state,
-										verify_state ? "Enable" : "Disable");
 
+						uprintf(
+								"Set Rapid Trigger State Fail: "
+								"EEPROM verify=%u expected=%u\r\n",
+								(unsigned int)verify_state,
+								(unsigned int)rx_state
+						);
+				} else {
+						rapidKeyEnable = verify_state;
 						*send_status = ione_api_status_success;
+
+						uprintf(
+								"Rapid Trigger State Saved: %u\r\n",
+								(unsigned int)verify_state
+						);
 				}
 
 				*payload_length = 1U;
@@ -1033,48 +1163,54 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length)
 
 				uprintf("API=>Get Rapid Trigger State:\r\n");
 
-				if (*payload_length != 0U)
-				{
+				if (*payload_length != 0U) {
+						uint8_t invalid_length = *payload_length;
+
 						*send_status = ione_api_status_fail;
 						*payload_length = 1U;
 
-						uprintf("Get Rapid Trigger State Fail: "
-										"payload length=%u, expected=0\r\n",
-										*payload_length);
+						uprintf(
+								"Get Rapid Trigger State Fail: "
+								"payload length=%u, expected=0\r\n",
+								(unsigned int)invalid_length
+						);
+
 						break;
 				}
 
-				stored_state =
-						eeprom_read_byte((const uint8_t *)RAPID_KEY_ENABLE_ADDR);
+				stored_state = eeprom_read_byte(
+						(const uint8_t *)RAPID_KEY_ENABLE_ADDR
+				);
 
 				/*
-				 * EEPROM 未初始化通常是 0xFF。
-				 * Rapid Trigger State 合法值只有 0 或 1。
-				 * 其他值全部恢復成預設 Disable。
+				 * Valid stored values are 0x00, 0x01 and 0x02.
+				 * Erased or invalid EEPROM data is restored to 0x00.
 				 */
-				if (stored_state > 1U)
-				{
-						uprintf("Rapid Trigger State invalid: 0x%02X, "
-										"initialize to Disable\r\n",
-										stored_state);
+				if (stored_state > 2U) {
+						uprintf(
+								"Rapid Trigger State invalid: 0x%02X, "
+								"initialize to Disable\r\n",
+								(unsigned int)stored_state
+						);
 
 						stored_state = 0U;
 
-						eeprom_update_byte((uint8_t *)RAPID_KEY_ENABLE_ADDR,
-															 stored_state);
+						eeprom_update_byte(
+								(uint8_t *)RAPID_KEY_ENABLE_ADDR,
+								stored_state
+						);
 				}
 
 				rapidKeyEnable = stored_state;
 
 				*send_status = ione_api_status_success;
-
 				*send_data = rapidKeyEnable;
-
-				uprintf("Get Rapid Trigger State: %u (%s)\r\n",
-								rapidKeyEnable,
-								rapidKeyEnable ? "Enable" : "Disable");
-
 				*payload_length = 2U;
+
+				uprintf(
+						"Get Rapid Trigger State: %u\r\n",
+						(unsigned int)rapidKeyEnable
+				);
 		}
 		break;
 
@@ -2501,33 +2637,83 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length)
             }
         }
         break;
-        case ione_api_cmd_clear_macro:
-            uprintf("API=>Clear Macro:\r\n");
-            macro_engine_stop();
-            if (*payload_length == 1 && recive_payload[0] < MACRO_GROUP_COUNT) {
-                macro_clear(recive_payload[0]);
-                *send_status = ione_api_status_success;
-            } else if (*payload_length == 0) {
-                macro_delete();
-                *send_status = ione_api_status_success;
-            } else {
-                *send_status = ione_api_status_fail;
-                uprintf("Fail\r\n");
-            }
-            *payload_length = 1;
-        break;
-        case ione_api_cmd_reset_all_key:
-            uprintf("API=>Reset All Key:\r\n");
-			if (*payload_length == 0){
-				*payload_length = 1;
-				*send_status = ione_api_status_success;
-                write_keymap_to_eeprom();
-                } else {
-				*send_status = ione_api_status_fail;
-				uprintf ("Fail\r\n");
+				case ione_api_cmd_clear_macro:
+				{
+						uprintf("API=>Clear Macro:\r\n");
+
+						macro_engine_stop();
+
+						if (*payload_length == 1U &&
+								recive_payload[0] < MACRO_GROUP_COUNT)
+						{
+								uint8_t macro_index = recive_payload[0];
+
+								uprintf(
+										"Clear Macro index=%u\r\n",
+										(unsigned int)macro_index
+								);
+
+								macro_clear(macro_index);
+
+								*send_status = ione_api_status_success;
+						}
+						else if (*payload_length == 0U)
+						{
+								uprintf("Clear all macros\r\n");
+
+								macro_delete();
+
+								*send_status = ione_api_status_success;
+						}
+						else
+						{
+								*send_status = ione_api_status_fail;
+
+								uprintf(
+										"Clear Macro fail: len=%u index=%u\r\n",
+										(unsigned int)*payload_length,
+										(unsigned int)recive_payload[0]
+								);
+						}
+
+						*payload_length = 1U;
+				}
+				break;
+			case ione_api_cmd_reset_all_key:
+			{
+					uprintf("API=>Reset All Key:\r\n");
+
+					if (*payload_length != 0U) {
+							*send_status = ione_api_status_fail;
+							*payload_length = 1U;
+
+							uprintf(
+									"Reset All Key fail: invalid payload length=%u\r\n",
+									(unsigned int)*payload_length
+							);
+
+							break;
+					}
+
+					if (reset_all_key_pending) {
+							*send_status = ione_api_status_fail;
+							*payload_length = 1U;
+
+							uprintf("Reset All Key fail: already pending\r\n");
+							break;
+					}
+
+					reset_all_key_pending = true;
+
+					/*
+					 * Return ACK immediately.
+					 */
+					*send_status = ione_api_status_success;
+					*payload_length = 1U;
+
+					uprintf("Reset All Key ACK queued\r\n");
 			}
-			*payload_length = 1;
-        break;
+			break;
 
 			case ione_api_cmd_get_dead_zone_settings:
 			{
@@ -2827,32 +3013,48 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length)
                 *payload_length = 1;
             }
         break;
-        case ione_api_cmd_factory_reset_and_system_reset:
-            uprintf("API=>Factory Reset And System Reset:\r\n");
-            if (*payload_length == 0) {
-                *send_status = ione_api_status_success;
-                *payload_length = 1;
-                knobState = 0;
-                eeprom_update_byte(KB_ENCODER_MODE_ADDR, knobState);
-                eeconfig_socd_clear();
-                eeconfig_rappy_snappy_clear();
-                eeconfig_modtap_clear();
-                eeconfig_clear_all_toggle_entry();
-                write_keymap_to_eeprom();
-                dynamic_macro_reset_eeprom();
-                macro_delete();
-                eeconfig_rapidTrigger_init();
-                *(data_start+3) |= 0x80;
-                raw_hid_send(data_start, length);
-                chThdSleepMilliseconds(100);
-                NVIC_SystemReset();
-                return false;
-            } else {
-                *send_status = ione_api_status_fail;
-                uprintf("Fail\r\n");
-                *payload_length = 1;
-            }
-        break;
+				case ione_api_cmd_factory_reset_and_system_reset:
+				{
+						uprintf("API=>Factory Reset And System Reset:\r\n");
+
+						if (*payload_length != 0U) {
+								*send_status = ione_api_status_fail;
+								*payload_length = 1U;
+
+								uprintf(
+										"Factory/System Reset fail: invalid payload length=%u\r\n",
+										(unsigned int)*payload_length
+								);
+
+								break;
+						}
+
+						if (factory_system_reset_pending) {
+								*send_status = ione_api_status_fail;
+								*payload_length = 1U;
+
+								uprintf(
+										"Factory/System Reset fail: request already pending\r\n"
+								);
+
+								break;
+						}
+
+						factory_system_reset_pending = true;
+
+						/*
+						 * Return success ACK immediately.
+						 * The background thread performs reset later.
+						 */
+						*send_status = ione_api_status_success;
+						*payload_length = 1U;
+
+						uprintf(
+								"Factory/System Reset ACK queued pending=%u\r\n",
+								(unsigned int)factory_system_reset_pending
+						);
+				}
+				break;
         case ione_api_cmd_set_lighting_value:
         {
             uprintf("API=>Set Lighting Value:\r\n");
@@ -3061,8 +3263,65 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length)
             }
             *payload_length = 4;
         break;
-		// case ione_api_cmd_set_test_mode:
-		// break;
+						
+				case ione_api_cmd_set_test_mode:
+				{
+						uint8_t test_mode;
+
+						uprintf("API=>Set Test Mode:\r\n");
+
+						if (*payload_length != 1U) {
+								uint8_t invalid_length = *payload_length;
+
+								*send_status = ione_api_status_fail;
+								*payload_length = 1U;
+
+								uprintf(
+										"Set Test Mode fail: invalid payload length=%u\r\n",
+										(unsigned int)invalid_length
+								);
+
+								break;
+						}
+
+						test_mode = recive_payload[0];
+
+						switch (test_mode) {
+								case 0x01U:
+										test_mode_enabled = true;
+
+										uprintf(
+												"Test Mode enabled, state=%u\r\n",
+												(unsigned int)test_mode_enabled
+										);
+
+										*send_status = ione_api_status_success;
+										break;
+
+								case 0x02U:
+										test_mode_enabled = false;
+
+										uprintf(
+												"Test Mode disabled, state=%u\r\n",
+												(unsigned int)test_mode_enabled
+										);
+
+										*send_status = ione_api_status_success;
+										break;
+
+								default:
+										*send_status = ione_api_status_fail;
+
+										uprintf(
+												"Set Test Mode fail: invalid mode=0x%02X\r\n",
+												(unsigned int)test_mode
+										);
+										break;
+						}
+
+						*payload_length = 1U;
+				}
+				break;
 
         case ione_api_cmd_get_eeprom_max_trigger_value:
         {
