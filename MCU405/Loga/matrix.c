@@ -1518,14 +1518,6 @@ static const ADCConversionGroup adcgrpcfg2 = {
 void irq_storm_gpt9_cb(GPTDriver *gptp)
 {
     (void)gptp;
-    //	msg_t msg;
-    //
-    //	(void)gptp;
-    //	chSysLockFromISR();
-    //#ifdef ADC_Debug
-    //	palTogglePad(GPIOF, 7);														//ADC GPT Trigger LED
-    //#endif
-    //	chSysUnlockFromISR();
 
 	sensorPowerCtrl(true);
 	testCB++;
@@ -1546,66 +1538,6 @@ void irq_storm_gpt9_cb(GPTDriver *gptp)
 //	adcStartConversion_Start(&ADCD1,ADC_CR2_SWSTART);
 }
 #endif
-
-//#ifdef ADC_v4
-//void irq_storm_gpt9_cb(GPTDriver* gptp)
-//{
-//	chSysLockFromISR();
-//	switch(adcStauts){
-//		case adcIdel:
-//			if (dly_times-- == 0){
-//				adcStauts = adcSensorPowerOn;
-//			}
-//
-//		break;
-//		case adcSensorPowerOn:
-//			sensorPowerCtrl(true);
-//			adcsampleIndex = 0;
-//			muxSelect(adcsampleIndex);
-//			adcStauts = adcConvertStart;
-//#ifdef minTriggerCheck
-//			dly_times = 4;
-//#else
-//			dly_times = 2;
-//#endif
-//		break;
-////		case adcMuxSelect:
-////			if (dly_times == 0){
-////				muxSelect(adcsampleIndex);
-////				adcStauts = adcConvertStart;
-////			}
-////		break;
-//		case adcConvertStart:
-//			if (!ledUpdatingLock && dly_times-- == 0){
-//				if (adcsampleIndex<16){
-//					adcStartConversion(&ADCD1, &adcgrpcfg2, samples1, 1);
-//
-//#ifdef minTriggerCheck
-//					dly_times = 20;
-//#else
-//					dly_times = 4;
-//#endif
-//				} else {
-//					sensorPowerCtrl(false);
-//					chBSemSignalI(&adcCompleteSem);
-//					adcsampleIndex = 0;
-//					muxSelect(adcsampleIndex);
-//					adcStauts = adcIdel;
-//
-//#ifdef minTriggerCheck
-//					dly_times = 5;
-//#else
-//					dly_times = 5;
-//#endif
-//				}
-//			}
-//		break;
-//		case adcSensorPowerOff:
-//		break;
-//	}
-//	chSysUnlockFromISR();
-//}
-//#endif
 
 #ifdef ADC_v4
 void irq_storm_gpt9_cb(GPTDriver *gptp)
@@ -1683,35 +1615,10 @@ void irq_storm_gpt9_cb(GPTDriver *gptp)
 #endif
 		break;
 		case adcConvertStart:
-//			adcStartConversion(&ADCD1, &adcgrpcfg2, &samples2[adcsampleIndex][0], 1);
 			if (!ledUpdatingLock){
-				if (adcsampleIndex<16){	
-					// palSetPadMode(GPIOC, 12, PAL_MODE_INPUT_PULLUP);
-					// palSetPad(GPIOC, 12);  
+				if (adcsampleIndex<16){	 
 					AdcPortChange(false);
-					// add control gpio at here
-					// palSetPad(GPIOC, 12);    // HIGH
-					// palClearPad(GPIOC, 12);  // LOW
-					// palTogglePad(GPIOC, 12); // ??
-					// palSetPadMode(GPIOC, 12, PAL_MODE_INPUT_PULLDOWN);
-					// chThdSleep(TIME_US2I(40));
-					// chThdSleepMicroseconds(10); 
-					//static bool toggleGpio = 0;
-					// palSetPad(GPIOB, 12);
-					////////////////palSetPad(GPIOC, 12); 
-					// if(toggleGpio){
-					// 	palSetPad(GPIOC, 12); 
-					// 	// palSetPadMode(GPIOC, 12, PAL_MODE_INPUT_PULLDOWN);
-					// 	toggleGpio = 0;
-					// } else {
-					// 	palClearPad(GPIOC, 12);
-					// 	// palSetPadMode(GPIOC, 12, PAL_MODE_INPUT_PULLUP);
-					// 	toggleGpio = 1;
-					// }
 					adcStartConversion(&ADCD1, &adcgrpcfg2, &samples2[adcsampleIndex][0], 1);
-					//adcStartConversion_Start(&ADCD1, ADC_CTRL2_OCSWTRG);
-					// palClearPad(GPIOB, 12);
-
 				return;
 				} else {
 					sensorPowerCtrl(false);
@@ -1902,59 +1809,6 @@ void adcTravelCalc(uint8_t mode)
     }
 }
 
-// void adc2mmCapture(bool update)
-// {
-//     uint32_t SampleTimer;
-//     uint16_t i;
-
-//     uprintf("Start 2mm capture\r\n");
-
-//     memset(adc2mmLevel, 0, sizeof(adc2mmLevel));   // ?????
-//     SampleTimer = timer_read();
-
-//     // ?????????,????
-//     lastKeyScanEffect  = keyScanEffect;
-//     lastRapidKeyEnable = rapidKeyEnable;
-//     lastkeycodeOutput  = keycodeOutput;
-
-//     keyScanEffect  = true;
-//     rapidKeyEnable = false;
-//     keycodeOutput  = false;
-//     currentKeyMatrixMode = keyMatrixMode_InitialPostionCalc;
-
-//     // ? 20~50ms ????
-//     while (timer_elapsed(SampleTimer) < 50) {
-//         // ?? ADC ??? samples2[][],???
-//         chThdSleepMilliseconds(1);
-//     }
-
-//     // ?????? ADC ????2mm ???????
-//     for (uint8_t i = 0; i < ADC_NUM_CHANNELS; i++) {
-//         for (uint8_t j = 0; j < ADC_BUF_DEPTH; j++) {
-//             adc2mmLevel[j][i] = samples2[j][i];
-//			   uprintf ("write:%d data:%d\r\n",travelPostionLevel[i % ADC_BUF_DEPTH][i / ADC_BUF_DEPTH]);
-//         }
-//     }
-
-//     uprintf("Captured 2mm ADC values\r\n");
-
-//     // ??????? EEPROM
-//     if (update) {
-//         uprintf("Saving 2mm ADC values to EEPROM...\r\n");
-//         for (i = 0; i < (ADC_NUM_CHANNELS * ADC_BUF_DEPTH); i++) {
-//             eeprom_write_word(EECONFIG_KEYMAP_TRAVEL_2MM + i * 2,
-//                 adc2mmLevel[i % ADC_BUF_DEPTH][i / ADC_BUF_DEPTH]);
-//         }
-//         uprintf("Save done\r\n");
-//     }
-
-//     // ?????
-//     currentKeyMatrixMode = keyMatrixMode_Normal;
-//     keyScanEffect  = lastKeyScanEffect;
-//     rapidKeyEnable = lastRapidKeyEnable;
-//     keycodeOutput  = lastkeycodeOutput;
-// }
-
 static void muxSelect(uint8_t channel){
 	// uprintf("mux idx=%d\r\n", channel);
 	uint8_t data, data_pa, data_pf;
@@ -2048,82 +1902,11 @@ static void adccallback(ADCDriver* adcp)
 }
 #endif
 
-//#ifdef ADC_v3
-//static void adccallback(ADCDriver* adcp)
-//{
-//	chSysLockFromISR();
-//	if (!ledUpdatingLock && adcsampleIndex>=0){
-//		for (uint8_t i = 0; i < ADC_NUM_CHANNELS; i++)
-//		  {
-//				samples2[adcsampleIndex][i] = samples1[i];
-//		  }
-//	} else {
-//		sensorPowerCtrl(false);
-//		adcsampleIndex = 0;
-//		muxSelect(adcsampleIndex);
-//		adcStauts = adcIdel;
-//#ifdef minTriggerCheck
-//		dly_times = 5;
-//#else
-//		dly_times = 4;
-//#endif
-//		chSysUnlockFromISR();
-//		return;
-//	}
-//	muxSelect(++adcsampleIndex);
-//	chSysUnlockFromISR();
-//}
-//#endif
-
-
-//#ifdef ADC_v4
-//static void adccallback(ADCDriver* adcp)
-//{
-////	if (!ledUpdatingLock){
-//		for (uint8_t i = 0; i < ADC_NUM_CHANNELS; i++)
-//		  {
-//				samples2[adcsampleIndex][i] = samples1[i];
-//		  }
-////	}
-////	else{
-////		sensorPowerCtrl(false);
-////		adcsampleIndex = 0;
-////		muxSelect(adcsampleIndex);
-////		adcStauts = adcIdel;
-////#ifdef minTriggerCheck
-////		dly_times = 5;
-////#else
-////		dly_times = 2;
-////#endif
-////		return;
-////	}
-//	muxSelect(++adcsampleIndex);
-//}
-//#endif
-
-
 #ifdef ADC_v4
 static void adccallback(ADCDriver* adcp)
 {
     (void)adcp;    // 消除 unused parameter 警告
-//	if (!ledUpdatingLock){
-//		for (uint8_t i = 0; i < ADC_NUM_CHANNELS; i++)
-//		  {
-//				samples2[adcsampleIndex][i] = samples1[i];
-//		  }
-//	}
-//	else{
-//		sensorPowerCtrl(false);
-//		adcsampleIndex = 0;
-//		muxSelect(adcsampleIndex);
-//		adcStauts = adcIdel;
-//#ifdef minTriggerCheck
-//		dly_times = 5;
-//#else
-//		dly_times = 2;
-//#endif
-//		return;
-//	}
+
 	muxSelect(++adcsampleIndex);
 }
 #endif
@@ -2164,325 +1947,7 @@ void analogPowerSwitch(uint8_t data)
 	//uprintf ("pa:%X pf:%X\r\n",data_pa,data_pf);
 	palWriteGroup(GPIOA, PAL_PORT_BIT(3) | PAL_PORT_BIT(4), 0, data_pa);
 	palWriteGroup(GPIOF, PAL_PORT_BIT(4) | PAL_PORT_BIT(5), 0, data_pf);
-    }
-//# ifdef ADCTestHispeed
-//void matrixDebugTest(uint8_t mode)
-//{
-//	int adcCalc;
-//	for (uint8_t group = 0; group < ADC_NUM_CHANNELS; group++)
-//	{
-//		for (uint8_t location = 0; location < ADC_BUF_DEPTH; location++)
-//		{
-//			switch (mode)
-//			{
-//				case 0:
-//					adcCalc = samples2[location][group] - initPostionLevel[location][group];
-//					if (adcCalc < 3)
-//					{
-//						adcCalc = 0;
-//					}
-//					else
-//					{
-//						adcCalc -= 3;
-//					}
-//					break;
-//				case 1:
-//					adcCalc = travelPostionLevel[location][group] - initPostionLevel[location][group];
-//					if (adcCalc < 32)
-//					{
-//						adcCalc = 0;
-//					}
-//					break;
-//			}
-//
-//			//analogBtnFill(group, location, LED_NULL, adcCalc);
-//
-//
-//				led_config_t EffectranbowColor;
-//				analogKey_Config_t keyLocation = analogKeyRelocate[group][location];;
-//				uint8_t currentStep = 0;
-//				if (location > colMax[group]) { break; }
-//				for (uint8_t i=0;i<RAPID_TRIGGER_COUNT;i++){
-//						if (rapidTriggerKeys[i].row == keyLocation.rowA && rapidTriggerKeys[i].col == keyLocation.colA){
-//							if (rapidTriggerKeys[i].enable && rapidTriggerKeys[i].counts != 0){
-//							if (adcCalc < rapidTriggerKeys[i].onLevel[0]){
-//								EffectranbowColor = LED_NULL;
-//
-//							} else {
-//								for (uint8_t j=0;j<rapidTriggerKeys[i].counts;j++){
-//									if (adcCalc> rapidTriggerKeys[i].onLevel[j] && adcCalc< rapidTriggerKeys[i].onLevel[j+1]){
-//										currentStep ++;
-//										break;
-//									}else {
-//										if (adcCalc>rapidTriggerKeys[i].onLevel[j+1]){currentStep ++;}
-//									}
-//								}
-//								EffectranbowColor = rainbowColor[currentStep-1];
-//							}
-//							if (currentStep && currentStep != rapidTriggerKeys[i].lastStep){
-//								if (rapidTriggerKeys[i].lastKeycode != 0xffff){
-//									unregister_rapidTrigger_code(rapidTriggerKeys[i].lastKeycode);
-//									register_rapidTrigger_code(rapidTriggerKeys[i].keycode[currentStep-1]);
-//
-//								} else {
-//									register_rapidTrigger_code(rapidTriggerKeys[i].keycode[currentStep-1]);
-//								}
-//								rapidTriggerKeys[i].lastKeycode = rapidTriggerKeys[i].keycode[currentStep-1];
-//							}
-//							if (currentStep == 0 && rapidTriggerKeys[i].lastStep != 0){
-//								unregister_rapidTrigger_code(rapidTriggerKeys[i].lastKeycode);
-//								rapidTriggerKeys[i].lastKeycode = 0xffff;
-//								rapidTriggerKeys[i].lastStep = 0;
-//							}
-//							rapidTriggerKeys[i].lastStep = currentStep;
-//							setKeyMatrixLED(keyLocation.rowA, keyLocation.colA, EffectranbowColor);
-//							//break;
-//						}
-//
-//					}
-//				}
-//
-//				float mult;
-//				if (keyLocation.rowA == -1 || keyLocation.colA == -1) { return; }
-//				EffectranbowColor = rainbowColor[group];
-//				if (adcCalc>35){ adcCalc-=35;}
-//				if (adcCalc>600){
-//					mult = 1;
-//				} else {
-//					mult = (float)adcCalc / 600;         //OP*2	nonOP*10
-//				}
-//				EffectranbowColor.red *= mult;
-//				EffectranbowColor.green *= mult;
-//				EffectranbowColor.blue *= mult;
-//				setKeyMatrixLED(keyLocation.rowA, keyLocation.colA, EffectranbowColor);
-//				//break;
-//
-//		}
-//	}
-//	chBSemSignal(&ledUpdateSem);
-//    }
-//
-//
-//#else
-//    uint8_t matrixDebugTest(uint8_t mode)
-//    {
-//        int adcCalc;
-//        uprintf("\033[2J\033[H");
-//        uprintf("Timer:%6d   00   01   02   03   04   05   06   07   08   09   10   11   12   13   14   15\r\n", adcUpdateIndex);
-//
-//        for (uint8_t i = 0; i < ADC_NUM_CHANNELS; i++)
-//        {
-//            uprintf("Key group %d: ", i);
-//            for (uint8_t j = 0; j < ADC_BUF_DEPTH; j++)
-//            {
-//                adcCalc = samples2[j][i] - initPostionLevel[j][i];
-//                if (adcCalc < 3)
-//                {
-//                    adcCalc = 0;
-//                    uprintf("   0 ");
-//                }
-//                else
-//                {
-//                    adcCalc -= 3;
-//                    uprintf("%4d ", adcCalc);
-//                }
-//                analogBtnFill(i, j, LED_NULL, adcCalc);
-//
-//            }
-//            uprintf("\r\n");
-//        }
-//        chBSemSignal(&ledUpdateSem);
-//    }
-//#endif
-//
-
-//Optimize version
-//bool matrixAnalogScan(void)
-//{
-//	uint8_t rapidKeyStatus;
-//	int adcCalc;
-//	bool rapidStartCheck, rapidEndCheck;
-//	led_config_t EffectranbowColor;
-//	uint8_t currentStep = 0;
-//    chSysLock();
-//	for (uint8_t group = 0; group < ADC_NUM_CHANNELS; group++)
-//	{
-//		for (uint8_t channel = 0; channel < (ADC_BUF_DEPTH); channel++)
-//		{
-//			switch (currentKeyMatrixMode)
-//			{
-//				case keyMatrixMode_Normal:
-//				case keyMatrixMode_InitialPostionCalc:
-//					adcCalc = samples2[channel][group] - initPostionLevel[channel][group];
-//					break;
-//				case keyMatrixMode_TravelPostionCalc:
-//					if (travelPostionLevel[channel][group] < samples2[channel][group])
-//					{
-//						travelPostionLevel[channel][group] = samples2[channel][group];
-//					}
-//					adcCalc = travelPostionLevel[channel][group] - initPostionLevel[channel][group];
-//					if (adcCalc < 32)
-//					{
-//						adcCalc = 0;
-//					}
-//					break;
-//			}
-//
-//			if (adcCalc < 0)
-//			{
-//				adcCalc = 0;
-//			}
-//			rapidKeyStatus = false;
-//			keyLocation = analogKeyRelocate[group][channel];
-//			for (uint8_t i = 0; i < RAPID_TRIGGER_COUNT && !rapidKeyStatus && rapidKeyEnable; i++)
-//			{
-//				if (rapidTriggerKeys[i].row == keyLocation.rowA && rapidTriggerKeys[i].col == keyLocation.colA)
-//				{
-//					if (rapidTriggerKeys[i].enable && rapidTriggerKeys[i].counts != 0)
-//					{
-//
-//						if (adcCalc < rapidTriggerKeys[i].onLevel[0])																//no press
-//						{
-//							EffectranbowColor = LED_NULL;
-//						}
-//						else
-//						{
-//							for (uint8_t j = 0; j < rapidTriggerKeys[i].counts; j++)
-//							{
-//								rapidEndCheck = false;
-//								rapidStartCheck = false;
-//								if (adcCalc > rapidTriggerKeys[i].onLevel[j] && adcCalc < rapidTriggerKeys[i].onLevel[j + 1])
-//								{
-//									currentStep++;
-//									break;
-//								}
-//								else
-//								{
-//									if (adcCalc > rapidTriggerKeys[i].onLevel[j + 1]) { currentStep++; }
-//								}
-//							}
-//							EffectranbowColor = rainbowColor[currentStep - 1];
-//						}
-//						if (currentStep && currentStep != rapidTriggerKeys[i].lastStep)
-//						{
-//							if (keycodeOutput){
-//								if (rapidTriggerKeys[i].lastKeycode != 0xffff)
-//								{
-//									unregister_rapidTrigger_code(rapidTriggerKeys[i].lastKeycode);
-//									uprintf ("last keycode:%X\r\n",rapidTriggerKeys[i].lastKeycode);
-//									uprintf ("break last key Step:%d\r\n",currentStep,rapidTriggerKeys[i].lastKeycode);
-//									register_rapidTrigger_code(rapidTriggerKeys[i].keycode[currentStep - 1]);
-//									uprintf ("make last key Step:%d code:%X\r\n",currentStep,rapidTriggerKeys[i].keycode[currentStep - 1]);
-//								}
-//								else
-//								{
-//									if (!rapidStartCheck){
-//									register_rapidTrigger_code(rapidTriggerKeys[i].keycode[currentStep - 1]);
-//									uprintf ("\033[2J\033[HMake start current step:%d rapidStartCheck:%d \r\n",currentStep,rapidStartCheck);
-//									rapidStartCheck = true;
-//									}
-//								}
-//							}
-//							rapidTriggerKeys[i].lastKeycode = rapidTriggerKeys[i].keycode[currentStep - 1];
-//						}
-//						if (currentStep == 0 && rapidTriggerKeys[i].lastStep != 0)
-//						{
-//							if (keycodeOutput && rapidTriggerKeys[i].lastKeycode != 0xffff && !rapidEndCheck){
-//							unregister_rapidTrigger_code(rapidTriggerKeys[i].lastKeycode);
-//							uprintf ("End break\r\n");
-//							//tap_code(KC_ENT);
-//							rapidEndCheck = true;
-//							}
-//							rapidTriggerKeys[i].lastKeycode = 0xffff;
-//							rapidTriggerKeys[i].lastStep = 0;
-//						}
-//						rapidTriggerKeys[i].lastStep = currentStep;
-//						if (keyScanEffect)LED_Datas[ledKeyMatrix[keyLocation.rowA][keyLocation.colA]] = EffectranbowColor;
-//						rapidKeyStatus = true;
-//						break;
-//					}
-//				}
-//			}
-//			if (rapidKeyStatus == false)
-//			{
-//				if (adcCalc > keyMatrixTriggerLevel)
-//				{
-//					matrix_temp[keyLocation.rowA] |= (0x01 << keyLocation.colA);
-//				}
-//				if (adcCalc <= keyMatrixReleaseLevel)
-//				{
-//					matrix_temp[keyLocation.rowA] &= ~(0x01 << keyLocation.colA);
-//				}
-//				if (globleTrigger){
-//					if (keyScanEffect)
-//					{
-//						float mult;
-//						//if (keyLocation.rowA == -1 || keyLocation.colA == -1) { return; }
-//
-//						if (adcCalc>1){
-//							adcCalc -= 1;
-//							EffectranbowColor = rainbowColor[group];
-//							if (adcCalc > 600)
-//							{
-//								mult = 1;
-//							}
-//							else
-//							{
-//								mult = (float)adcCalc / 600;         //OP*2	nonOP*10
-//							}
-//							EffectranbowColor.red *= mult;
-//							EffectranbowColor.green *= mult;
-//							EffectranbowColor.blue *= mult;
-//
-//							LED_Datas[ledKeyMatrix[keyLocation.rowA][keyLocation.colA]] = EffectranbowColor;
-//
-//						} else {
-//							EffectranbowColor = LED_NULL;
-//						}
-//						//LED_Datas[ledKeyMatrix[keyLocation.rowA][keyLocation.colA]] = EffectranbowColor;
-//					}
-//				}
-//				else {
-//					if (keyScanEffect)
-//					{
-//						float mult;
-//						//if (keyLocation.rowA == -1 || keyLocation.colA == -1) { return; }
-//
-//						if (adcCalc>15){
-//							adcCalc -= 15;
-//							EffectranbowColor = rainbowColor[group];
-//							if (adcCalc > 600)
-//							{
-//								mult = 1;
-//							}
-//							else
-//							{
-//								mult = (float)adcCalc / 600;         //OP*2	nonOP*10
-//							}
-//							EffectranbowColor.red *= mult;
-//							EffectranbowColor.green *= mult;
-//							EffectranbowColor.blue *= mult;
-//						} else {
-//							EffectranbowColor = LED_NULL;
-//						}
-//						LED_Datas[ledKeyMatrix[keyLocation.rowA][keyLocation.colA]] = EffectranbowColor;
-//					}
-//				}
-//			}
-//		}
-//	}
-//		crcReset(&CRCD1);
-//		currentMatrix_CRC = crcCalc(&CRCD1, sizeof(matrix_temp), &matrix_temp);
-//		if (lastMatrix_CRC != currentMatrix_CRC)
-//		{
-//			memcpy(matrix, matrix_temp, sizeof(matrix));
-//			keyboard_taskTMR();
-//			lastMatrix_CRC = currentMatrix_CRC;
-//		}
-//
-//	if (keyScanEffect)chBSemSignal(&ledUpdateSem);
-//    chSysUnlock();
-//}
+}
 
 uint16_t current_keycode = KC_NO;
 uint8_t level = 0;
@@ -2561,14 +2026,10 @@ static void perform_factory_reset(void)
 
 bool matrixAnalogScan(void)
 {
-	bool rapidKeyStatus;
-	int adcCalc, adcPre;
-	//bool rapidStartCheck, rapidEndCheck;
-	led_config_t EffectranbowColor;
-	float mult;
-	int8_t currentStep = 0;
-//	uint8_t filterValue;
-//    chSysLock();
+    int adcCalc, adcPre;
+    led_config_t EffectranbowColor;
+    float mult;
+    int8_t currentStep = 0;
 
 #ifdef eepromClear
     static bool reset_checked = false;
@@ -2588,469 +2049,949 @@ bool matrixAnalogScan(void)
 #endif // eepromClear
 
 #ifdef minTriggerCheck
-
-    if (rapidKeyEnable){
-    	draftValue = 0;
+    if (rapidKeyEnable) {
+        draftValue = 0;
     } else {
-    	draftValue = 15;
+        draftValue = 15;
     }
 #else
     draftValue = 0;
 #endif
-	for (uint8_t group = 0; group < ADC_NUM_CHANNELS; group++)
-	{
-		for (uint8_t channel = 0; channel < (ADC_BUF_DEPTH); channel++)
-		{
-			keyLocation = analogKeyRelocate[group][channel];
-			if (!matrix_key_location_valid(keyLocation)) {
-				continue;
-			}
 
-			switch (currentKeyMatrixMode)
-			{
-				case keyMatrixMode_Normal:
-				case keyMatrixMode_InitialPostionCalc:
-					adcCalc = samples2[channel][group] - initPostionLevel[channel][group];
-					break;
-				case keyMatrixMode_TravelPostionCalc:
-					if (travelPostionLevel[channel][group] < samples2[channel][group])
-					{
-						travelPostionLevel[channel][group] = samples2[channel][group];
-					}
-					adcCalc = travelPostionLevel[channel][group] - initPostionLevel[channel][group];
-					if (adcCalc < 32)
-					{
-						adcCalc = 0;
-					}
-					break;
-			}
+    for (uint8_t group = 0; group < ADC_NUM_CHANNELS; group++)
+    {
+        for (uint8_t channel = 0; channel < ADC_BUF_DEPTH; channel++)
+        {
+            bool dksKeyMatched = false;
 
-			adcsample_t travel = travelPostionLevel[channel][group];
-			adcsample_t init   = initPostionLevel[channel][group];
-			//adcsample_t now    = samples2[channel][group];
-			int32_t range      = (int32_t)travel - (int32_t)init;
+            keyLocation = analogKeyRelocate[group][channel];
 
-			if (adcCalc < 0 || range <= 0) {
-				adcPre = 0;
-			} else {
-				adcPre = (int32_t)adcCalc * TRAVEL_STEPS / range;
-			}
+            if (!matrix_key_location_valid(keyLocation)) {
+                continue;
+            }
 
-			if (adcPre < 0){
-				adcPre = 0;
-			}
-			if (adcPre >= TRAVEL_STEPS){
-				adcPre = TRAVEL_STEPS;
-			}
+            switch (currentKeyMatrixMode)
+            {
+                case keyMatrixMode_Normal:
+                case keyMatrixMode_InitialPostionCalc:
+                    adcCalc =
+                        samples2[channel][group] -
+                        initPostionLevel[channel][group];
+                    break;
 
-			if (adcCalc < 0)
-			{
-				adcCalc = 0;
-			}
+                case keyMatrixMode_TravelPostionCalc:
+                    if (travelPostionLevel[channel][group] <
+                        samples2[channel][group])
+                    {
+                        travelPostionLevel[channel][group] =
+                            samples2[channel][group];
+                    }
 
-			/* Make ADC visible as early as possible in keyscan before extra feature logic runs. */
-			// if (keyLocation.rowA >= 0 && keyLocation.colA >= 0 &&
-			// 	keyLocation.rowA < MATRIX_ROWS && keyLocation.colA < MATRIX_COLS)
-			// {
-			// 	keyRawDepth[keyLocation.rowA][keyLocation.colA] = now;
-			// 	keyDepth[keyLocation.rowA][keyLocation.colA] = (adcsample_t)adcCalc;
-			// }
+                    adcCalc =
+                        travelPostionLevel[channel][group] -
+                        initPostionLevel[channel][group];
 
-			// Dynamic Keystroke - lyon
-			rapidKeyStatus = false;
-			if (rapidKeyEnable){
-				for (uint8_t i = 0; i < RAPID_TRIGGER_COUNT && !rapidKeyStatus; i++){
-					if (rapidTriggerKey[i].key.enable && rapidTriggerKey[i].key.counts != 0){
-						if (rapidTriggerKey[i].key.row == keyLocation.rowA && rapidTriggerKey[i].key.col == keyLocation.colA){
-							currentStep = 0;
-							rapidKeyStatus = true;
-							if (adcCalc < rapidTriggerKey[i].onLevel[0])																//no press
-							{
+                    if (adcCalc < 32) {
+                        adcCalc = 0;
+                    }
+                    break;
+            }
 
-								if (rapidTriggerKey[i].lastStep != -1 && adcCalc<=4){
-									//uprintf ("<==end break:%d \r\n",rapidTriggerKey[i].lastStep);
-									if (keycodeOutput){
-										unregister_rapidTrigger_code(rapidTriggerKey[i].key.keycode[rapidTriggerKey[i].lastStep]);
+            adcsample_t travel =
+                travelPostionLevel[channel][group];
 
-										tap_code(KC_ENT);
-									}
-									rapidTriggerKey[i].lastStep = -1;
-									rapidTriggerKey[i].triggeredLevel = 0;
-									if (keyScanEffect && ledKeyMatrix[keyLocation.rowA][keyLocation.colA] != -1)LED_Datas[ledKeyMatrix[keyLocation.rowA][keyLocation.colA]] = LED_NULL;
-									//chThdSleepMilliseconds(3);
-									//rapidKeyStatus = true;
-									continue;
-								}
+            adcsample_t init =
+                initPostionLevel[channel][group];
 
-							}else {
-								for (uint8_t j = 1; j < rapidTriggerKey[i].key.counts; j++)
-								{
-									//rapidEndCheck = false;
-									//rapidStartCheck = false;
-									if (adcCalc >= rapidTriggerKey[i].onLevel[j] && adcCalc < rapidTriggerKey[i].onLevel[j + 1])
-									//if (adcCalc >= rapidTriggerKey[i].onLevel[j] && adcCalc < rapidTriggerKey[i].onLevel[j] + 50)
-									{
-										currentStep++;
-										break;
-									}
-									else
-									{
-										if (adcCalc > rapidTriggerKey[i].onLevel[j + 1]) { currentStep++; }
-									}
-								}
-								EffectranbowColor = rainbowColor[currentStep];
-								EffectranbowColor = rainbowColor[currentStep - 1];
-#ifdef nonOP
-								if (rapidTriggerKey[i].lastStep != currentStep && (rapidTriggerKey[i].triggeredLevel == 0 || (abs(rapidTriggerKey[i].triggeredLevel - adcCalc)>8)) && ((adcCalc < rapidTriggerKey[i].onLevel[rapidTriggerKey[i].key.counts]) || rapidTriggerKey[i].key.counts == RAPID_TRIGGER_LEVELS)){
-#else
-								if (rapidTriggerKey[i].lastStep != currentStep && (rapidTriggerKey[i].triggeredLevel == 0 || (abs(rapidTriggerKey[i].triggeredLevel - adcCalc)>30)) && ((adcCalc < rapidTriggerKey[i].onLevel[rapidTriggerKey[i].key.counts]) || rapidTriggerKey[i].key.counts == RAPID_TRIGGER_LEVELS)){
-#endif
-									if (currentStep == 0 && rapidTriggerKey[i].lastStep ==-1){
-										//uprintf ("\033[2J\033[H==>start make step:%d\r\n",currentStep);
-										if (keycodeOutput){
-											register_rapidTrigger_code(rapidTriggerKey[i].key.keycode[currentStep]);
-										}
-										if (keyScanEffect && ledKeyMatrix[keyLocation.rowA][keyLocation.colA] != -1)LED_Datas[ledKeyMatrix[keyLocation.rowA][keyLocation.colA]] = rainbowColor[0];
-										//chThdSleepMilliseconds(3);
-									}else {
-										//uprintf ("break last step:%d\r\n",rapidTriggerKey[i].lastStep);
-										//if (rapidTriggerKey[i].triggeredLevel!=0 || ((abs(rapidTriggerKey[i].triggeredLevel - adcCalc)>50) && currentStep == rapidTriggerKey[i].lastStep)){
-										//if (rapidTriggerKey[i].triggeredLevel!=0){
-											rapidTriggerKey[i].triggeredLevel = adcCalc;
-											if (keycodeOutput){
-												//chThdSleepMilliseconds(3);
-												unregister_rapidTrigger_code(rapidTriggerKey[i].key.keycode[rapidTriggerKey[i].lastStep]);
-												//uprintf ("make step:%d\r\n",currentStep);
-												register_rapidTrigger_code(rapidTriggerKey[i].key.keycode[currentStep]);
-											}
-											if (keyScanEffect && ledKeyMatrix[keyLocation.rowA][keyLocation.colA] != -1)LED_Datas[ledKeyMatrix[keyLocation.rowA][keyLocation.colA]] = rainbowColor[currentStep];
-										//}
-									}
-									//rapidKeyStatus = true;
-									rapidTriggerKey[i].lastStep = currentStep;
-									continue;
-								}
-							}
-						}
-					}
-				}
+            int32_t range =
+                (int32_t)travel -
+                (int32_t)init;
 
-			}
+            if (adcCalc < 0 || range <= 0) {
+                adcPre = 0;
+            } else {
+                adcPre =
+                    (int32_t)adcCalc *
+                    TRAVEL_STEPS /
+                    range;
+            }
 
-			if (keyScanEffect)
-			{
+            if (adcPre < 0) {
+                adcPre = 0;
+            }
 
-				//if (keyLocation.rowA == -1 || keyLocation.colA == -1) { return; }
+            if (adcPre >= TRAVEL_STEPS) {
+                adcPre = TRAVEL_STEPS;
+            }
 
-				if (adcCalc>150){//DEFAULT_TRIGGER_LEVEL){ // lyon change DEFAULT_TRIGGER_LEVEL to original daytona value 150
-					adcCalc -= 150;
-					EffectranbowColor = rainbowColor[group];
-					if (adcCalc > 600)
-					{
-						mult = 1;
-					}
-					else
-					{
-						mult = (float)adcCalc / 600;         //OP*2	nonOP*10
-					}
-					EffectranbowColor.red *= mult;
-					EffectranbowColor.green *= mult;
-					EffectranbowColor.blue *= mult;
+            if (adcCalc < 0) {
+                adcCalc = 0;
+            }
 
+            /*
+             * Dynamic Keystroke
+             *
+             * DKS row/col use logical keyboard matrix coordinates.
+             * keyLocation.rowA/colA are the logical matrix coordinates
+             * converted from the current ADC scan position.
+             */
 
-				} else {
-					EffectranbowColor = LED_NULL;
-				}
-			if (ledKeyMatrix[keyLocation.rowA][keyLocation.colA] != -1){
-					LED_Datas[ledKeyMatrix[keyLocation.rowA][keyLocation.colA]] = EffectranbowColor;
-					chBSemSignal(&ledUpdateSem);
-				}
-			}
-				// uprintf("KEY row=%d col=%d layer=%d kc=%04X pressed=%d\r\n",
-				// 	keyLocation.rowA, keyLocation.colA, get_highest_layer(layer_state), keycode, pressed);
+            if (rapidKeyEnable)
+            {
+                for (uint8_t i = 0U;
+                     i < RAPID_TRIGGER_COUNT;
+                     i++)
+                {
+                    if (rapidTriggerKey[i].key.enable != 0x01U ||
+                        rapidTriggerKey[i].key.counts == 0U)
+                    {
+                        continue;
+                    }
 
-			#ifdef rappySnappy
-			// adcCalc ????
-			adcPre_value[keyLocation.rowA][keyLocation.colA] = (int16_t)adcPre;
+                    if (rapidTriggerKey[i].key.row != keyLocation.rowA ||
+                        rapidTriggerKey[i].key.col != keyLocation.colA)
+                    {
+                        continue;
+                    }
 
+                    /*
+                     * This physical key belongs to DKS.
+                     */
+                    dksKeyMatched = true;
+                    currentStep = 0;
 
+                    /*
+                     * Prevent the original physical key from being
+                     * reported through the normal matrix path.
+                     */
+                    if (keyLocation.rowA >= 0 &&
+                        keyLocation.rowA < MATRIX_ROWS &&
+                        keyLocation.colA >= 0 &&
+                        keyLocation.colA < MATRIX_COLS)
+                    {
+                        matrix_temp[keyLocation.rowA] &=
+                            ~((matrix_row_t)1U <<
+                              keyLocation.colA);
+                    }
 
-			if (rappy_snappy_is_key(keyLocation.rowA, keyLocation.colA)) {
-				continue;
-			}
-			#endif // rappySnappy
+                    /*
+                     * Fully released.
+                     */
+                    if (adcCalc <
+                        rapidTriggerKey[i].onLevel[0])
+                    {
+                        if (rapidTriggerKey[i].lastStep >= 0 &&
+                            rapidTriggerKey[i].lastStep <
+                                rapidTriggerKey[i].key.counts &&
+                            adcCalc <= 4)
+                        {
+                            uint8_t last =
+                                (uint8_t)
+                                rapidTriggerKey[i].lastStep;
 
-			#ifdef rappyTrigger
-			if(keyLocation.rowA == -1 && keyLocation.colA == -1){continue;}
-			#endif // rappyTrigger
+                            uprintf(
+                                "[DKS RELEASE] IDX=%u STEP=%u "
+                                "KC=%02X ADC=%d\r\n",
+                                (unsigned int)i,
+                                (unsigned int)last,
+                                (unsigned int)
+                                    rapidTriggerKey[i]
+                                        .key.keycode[last],
+                                adcCalc
+                            );
 
-			#ifdef socd
-			{
-				static bool socd_last_pressed[MATRIX_ROWS][MATRIX_COLS];
-				bool socd_pressed_now = calc_pressed_now(
-					keyLocation.rowA,
-					keyLocation.colA,
-					adcPre
-				);
+                            if (keycodeOutput) {
+                                unregister_rapidTrigger_code(
+                                    rapidTriggerKey[i]
+                                        .key.keycode[last]
+                                );
+                            }
 
-				bool socd_previous =
-					socd_last_pressed[keyLocation.rowA][keyLocation.colA];
+                            rapidTriggerKey[i].lastStep = -1;
+                            rapidTriggerKey[i].triggeredLevel = 0;
 
-				if (isSOCD && socd_previous != socd_pressed_now) {
-					socd_last_pressed[keyLocation.rowA][keyLocation.colA] =
-						socd_pressed_now;
+                            if (keyScanEffect &&
+                                ledKeyMatrix[
+                                    keyLocation.rowA
+                                ][
+                                    keyLocation.colA
+                                ] != -1)
+                            {
+                                LED_Datas[
+                                    ledKeyMatrix[
+                                        keyLocation.rowA
+                                    ][
+                                        keyLocation.colA
+                                    ]
+                                ] = LED_NULL;
+                            }
+                        }
 
-					on_key_changed(
-						keyLocation.rowA,
-						keyLocation.colA,
-						socd_pressed_now
-					);
-				}
-			}
-			#endif // socd
+                        break;
+                    }
 
-			#ifdef modTap
-			{
-				uint8_t L = 0U;
-				bool modtap_pressed_now = calc_pressed_now(
-					keyLocation.rowA,
-					keyLocation.colA,
-					adcPre
-				);
-				bool modtap_previous =
-					mt_prev[keyLocation.rowA][keyLocation.colA];
+                    /*
+                     * Calculate DKS step.
+                     */
+                    currentStep = 0;
 
-				if (mt_active(L, keyLocation.rowA, keyLocation.colA)) {
-					if (modtap_pressed_now && !modtap_previous) {
-						mt_on_down(L, keyLocation.rowA, keyLocation.colA);
-					}
+                    for (uint8_t j = 1U;
+                         j < rapidTriggerKey[i].key.counts;
+                         j++)
+                    {
+                        if (adcCalc >=
+                                rapidTriggerKey[i].onLevel[j] &&
+                            adcCalc <
+                                rapidTriggerKey[i]
+                                    .onLevel[j + 1U])
+                        {
+                            currentStep++;
+                            break;
+                        }
 
-					if (!modtap_pressed_now && modtap_previous) {
-						mt_on_up(L, keyLocation.rowA, keyLocation.colA);
-					}
+                        if (adcCalc >
+                            rapidTriggerKey[i]
+                                .onLevel[j + 1U])
+                        {
+                            currentStep++;
+                        }
+                    }
 
-					mt_prev[keyLocation.rowA][keyLocation.colA] =
-						modtap_pressed_now;
-					continue;
-				}
-			}
-			#endif // modTap
-			#ifdef toggleKey
-			// ???? active layer(???? action_layer.h / layer_state)
-			uint8_t act_layer = biton32(layer_state);
+                    /*
+                     * Protect keycode[] from an invalid step.
+                     */
+                    if (currentStep < 0) {
+                        currentStep = 0;
+                    }
 
-			// ???????
-			if (keyLocation.rowA >= 0 && keyLocation.colA >= 0 &&
-				keyLocation.rowA < MATRIX_ROWS && keyLocation.colA < MATRIX_COLS &&
-				act_layer < KEYMAPS_COUNT) {
+                    if (currentStep >=
+                        rapidTriggerKey[i].key.counts)
+                    {
+                        currentStep =
+                            rapidTriggerKey[i]
+                                .key.counts - 1;
+                    }
 
-				toggle_key_slot_t *tk = &toggle_keys[act_layer][keyLocation.rowA][keyLocation.colA];
+                    /*
+                     * Never use rainbowColor[currentStep - 1].
+                     */
+                    EffectranbowColor =
+                        rainbowColor[
+                            (uint8_t)currentStep
+                        ];
 
-				if (tk->enabled) {
-					bool was_pressed =
-						toggle_last_pressed[act_layer][keyLocation.rowA][keyLocation.colA];
-					bool now_pressed = was_pressed;
-					int32_t toggle_trigger_level;
-					int32_t toggle_release_level;
-
-					if (globleTrigger) {
-						toggle_trigger_level =
-							(int32_t)keyMatrixTriggerLevel + (int32_t)draftValue;
-						toggle_release_level = (int32_t)keyMatrixReleaseLevel;
-					} else {
-						toggle_trigger_level =
-							(int32_t)eeconfig_read_Trigger(
-								keyLocation.rowA,
-								keyLocation.colA
-							) + (int32_t)draftValue;
-						toggle_release_level =
-							(int32_t)eeconfig_read_Release(
-								keyLocation.rowA,
-								keyLocation.colA
-							);
-					}
-
-					if (!was_pressed && adcPre > toggle_trigger_level) {
-						now_pressed = true;
-					} else if (was_pressed && adcPre <= toggle_release_level) {
-						now_pressed = false;
-					}
-
-					toggle_last_pressed[act_layer][keyLocation.rowA][keyLocation.colA] = now_pressed;
-
-					// === 2. Rising edge:???????????????? ===
-					if (!was_pressed && now_pressed) {
-						tk->state = !tk->state;
-
-						if (tk->state) {
-							// ?? ON:?? keycode
-							if (tk->keycode) {
-								register_code(tk->keycode);
-								// uprintf("Toggle ON L%u R%u C%u KC=0x%02X\r\n",
-								//         act_layer, keyLocation.rowA, keyLocation.colA, tk->keycode);
-							}
-						} else {
-							// ?? OFF:?? keycode
-							if (tk->keycode) {
-								unregister_code(tk->keycode);
-								// uprintf("Toggle OFF L%u R%u C%u KC=0x%02X\r\n", ...);
-							}
-						}
-					}
-
-					// === 3. ?? key ?????????,????? matrix ?? ===
-					matrix_temp[keyLocation.rowA] &= ~(1 << keyLocation.colA);
-
-					continue;
-				}
-			}
-
-			#endif // toggleKey
-
-			{
-				const uint8_t row = (uint8_t)keyLocation.rowA;
-				const uint8_t col = (uint8_t)keyLocation.colA;
-				const matrix_row_t key_mask = ((matrix_row_t)1U << col);
-				const bool was_pressed = (matrix_temp[row] & key_mask) != 0U;
-				int32_t trigger_level;
-				int32_t release_level;
-
-				if (globleTrigger) {
-					trigger_level =
-						(int32_t)keyMatrixTriggerLevel + (int32_t)draftValue;
-					release_level = (int32_t)keyMatrixReleaseLevel;
-				} else {
-					trigger_level =
-						(int32_t)eeconfig_read_Trigger(row, col) +
-						(int32_t)draftValue;
-					release_level =
-						(int32_t)eeconfig_read_Release(row, col);
-				}
-
-				if (!was_pressed) {
-					if (adcPre > trigger_level) {
-						matrix_temp[row] |= key_mask;
-					}
-				} else if (adcPre <= release_level) {
-					matrix_temp[row] &= ~key_mask;
-				}
-
-				{
-					const bool now_pressed =
-						(matrix_temp[row] & key_mask) != 0U;
-
-					if (was_pressed != now_pressed) {
-						uint8_t active_layer = biton32(layer_state);
-						uint16_t keycode = KC_NO;
-
-						if (active_layer < KEYMAPS_COUNT) {
-							keycode = keymaps[active_layer][row][col];
-						}
-
-						uprintf(
-							"[ANALOG KEY] %s KC=%04X L=%u R=%u C=%u "
-							"ADC_RAW=%ld TRAVEL=%ld TRIG=%ld REL=%ld "
-							"GLOBAL=%u DRAFT=%u\r\n",
-							now_pressed ? "PRESS" : "RELEASE",
-							(unsigned int)keycode,
-							(unsigned int)active_layer,
-							(unsigned int)row,
-							(unsigned int)col,
-							(long)adcCalc,
-							(long)adcPre,
-							(long)trigger_level,
-							(long)release_level,
-							(unsigned int)globleTrigger,
-							(unsigned int)draftValue
-						);
-					}
-				}
+                    /*
+                     * Print only when step changes.
+                     */
+                    if (rapidTriggerKey[i].lastStep !=
+                        currentStep)
+                    {
+                        uprintf(
+                            "[DKS STEP] IDX=%u R=%u C=%u "
+                            "ADC=%d STEP=%d LAST=%d "
+                            "KC=%02X\r\n",
+                            (unsigned int)i,
+                            (unsigned int)
+                                keyLocation.rowA,
+                            (unsigned int)
+                                keyLocation.colA,
+                            adcCalc,
+                            (int)currentStep,
+                            (int)
+                                rapidTriggerKey[i]
+                                    .lastStep,
+                            (unsigned int)
+                                rapidTriggerKey[i]
+                                    .key.keycode[
+                                        (uint8_t)currentStep
+                                    ]
+                        );
+                    }
 
 #ifdef nonOP
-					if (keyScanEffect)
-					{
-						float mult;
-						//if (keyLocation.rowA == -1 || keyLocation.colA == -1) { return; }
+                    if (
+                        rapidTriggerKey[i].lastStep !=
+                            currentStep &&
+                        (
+                            rapidTriggerKey[i]
+                                .triggeredLevel == 0 ||
+                            abs(
+                                rapidTriggerKey[i]
+                                    .triggeredLevel -
+                                adcCalc
+                            ) > 8
+                        ) &&
+                        (
+                            adcCalc <
+                                rapidTriggerKey[i]
+                                    .onLevel[
+                                        rapidTriggerKey[i]
+                                            .key.counts
+                                    ] ||
+                            rapidTriggerKey[i]
+                                .key.counts ==
+                                RAPID_TRIGGER_LEVELS
+                        )
+                    )
+#else
+                    if (
+                        rapidTriggerKey[i].lastStep !=
+                            currentStep &&
+                        (
+                            rapidTriggerKey[i]
+                                .triggeredLevel == 0 ||
+                            abs(
+                                rapidTriggerKey[i]
+                                    .triggeredLevel -
+                                adcCalc
+                            ) > 30
+                        ) &&
+                        (
+                            adcCalc <
+                                rapidTriggerKey[i]
+                                    .onLevel[
+                                        rapidTriggerKey[i]
+                                            .key.counts
+                                    ] ||
+                            rapidTriggerKey[i]
+                                .key.counts ==
+                                RAPID_TRIGGER_LEVELS
+                        )
+                    )
+#endif
+                    {
+                        /*
+                         * Release previous DKS step only when
+                         * lastStep is valid.
+                         */
+                        if (rapidTriggerKey[i].lastStep >= 0 &&
+                            rapidTriggerKey[i].lastStep <
+                                rapidTriggerKey[i].key.counts)
+                        {
+                            uint8_t last =
+                                (uint8_t)
+                                rapidTriggerKey[i].lastStep;
 
-						if (adcCalc>5){
-							adcCalc -= 5;
-							EffectranbowColor = rainbowColor[group];
-							if (adcCalc > 100)
-							{
-								mult = 1;
-							}
-							else
-							{
-								mult = (float)adcCalc / 100;         //OP*2	nonOP*10
-							}
-							EffectranbowColor.red *= mult;
-							EffectranbowColor.green *= mult;
-							EffectranbowColor.blue *= mult;
+                            uprintf(
+                                "[DKS RELEASE] IDX=%u STEP=%u "
+                                "KC=%02X\r\n",
+                                (unsigned int)i,
+                                (unsigned int)last,
+                                (unsigned int)
+                                    rapidTriggerKey[i]
+                                        .key.keycode[last]
+                            );
 
-							//LED_Datas[ledKeyMatrix[keyLocation.rowA][keyLocation.colA]] = EffectranbowColor;
+                            if (keycodeOutput) {
+                                unregister_rapidTrigger_code(
+                                    rapidTriggerKey[i]
+                                        .key.keycode[last]
+                                );
+                            }
+                        }
 
-						} else {
-							EffectranbowColor = LED_NULL;
-						}
-						LED_Datas[ledKeyMatrix[keyLocation.rowA][keyLocation.colA]] = EffectranbowColor;
-					}
+                        /*
+                         * Press current DKS step.
+                         */
+                        uprintf(
+                            "[DKS PRESS] IDX=%u STEP=%d "
+                            "KC=%02X ADC=%d\r\n",
+                            (unsigned int)i,
+                            (int)currentStep,
+                            (unsigned int)
+                                rapidTriggerKey[i]
+                                    .key.keycode[
+                                        (uint8_t)currentStep
+                                    ],
+                            adcCalc
+                        );
+
+                        if (keycodeOutput) {
+                            register_rapidTrigger_code(
+                                rapidTriggerKey[i]
+                                    .key.keycode[
+                                        (uint8_t)currentStep
+                                    ]
+                            );
+                        }
+
+                        rapidTriggerKey[i].triggeredLevel =
+                            adcCalc;
+
+                        rapidTriggerKey[i].lastStep =
+                            currentStep;
+
+                        if (keyScanEffect &&
+                            ledKeyMatrix[
+                                keyLocation.rowA
+                            ][
+                                keyLocation.colA
+                            ] != -1)
+                        {
+                            LED_Datas[
+                                ledKeyMatrix[
+                                    keyLocation.rowA
+                                ][
+                                    keyLocation.colA
+                                ]
+                            ] =
+                                rainbowColor[
+                                    (uint8_t)currentStep
+                                ];
+                        }
+                    }
+
+                    /*
+                     * Only one DKS slot can own this matrix key.
+                     */
+                    break;
+                }
+            }
+
+            /*
+             * A DKS key must not continue into normal keyboard,
+             * Mod Tap, Toggle Key, SOCD, or matrix_temp handling.
+             *
+             * Normal keys continue through the original path.
+             */
+            if (dksKeyMatched) {
+                continue;
+            }
+
+            /*
+             * Original LED scan effect.
+             */
+            if (keyScanEffect)
+            {
+                if (adcCalc > 150)
+                {
+                    adcCalc -= 150;
+
+                    EffectranbowColor =
+                        rainbowColor[group];
+
+                    if (adcCalc > 600) {
+                        mult = 1;
+                    } else {
+                        mult =
+                            (float)adcCalc /
+                            600;
+                    }
+
+                    EffectranbowColor.red *= mult;
+                    EffectranbowColor.green *= mult;
+                    EffectranbowColor.blue *= mult;
+                }
+                else
+                {
+                    EffectranbowColor =
+                        LED_NULL;
+                }
+
+                if (ledKeyMatrix[
+                        keyLocation.rowA
+                    ][
+                        keyLocation.colA
+                    ] != -1)
+                {
+                    LED_Datas[
+                        ledKeyMatrix[
+                            keyLocation.rowA
+                        ][
+                            keyLocation.colA
+                        ]
+                    ] = EffectranbowColor;
+
+                    chBSemSignal(
+                        &ledUpdateSem
+                    );
+                }
+            }
+
+#ifdef rappySnappy
+            adcPre_value[
+                keyLocation.rowA
+            ][
+                keyLocation.colA
+            ] = (int16_t)adcPre;
+
+            if (rappy_snappy_is_key(
+                    keyLocation.rowA,
+                    keyLocation.colA))
+            {
+                continue;
+            }
+#endif // rappySnappy
+
+#ifdef rappyTrigger
+            if (keyLocation.rowA == -1 &&
+                keyLocation.colA == -1)
+            {
+                continue;
+            }
+#endif // rappyTrigger
+
+#ifdef socd
+            {
+                static bool socd_last_pressed
+                    [MATRIX_ROWS][MATRIX_COLS];
+
+                bool socd_pressed_now =
+                    calc_pressed_now(
+                        keyLocation.rowA,
+                        keyLocation.colA,
+                        adcPre
+                    );
+
+                bool socd_previous =
+                    socd_last_pressed[
+                        keyLocation.rowA
+                    ][
+                        keyLocation.colA
+                    ];
+
+                if (isSOCD &&
+                    socd_previous !=
+                        socd_pressed_now)
+                {
+                    socd_last_pressed[
+                        keyLocation.rowA
+                    ][
+                        keyLocation.colA
+                    ] = socd_pressed_now;
+
+                    on_key_changed(
+                        keyLocation.rowA,
+                        keyLocation.colA,
+                        socd_pressed_now
+                    );
+                }
+            }
+#endif // socd
+
+#ifdef modTap
+            {
+                uint8_t L = 0U;
+
+                bool modtap_pressed_now =
+                    calc_pressed_now(
+                        keyLocation.rowA,
+                        keyLocation.colA,
+                        adcPre
+                    );
+
+                bool modtap_previous =
+                    mt_prev[
+                        keyLocation.rowA
+                    ][
+                        keyLocation.colA
+                    ];
+
+                if (mt_active(
+                        L,
+                        keyLocation.rowA,
+                        keyLocation.colA))
+                {
+                    if (modtap_pressed_now &&
+                        !modtap_previous)
+                    {
+                        mt_on_down(
+                            L,
+                            keyLocation.rowA,
+                            keyLocation.colA
+                        );
+                    }
+
+                    if (!modtap_pressed_now &&
+                        modtap_previous)
+                    {
+                        mt_on_up(
+                            L,
+                            keyLocation.rowA,
+                            keyLocation.colA
+                        );
+                    }
+
+                    mt_prev[
+                        keyLocation.rowA
+                    ][
+                        keyLocation.colA
+                    ] = modtap_pressed_now;
+
+                    continue;
+                }
+            }
+#endif // modTap
+
+#ifdef toggleKey
+            {
+                uint8_t act_layer =
+                    biton32(layer_state);
+
+                if (keyLocation.rowA >= 0 &&
+                    keyLocation.colA >= 0 &&
+                    keyLocation.rowA < MATRIX_ROWS &&
+                    keyLocation.colA < MATRIX_COLS &&
+                    act_layer < KEYMAPS_COUNT)
+                {
+                    toggle_key_slot_t *tk =
+                        &toggle_keys[
+                            act_layer
+                        ][
+                            keyLocation.rowA
+                        ][
+                            keyLocation.colA
+                        ];
+
+                    if (tk->enabled)
+                    {
+                        bool was_pressed =
+                            toggle_last_pressed[
+                                act_layer
+                            ][
+                                keyLocation.rowA
+                            ][
+                                keyLocation.colA
+                            ];
+
+                        bool now_pressed =
+                            was_pressed;
+
+                        int32_t toggle_trigger_level;
+                        int32_t toggle_release_level;
+
+                        if (globleTrigger)
+                        {
+                            toggle_trigger_level =
+                                (int32_t)
+                                    keyMatrixTriggerLevel +
+                                (int32_t)
+                                    draftValue;
+
+                            toggle_release_level =
+                                (int32_t)
+                                    keyMatrixReleaseLevel;
+                        }
+                        else
+                        {
+                            toggle_trigger_level =
+                                (int32_t)
+                                    eeconfig_read_Trigger(
+                                        keyLocation.rowA,
+                                        keyLocation.colA
+                                    ) +
+                                (int32_t)
+                                    draftValue;
+
+                            toggle_release_level =
+                                (int32_t)
+                                    eeconfig_read_Release(
+                                        keyLocation.rowA,
+                                        keyLocation.colA
+                                    );
+                        }
+
+                        if (!was_pressed &&
+                            adcPre >
+                                toggle_trigger_level)
+                        {
+                            now_pressed = true;
+                        }
+                        else if (
+                            was_pressed &&
+                            adcPre <=
+                                toggle_release_level)
+                        {
+                            now_pressed = false;
+                        }
+
+                        toggle_last_pressed[
+                            act_layer
+                        ][
+                            keyLocation.rowA
+                        ][
+                            keyLocation.colA
+                        ] = now_pressed;
+
+                        if (!was_pressed &&
+                            now_pressed)
+                        {
+                            tk->state =
+                                !tk->state;
+
+                            if (tk->state)
+                            {
+                                if (tk->keycode) {
+                                    register_code(
+                                        tk->keycode
+                                    );
+                                }
+                            }
+                            else
+                            {
+                                if (tk->keycode) {
+                                    unregister_code(
+                                        tk->keycode
+                                    );
+                                }
+                            }
+                        }
+
+                        matrix_temp[
+                            keyLocation.rowA
+                        ] &=
+                            ~((matrix_row_t)1U <<
+                              keyLocation.colA);
+
+                        continue;
+                    }
+                }
+            }
+#endif // toggleKey
+
+            /*
+             * Original normal analog key path.
+             */
+            {
+                const uint8_t row =
+                    (uint8_t)
+                        keyLocation.rowA;
+
+                const uint8_t col =
+                    (uint8_t)
+                        keyLocation.colA;
+
+                const matrix_row_t key_mask =
+                    ((matrix_row_t)1U << col);
+
+                const bool was_pressed =
+                    (matrix_temp[row] &
+                     key_mask) != 0U;
+
+                int32_t trigger_level;
+                int32_t release_level;
+
+                if (globleTrigger)
+                {
+                    trigger_level =
+                        (int32_t)
+                            keyMatrixTriggerLevel +
+                        (int32_t)
+                            draftValue;
+
+                    release_level =
+                        (int32_t)
+                            keyMatrixReleaseLevel;
+                }
+                else
+                {
+                    trigger_level =
+                        (int32_t)
+                            eeconfig_read_Trigger(
+                                row,
+                                col
+                            ) +
+                        (int32_t)
+                            draftValue;
+
+                    release_level =
+                        (int32_t)
+                            eeconfig_read_Release(
+                                row,
+                                col
+                            );
+                }
+
+                if (!was_pressed)
+                {
+                    if (adcPre >
+                        trigger_level)
+                    {
+                        matrix_temp[row] |=
+                            key_mask;
+                    }
+                }
+                else if (
+                    adcPre <= release_level)
+                {
+                    matrix_temp[row] &=
+                        ~key_mask;
+                }
+
+                {
+                    const bool now_pressed =
+                        (matrix_temp[row] &
+                         key_mask) != 0U;
+
+                    if (was_pressed !=
+                        now_pressed)
+                    {
+                        uint8_t active_layer =
+                            biton32(
+                                layer_state
+                            );
+
+                        uint16_t keycode =
+                            KC_NO;
+
+                        if (active_layer <
+                            KEYMAPS_COUNT)
+                        {
+                            keycode =
+                                keymaps[
+                                    active_layer
+                                ][
+                                    row
+                                ][
+                                    col
+                                ];
+                        }
+
+                        uprintf(
+                            "[ANALOG KEY] %s "
+                            "KC=%04X L=%u R=%u C=%u "
+                            "ADC_RAW=%ld TRAVEL=%ld "
+                            "TRIG=%ld REL=%ld "
+                            "GLOBAL=%u DRAFT=%u\r\n",
+                            now_pressed ?
+                                "PRESS" :
+                                "RELEASE",
+                            (unsigned int)
+                                keycode,
+                            (unsigned int)
+                                active_layer,
+                            (unsigned int)row,
+                            (unsigned int)col,
+                            (long)adcCalc,
+                            (long)adcPre,
+                            (long)trigger_level,
+                            (long)release_level,
+                            (unsigned int)
+                                globleTrigger,
+                            (unsigned int)
+                                draftValue
+                        );
+                    }
+                }
+
+#ifdef nonOP
+                if (keyScanEffect)
+                {
+                    float effect_mult;
+
+                    if (adcCalc > 5)
+                    {
+                        adcCalc -= 5;
+
+                        EffectranbowColor =
+                            rainbowColor[group];
+
+                        if (adcCalc > 100) {
+                            effect_mult = 1;
+                        } else {
+                            effect_mult =
+                                (float)adcCalc /
+                                100;
+                        }
+
+                        EffectranbowColor.red *=
+                            effect_mult;
+
+                        EffectranbowColor.green *=
+                            effect_mult;
+
+                        EffectranbowColor.blue *=
+                            effect_mult;
+                    }
+                    else
+                    {
+                        EffectranbowColor =
+                            LED_NULL;
+                    }
+
+                    LED_Datas[
+                        ledKeyMatrix[
+                            keyLocation.rowA
+                        ][
+                            keyLocation.colA
+                        ]
+                    ] = EffectranbowColor;
+                }
 #else
 
 #endif
+            }
+        }
+    }
 
-			}
-		}
-	}
-	static uint32_t lastMatrixUpdateTime = 0;
+#ifdef rappySnappy
+    rappy_snappy_process_all();
+#endif // rappySnappy
 
-	#ifdef rappySnappy
-	rappy_snappy_process_all();
-	#endif // rappySnappy
+#ifdef rappyTrigger
+    rappy_q.enabled = false;
 
-	#ifdef rappyTrigger
-	// process_rappy_ratio_trend(&rappy_q);
-	rappy_q.enabled = false;
-	if(rappy_q.enabled == true){
-		process_rappy_fixed_ratio(&rappy_q);
-	}
-	#endif // rappyTrigger
+    if (rappy_q.enabled == true) {
+        process_rappy_fixed_ratio(
+            &rappy_q
+        );
+    }
+#endif // rappyTrigger
 
-	#ifdef modTap
-	mt_tick(0);        
-	mt_apply_pending(); //
-	#endif // modTap
+#ifdef modTap
+    mt_tick(0);
+    mt_apply_pending();
+#endif // modTap
 
+    /*
+     * Always update the normal QMK matrix.
+     *
+     * DKS physical keys have already been removed from
+     * matrix_temp inside the scan loop, therefore updating
+     * matrix[] here does not send the original Q key.
+     *
+     * Normal keys remain unaffected.
+     */
+    {
+        uint32_t current_layer_state =
+            layer_state;
 
-// uprintf("rapidKeyStatus is %d\r\n", rapidKeyStatus);
-	if (!rapidKeyStatus) {
-		uint32_t current_layer_state = layer_state;
-		bool mo1_pressed =
-			((last_layer_state & (1UL << 1)) == 0U) &&
-			((current_layer_state & (1UL << 1)) != 0U);
+        bool mo1_pressed =
+            ((last_layer_state &
+              (1UL << 1)) == 0U) &&
+            ((current_layer_state &
+              (1UL << 1)) != 0U);
 
-		if (mo1_pressed) {
-			clear_mods();
-			layer_clear();
-			layer_on(1);
-		}
+        if (mo1_pressed)
+        {
+            clear_mods();
+            layer_clear();
+            layer_on(1);
+        }
 
-		last_layer_state = current_layer_state;
-		memcpy(matrix, matrix_temp, sizeof(matrix));
-		keyboard_taskTMR();
-	} else if (timer_elapsed32(lastMatrixUpdateTime) > 500U) {
-		keyboard_taskTMR();
-		lastMatrixUpdateTime = timer_read32();
-	}
-	if (gameAnalogStickStatus.raw !=0){
-		chBSemSignal(&gamepadAnalogSem);
-	}
-   chSysUnlock();
+        last_layer_state =
+            current_layer_state;
 
-	eeclr_task();
+        memcpy(
+            matrix,
+            matrix_temp,
+            sizeof(matrix)
+        );
 
-	return true;
+        keyboard_taskTMR();
+    }
 
+    if (gameAnalogStickStatus.raw != 0) {
+        chBSemSignal(
+            &gamepadAnalogSem
+        );
+    }
 
+    chSysUnlock();
+
+    eeclr_task();
+
+    return true;
 }
 
 bool matrixAnalogFind(void)

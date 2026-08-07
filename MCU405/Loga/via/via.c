@@ -1696,254 +1696,459 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length)
             // socd_test_eeprom();
         break;
 #endif //socd
-			case ione_api_cmd_set_dynamic_keystroke:
-			{
-					bool saved = false;
-					uint8_t layer;
-					uint8_t row;
-					uint8_t col;
-					uint8_t key_press;
-					uint8_t key_release;
+case ione_api_cmd_set_dynamic_keystroke:
+{
+    bool saved = false;
+    uint8_t layer;
+    uint8_t row;
+    uint8_t col;
+    uint8_t key_press;
+    uint8_t key_release;
+    uint8_t rx_payload_length;
 
-					uprintf("API=>Set Dynamic Keystroke:\r\n");
+    uprintf("API=>Set Dynamic Keystroke:\r\n");
 
-					if (*payload_length != 9U) {
-							*send_status = ione_api_status_fail;
-							*payload_length = 1U;
+    /*
+     * Save original payload length for debug before modifying it.
+     */
+    rx_payload_length = *payload_length;
 
-							uprintf(
-									"Fail: invalid payload length=%u\r\n",
-									(unsigned int)*payload_length
-							);
-							break;
-					}
+    if (rx_payload_length != 9U) {
+        *send_status = ione_api_status_fail;
+        *payload_length = 1U;
 
-					layer       = recive_payload[0];
-					row         = recive_payload[1];
-					col         = recive_payload[2];
-					key_press   = recive_payload[7];
-					key_release = recive_payload[8];
+        uprintf(
+            "Fail: invalid payload length=%u\r\n",
+            (unsigned int)rx_payload_length
+        );
 
-					uprintf(
-							"DKS RX: layer=%u row=%u col=%u "
-							"keys=%02X %02X %02X %02X "
-							"press=%u release=%u\r\n",
-							(unsigned int)layer,
-							(unsigned int)row,
-							(unsigned int)col,
-							recive_payload[3],
-							recive_payload[4],
-							recive_payload[5],
-							recive_payload[6],
-							(unsigned int)key_press,
-							(unsigned int)key_release
-					);
+        break;
+    }
 
-					/*
-					 * Current firmware does not store layer per DKS slot.
-					 */
-					if (layer != 0U) {
-							*send_status = ione_api_status_fail;
-							*payload_length = 1U;
+    layer       = recive_payload[0];
+    row         = recive_payload[1];
+    col         = recive_payload[2];
+    key_press   = recive_payload[7];
+    key_release = recive_payload[8];
 
-							uprintf("Fail: only layer 0 is currently supported\r\n");
-							break;
-					}
+    uprintf(
+        "DKS RX: layer=%u row=%u col=%u "
+        "keys=%02X %02X %02X %02X "
+        "press=%u release=%u\r\n",
+        (unsigned int)layer,
+        (unsigned int)row,
+        (unsigned int)col,
+        (unsigned int)recive_payload[3],
+        (unsigned int)recive_payload[4],
+        (unsigned int)recive_payload[5],
+        (unsigned int)recive_payload[6],
+        (unsigned int)key_press,
+        (unsigned int)key_release
+    );
 
-					if (row >= MATRIX_ROWS || col >= MATRIX_COLS) {
-							*send_status = ione_api_status_fail;
-							*payload_length = 1U;
+    /*
+     * Current firmware does not store layer per DKS slot.
+     */
+    if (layer != 0U) {
+        *send_status = ione_api_status_fail;
+        *payload_length = 1U;
 
-							uprintf("Fail: invalid row or column\r\n");
-							break;
-					}
+        uprintf(
+            "Fail: only layer 0 is currently supported\r\n"
+        );
 
-					/*
-					 * Store global trigger and release levels.
-					 * These values are shared by all DKS entries.
-					 */
-					keyMatrixTriggerLevel = key_press;
-					keyMatrixReleaseLevel = key_release;
+        break;
+    }
 
-					for (uint8_t i = 0U; i < RAPID_TRIGGER_COUNT; i++) {
+    if (row >= MATRIX_ROWS || col >= MATRIX_COLS) {
+        *send_status = ione_api_status_fail;
+        *payload_length = 1U;
 
-							if (rapidTriggerKey[i].key.enable == 0x01U &&
-									rapidTriggerKey[i].key.row == row &&
-									rapidTriggerKey[i].key.col == col) {
+        uprintf(
+            "Fail: invalid row or column R=%u C=%u\r\n",
+            (unsigned int)row,
+            (unsigned int)col
+        );
 
-									rapidTriggerKey[i].key.enable = 0x01U;
-									rapidTriggerKey[i].key.counts = 0x04U;
+        break;
+    }
 
-									rapidTriggerKey[i].key.keycode[0] = recive_payload[3];
-									rapidTriggerKey[i].key.keycode[1] = recive_payload[4];
-									rapidTriggerKey[i].key.keycode[2] = recive_payload[5];
-									rapidTriggerKey[i].key.keycode[3] = recive_payload[6];
+    /*
+     * Store global trigger and release levels.
+     * These values are shared by all DKS entries.
+     */
+    keyMatrixTriggerLevel = key_press;
+    keyMatrixReleaseLevel = key_release;
 
-									eeconfig_write_rapidTrigger(
-											i,
-											rapidTriggerKey[i].key
-									);
+    uprintf(
+        "[DKS API] Levels set TRIGGER=%u RELEASE=%u\r\n",
+        (unsigned int)keyMatrixTriggerLevel,
+        (unsigned int)keyMatrixReleaseLevel
+    );
 
-									rapidTriggerProcess(true, i);
+    /*
+     * First try to update an existing DKS entry.
+     */
+    for (uint8_t i = 0U;
+         i < RAPID_TRIGGER_COUNT;
+         i++) {
 
-									saved = true;
+        if (rapidTriggerKey[i].key.enable == 0x01U &&
+            rapidTriggerKey[i].key.row == row &&
+            rapidTriggerKey[i].key.col == col) {
 
-									uprintf(
-											"DKS updated: index=%u row=%u col=%u\r\n",
-											(unsigned int)i,
-											(unsigned int)row,
-											(unsigned int)col
-									);
+            uprintf(
+                "[DKS API] Existing slot found index=%u\r\n",
+                (unsigned int)i
+            );
 
-									break;
-							}
-					}
+            rapidTriggerKey[i].key.enable = 0x01U;
+            rapidTriggerKey[i].key.counts = 0x04U;
 
-					if (!saved) {
-							for (uint8_t i = 0U; i < RAPID_TRIGGER_COUNT; i++) {
+            rapidTriggerKey[i].key.keycode[0] =
+                recive_payload[3];
 
-									if (rapidTriggerKey[i].key.enable != 0x01U) {
+            rapidTriggerKey[i].key.keycode[1] =
+                recive_payload[4];
 
-											memset(
-													&rapidTriggerKey[i],
-													0,
-													sizeof(rapidTriggerKey[i])
-											);
+            rapidTriggerKey[i].key.keycode[2] =
+                recive_payload[5];
 
-											rapidTriggerKey[i].key.enable = 0x01U;
-											rapidTriggerKey[i].key.counts = 0x04U;
-											rapidTriggerKey[i].key.row = row;
-											rapidTriggerKey[i].key.col = col;
+            rapidTriggerKey[i].key.keycode[3] =
+                recive_payload[6];
 
-											rapidTriggerKey[i].key.keycode[0] = recive_payload[3];
-											rapidTriggerKey[i].key.keycode[1] = recive_payload[4];
-											rapidTriggerKey[i].key.keycode[2] = recive_payload[5];
-											rapidTriggerKey[i].key.keycode[3] = recive_payload[6];
+            uprintf(
+                "[DKS API] Write EEPROM index=%u "
+                "EN=%u COUNT=%u R=%u C=%u "
+                "KC=%02X %02X %02X %02X\r\n",
+                (unsigned int)i,
+                (unsigned int)rapidTriggerKey[i].key.enable,
+                (unsigned int)rapidTriggerKey[i].key.counts,
+                (unsigned int)rapidTriggerKey[i].key.row,
+                (unsigned int)rapidTriggerKey[i].key.col,
+                (unsigned int)rapidTriggerKey[i].key.keycode[0],
+                (unsigned int)rapidTriggerKey[i].key.keycode[1],
+                (unsigned int)rapidTriggerKey[i].key.keycode[2],
+                (unsigned int)rapidTriggerKey[i].key.keycode[3]
+            );
 
-											eeconfig_write_rapidTrigger(
-													i,
-													rapidTriggerKey[i].key
-											);
+            eeconfig_write_rapidTrigger(
+                i,
+                rapidTriggerKey[i].key
+            );
 
-											rapidTriggerProcess(true, i);
+            uprintf(
+                "[DKS API] Before rapidTriggerProcess "
+                "rapidKeyEnable=%u index=%u\r\n",
+                (unsigned int)rapidKeyEnable,
+                (unsigned int)i
+            );
 
-											saved = true;
+            rapidTriggerProcess(true, i);
 
-											uprintf(
-													"DKS created: index=%u row=%u col=%u\r\n",
-													(unsigned int)i,
-													(unsigned int)row,
-													(unsigned int)col
-											);
+            uprintf(
+                "[DKS API] After rapidTriggerProcess "
+                "rapidKeyEnable=%u index=%u\r\n",
+                (unsigned int)rapidKeyEnable,
+                (unsigned int)i
+            );
 
-											break;
-									}
-							}
-					}
+            uprintf(
+                "[DKS API] Runtime index=%u "
+                "lastStep=%d triggered=%ld "
+                "ON=%u,%u,%u,%u,%u\r\n",
+                (unsigned int)i,
+                (int)rapidTriggerKey[i].lastStep,
+                (long)rapidTriggerKey[i].triggeredLevel,
+                (unsigned int)rapidTriggerKey[i].onLevel[0],
+                (unsigned int)rapidTriggerKey[i].onLevel[1],
+                (unsigned int)rapidTriggerKey[i].onLevel[2],
+                (unsigned int)rapidTriggerKey[i].onLevel[3],
+                (unsigned int)rapidTriggerKey[i].onLevel[4]
+            );
 
-					if (saved) {
-							*send_status = ione_api_status_success;
+            saved = true;
 
-							uprintf(
-									"DKS saved: press=%u release=%u\r\n",
-									(unsigned int)keyMatrixTriggerLevel,
-									(unsigned int)keyMatrixReleaseLevel
-							);
-					} else {
-							*send_status = ione_api_status_fail;
-							uprintf("Fail: no available DKS slot\r\n");
-					}
+            uprintf(
+                "DKS updated: index=%u row=%u col=%u\r\n",
+                (unsigned int)i,
+                (unsigned int)row,
+                (unsigned int)col
+            );
 
-					*payload_length = 1U;
-			}
-			break;
-			case ione_api_cmd_get_dynamic_keysytoke:
-			{
-					bool sent = false;
-					uint8_t *w;
+            break;
+        }
+    }
 
-					uprintf("API=>Get Dynamic Keystroke:\r\n");
+    /*
+     * No existing entry was found.
+     * Allocate a new DKS slot.
+     */
+    if (!saved) {
 
-					if (*payload_length != 0U) {
-							*send_status = ione_api_status_fail;
-							*payload_length = 1U;
+        for (uint8_t i = 0U;
+             i < RAPID_TRIGGER_COUNT;
+             i++) {
 
-							uprintf("Fail: invalid payload length\r\n");
-							break;
-					}
+            if (rapidTriggerKey[i].key.enable != 0x01U) {
 
-					for (uint8_t i = 0U; i < RAPID_TRIGGER_COUNT; i++) {
+                uprintf(
+                    "[DKS API] Free slot found index=%u\r\n",
+                    (unsigned int)i
+                );
 
-							if (rapidTriggerKey[i].key.enable != 0x01U) {
-									continue;
-							}
+                memset(
+                    &rapidTriggerKey[i],
+                    0,
+                    sizeof(rapidTriggerKey[i])
+                );
 
-							memset(
-									send_payload,
-									0,
-									sizeof(recive_payload)
-							);
+                rapidTriggerKey[i].key.enable = 0x01U;
+                rapidTriggerKey[i].key.counts = 0x04U;
+                rapidTriggerKey[i].key.row = row;
+                rapidTriggerKey[i].key.col = col;
 
-							w = send_data;
-							*send_status = ione_api_status_sending;
+                rapidTriggerKey[i].key.keycode[0] =
+                    recive_payload[3];
 
-							*w++ = i;
-							*w++ = 0x00U;
-							*w++ = rapidTriggerKey[i].key.row;
-							*w++ = rapidTriggerKey[i].key.col;
-							*w++ = (uint8_t)rapidTriggerKey[i].key.keycode[0];
-							*w++ = (uint8_t)rapidTriggerKey[i].key.keycode[1];
-							*w++ = (uint8_t)rapidTriggerKey[i].key.keycode[2];
-							*w++ = (uint8_t)rapidTriggerKey[i].key.keycode[3];
-							*w++ = (uint8_t)keyMatrixTriggerLevel;
-							*w++ = (uint8_t)keyMatrixReleaseLevel;
+                rapidTriggerKey[i].key.keycode[1] =
+                    recive_payload[4];
 
-							*payload_length =
-									(uint8_t)(1U + (uint8_t)(w - send_data));
+                rapidTriggerKey[i].key.keycode[2] =
+                    recive_payload[5];
 
-							uprintf(
-									"DKS TX: index=%u layer=0 row=%u col=%u "
-									"keys=%02X %02X %02X %02X "
-									"press=%u release=%u\r\n",
-									(unsigned int)i,
-									(unsigned int)rapidTriggerKey[i].key.row,
-									(unsigned int)rapidTriggerKey[i].key.col,
-									(unsigned int)rapidTriggerKey[i].key.keycode[0],
-									(unsigned int)rapidTriggerKey[i].key.keycode[1],
-									(unsigned int)rapidTriggerKey[i].key.keycode[2],
-									(unsigned int)rapidTriggerKey[i].key.keycode[3],
-									(unsigned int)keyMatrixTriggerLevel,
-									(unsigned int)keyMatrixReleaseLevel
-							);
+                rapidTriggerKey[i].key.keycode[3] =
+                    recive_payload[6];
 
-							ione_send_stream_packet(
-									tx_packet,
-									data_start,
-									tx_length,
-									ione_api_cmd_get_dynamic_keysytoke
-							);
+                uprintf(
+                    "[DKS API] Write EEPROM index=%u "
+                    "EN=%u COUNT=%u R=%u C=%u "
+                    "KC=%02X %02X %02X %02X\r\n",
+                    (unsigned int)i,
+                    (unsigned int)rapidTriggerKey[i].key.enable,
+                    (unsigned int)rapidTriggerKey[i].key.counts,
+                    (unsigned int)rapidTriggerKey[i].key.row,
+                    (unsigned int)rapidTriggerKey[i].key.col,
+                    (unsigned int)rapidTriggerKey[i].key.keycode[0],
+                    (unsigned int)rapidTriggerKey[i].key.keycode[1],
+                    (unsigned int)rapidTriggerKey[i].key.keycode[2],
+                    (unsigned int)rapidTriggerKey[i].key.keycode[3]
+                );
 
-							sent = true;
-					}
+                eeconfig_write_rapidTrigger(
+                    i,
+                    rapidTriggerKey[i].key
+                );
 
-					memset(
-							send_payload,
-							0,
-							sizeof(recive_payload)
-					);
+                uprintf(
+                    "[DKS API] Before rapidTriggerProcess "
+                    "rapidKeyEnable=%u index=%u\r\n",
+                    (unsigned int)rapidKeyEnable,
+                    (unsigned int)i
+                );
 
-					*send_status =
-							sent
-									? ione_api_status_success
-									: ione_api_status_fail;
+                rapidTriggerProcess(true, i);
 
-					*payload_length = 1U;
+                uprintf(
+                    "[DKS API] After rapidTriggerProcess "
+                    "rapidKeyEnable=%u index=%u\r\n",
+                    (unsigned int)rapidKeyEnable,
+                    (unsigned int)i
+                );
 
-					if (!sent) {
-							uprintf("Fail: no enabled DKS entries\r\n");
-					}
-			}
-			break;
+                uprintf(
+                    "[DKS API] Runtime index=%u "
+                    "lastStep=%d triggered=%ld "
+                    "ON=%u,%u,%u,%u,%u\r\n",
+                    (unsigned int)i,
+                    (int)rapidTriggerKey[i].lastStep,
+                    (long)rapidTriggerKey[i].triggeredLevel,
+                    (unsigned int)rapidTriggerKey[i].onLevel[0],
+                    (unsigned int)rapidTriggerKey[i].onLevel[1],
+                    (unsigned int)rapidTriggerKey[i].onLevel[2],
+                    (unsigned int)rapidTriggerKey[i].onLevel[3],
+                    (unsigned int)rapidTriggerKey[i].onLevel[4]
+                );
+
+                saved = true;
+
+                uprintf(
+                    "DKS created: index=%u row=%u col=%u\r\n",
+                    (unsigned int)i,
+                    (unsigned int)row,
+                    (unsigned int)col
+                );
+
+                break;
+            }
+        }
+    }
+
+		if (saved) {
+				/*
+				 * Enable DKS runtime processing after a valid entry
+				 * has been successfully created or updated.
+				 */
+				rapidKeyEnable = true;
+
+				*send_status = ione_api_status_success;
+
+				uprintf(
+						"DKS saved: press=%u release=%u "
+						"rapidKeyEnable=%u\r\n",
+						(unsigned int)keyMatrixTriggerLevel,
+						(unsigned int)keyMatrixReleaseLevel,
+						(unsigned int)rapidKeyEnable
+				);
+		} else {
+
+        *send_status = ione_api_status_fail;
+
+        uprintf(
+            "Fail: no available DKS slot\r\n"
+        );
+    }
+
+    *payload_length = 1U;
+}
+break;
+
+
+case ione_api_cmd_get_dynamic_keysytoke:
+{
+    bool sent = false;
+    uint8_t *w;
+    uint8_t rx_payload_length;
+
+    uprintf("API=>Get Dynamic Keystroke:\r\n");
+
+    rx_payload_length = *payload_length;
+
+    if (rx_payload_length != 0U) {
+
+        *send_status = ione_api_status_fail;
+        *payload_length = 1U;
+
+        uprintf(
+            "Fail: invalid payload length=%u\r\n",
+            (unsigned int)rx_payload_length
+        );
+
+        break;
+    }
+
+    uprintf(
+        "[DKS GET] rapidKeyEnable=%u "
+        "TRIGGER=%u RELEASE=%u\r\n",
+        (unsigned int)rapidKeyEnable,
+        (unsigned int)keyMatrixTriggerLevel,
+        (unsigned int)keyMatrixReleaseLevel
+    );
+
+    for (uint8_t i = 0U;
+         i < RAPID_TRIGGER_COUNT;
+         i++) {
+
+        if (rapidTriggerKey[i].key.enable != 0x01U) {
+            continue;
+        }
+
+        memset(
+            send_payload,
+            0,
+            sizeof(recive_payload)
+        );
+
+        w = send_data;
+        *send_status = ione_api_status_sending;
+
+        *w++ = i;
+        *w++ = 0x00U;
+        *w++ = rapidTriggerKey[i].key.row;
+        *w++ = rapidTriggerKey[i].key.col;
+
+        *w++ =
+            (uint8_t)rapidTriggerKey[i].key.keycode[0];
+
+        *w++ =
+            (uint8_t)rapidTriggerKey[i].key.keycode[1];
+
+        *w++ =
+            (uint8_t)rapidTriggerKey[i].key.keycode[2];
+
+        *w++ =
+            (uint8_t)rapidTriggerKey[i].key.keycode[3];
+
+        *w++ = (uint8_t)keyMatrixTriggerLevel;
+        *w++ = (uint8_t)keyMatrixReleaseLevel;
+
+        *payload_length =
+            (uint8_t)(
+                1U +
+                (uint8_t)(w - send_data)
+            );
+
+        uprintf(
+            "DKS TX: index=%u layer=0 row=%u col=%u "
+            "keys=%02X %02X %02X %02X "
+            "press=%u release=%u\r\n",
+            (unsigned int)i,
+            (unsigned int)rapidTriggerKey[i].key.row,
+            (unsigned int)rapidTriggerKey[i].key.col,
+            (unsigned int)rapidTriggerKey[i].key.keycode[0],
+            (unsigned int)rapidTriggerKey[i].key.keycode[1],
+            (unsigned int)rapidTriggerKey[i].key.keycode[2],
+            (unsigned int)rapidTriggerKey[i].key.keycode[3],
+            (unsigned int)keyMatrixTriggerLevel,
+            (unsigned int)keyMatrixReleaseLevel
+        );
+
+        uprintf(
+            "[DKS GET] index=%u EN=%u COUNT=%u "
+            "lastStep=%d triggered=%ld "
+            "ON=%u,%u,%u,%u,%u\r\n",
+            (unsigned int)i,
+            (unsigned int)rapidTriggerKey[i].key.enable,
+            (unsigned int)rapidTriggerKey[i].key.counts,
+            (int)rapidTriggerKey[i].lastStep,
+            (long)rapidTriggerKey[i].triggeredLevel,
+            (unsigned int)rapidTriggerKey[i].onLevel[0],
+            (unsigned int)rapidTriggerKey[i].onLevel[1],
+            (unsigned int)rapidTriggerKey[i].onLevel[2],
+            (unsigned int)rapidTriggerKey[i].onLevel[3],
+            (unsigned int)rapidTriggerKey[i].onLevel[4]
+        );
+
+        ione_send_stream_packet(
+            tx_packet,
+            data_start,
+            tx_length,
+            ione_api_cmd_get_dynamic_keysytoke
+        );
+
+        sent = true;
+    }
+
+    memset(
+        send_payload,
+        0,
+        sizeof(recive_payload)
+    );
+
+    *send_status =
+        sent
+            ? ione_api_status_success
+            : ione_api_status_fail;
+
+    *payload_length = 1U;
+
+    if (!sent) {
+        uprintf(
+            "Fail: no enabled DKS entries\r\n"
+        );
+    }
+}
+break;
 #ifdef toggleKey
         
 			case ione_api_cmd_set_toggle_key:
