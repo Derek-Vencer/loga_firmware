@@ -4394,16 +4394,32 @@ static bool usb_request_hook_cb(USBDriver *usbp)
 
 #ifdef CONTROL_ENABLE
                             case CONTROL_INTERFACE:
+#ifdef LAMP_ARRAY_ENABLE
+                                /*
+                                 * v1505 ADC compatibility for Feature Report ID 7.
+                                 * The HID Report ID is carried in wValue (setup[2]);
+                                 * the control data stage contains only the payload.
+                                 */
+                                lamp_array_data_report.reportID = usbp->setup[2];
+                                lamp_array_data_report.length = usbp->setup[6];
+
                                 usbSetupTransfer(
                                     usbp,
-                                    (uint8_t *)&control_data_report,
+                                    (uint8_t *)lamp_array_data_report.data,
+                                    usbp->setup[6],
+                                    dynamticReciveCB
+                                );
+#else
+                                usbSetupTransfer(
+                                    usbp,
+                                    (uint8_t *)control_data_report.data,
                                     usbp->setup[6],
                                     controlReciveCB
                                 );
 
-                                control_data_report.length =
-                                    usbp->setup[6] - 1;
-
+                                control_data_report.reportID = usbp->setup[2];
+                                control_data_report.length = usbp->setup[6];
+#endif /* LAMP_ARRAY_ENABLE */
                                 return TRUE;
 #endif /* CONTROL_ENABLE */
 
