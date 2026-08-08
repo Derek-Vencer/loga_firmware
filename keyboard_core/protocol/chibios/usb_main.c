@@ -4092,7 +4092,7 @@ static void dynamticReciveCB(USBDriver *usbp)
     osalSysUnlockFromISR();
 }
 #endif
-
+/*
 #ifdef CONTROL_ENABLE
 static void controlReciveCB(USBDriver *usbp)
 {
@@ -4104,7 +4104,7 @@ static void controlReciveCB(USBDriver *usbp)
     osalSysUnlockFromISR();
 }
 #endif
-
+*/
 /* Callback for SETUP request on the endpoint 0 (control) */
 static bool usb_request_hook_cb(USBDriver *usbp)
 {
