@@ -28,7 +28,7 @@
 
 //#include "driver/led_RGBTable.h"
 
-//#define NO_PRINT
+#define NO_PRINT
 //#define multiChannelARGB
 
 #define LED_SPI_Port1					SPID1
