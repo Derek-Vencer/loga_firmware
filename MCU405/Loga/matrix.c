@@ -1358,26 +1358,21 @@ void hook_early_init(void)
 	#endif
 }
 
-void AdcPortChange(bool mode){
-//	adcStop(&ADCD1);
-	if (mode == true){
-		setPinOutputOpenDrain(C0);
-		setPinOutputOpenDrain(C1);
-		setPinOutputOpenDrain(C2);
-		setPinOutputOpenDrain(C3);
-		setPinOutputOpenDrain(A0);
-		setPinOutputOpenDrain(A1);
-		setPinOutputOpenDrain(A2);
-	} else {
-		palSetPadMode(GPIOC, 0, PAL_MODE_INPUT_ANALOG);
-		palSetPadMode(GPIOC, 1, PAL_MODE_INPUT_ANALOG);
-		palSetPadMode(GPIOC, 2, PAL_MODE_INPUT_ANALOG);
-		palSetPadMode(GPIOC, 3, PAL_MODE_INPUT_ANALOG);
-		palSetPadMode(GPIOA, 0, PAL_MODE_INPUT_ANALOG);
-		palSetPadMode(GPIOA, 1, PAL_MODE_INPUT_ANALOG);
-		palSetPadMode(GPIOA, 2, PAL_MODE_INPUT_ANALOG);
-	}
-//	adcStart(&ADCD1, NULL);
+void AdcPortChange(bool mode)
+{
+    /*
+     * ADC pins are always kept in analog input mode.
+     */
+    (void)mode;
+
+    palSetPadMode(GPIOC, 0, PAL_MODE_INPUT_ANALOG);
+    palSetPadMode(GPIOC, 1, PAL_MODE_INPUT_ANALOG);
+    palSetPadMode(GPIOC, 2, PAL_MODE_INPUT_ANALOG);
+    palSetPadMode(GPIOC, 3, PAL_MODE_INPUT_ANALOG);
+
+    palSetPadMode(GPIOA, 0, PAL_MODE_INPUT_ANALOG);
+    palSetPadMode(GPIOA, 1, PAL_MODE_INPUT_ANALOG);
+    palSetPadMode(GPIOA, 2, PAL_MODE_INPUT_ANALOG);
 }
 
 void sensorPowerCtrl(bool enable){
@@ -2032,20 +2027,139 @@ bool matrixAnalogScan(void)
     int8_t currentStep = 0;
 
 #ifdef eepromClear
-    static bool reset_checked = false;
 
-    if (!reset_checked) {
-        analogKey_Config_t loc = matrixAnalogRelocate[0][0];
-        int adc_val;
+static bool reset_checked = false;
+static uint16_t reset_check_delay = 0U;
+static uint8_t reset_pressed_count = 0U;
 
-        reset_checked = true;
-        adc_val = samples2[loc.rowA][loc.colA] -
-                  initPostionLevel[loc.rowA][loc.colA];
+if (!reset_checked)
+{
+    analogKey_Config_t loc;
+    int raw_adc;
+    int init_adc;
+    int adc_val;
 
-        if (adc_val > keyMatrixTriggerLevel) {
-            perform_factory_reset();
+    /*
+     * Wait for ADC conversion and calibration data loading.
+     * Adjust this value according to the actual ADC scan rate.
+     */
+    if (reset_check_delay < 100U)
+    {
+        reset_check_delay++;
+
+        if (reset_check_delay == 1U) {
+            uprintf(
+                "[FACTORY RESET CHECK] Waiting for ADC and "
+                "calibration data\r\n"
+            );
         }
     }
+    else
+    {
+        loc = matrixAnalogRelocate[0][0];
+
+        uprintf(
+            "[FACTORY RESET CHECK] Location rowA=%d colA=%d\r\n",
+            loc.rowA,
+            loc.colA
+        );
+
+        /*
+         * Validate ADC array indexes before accessing the arrays.
+         */
+        if (loc.rowA < 0 ||
+            loc.rowA >= ADC_BUF_DEPTH ||
+            loc.colA < 0 ||
+            loc.colA >= ADC_NUM_CHANNELS)
+        {
+            uprintf(
+                "[FACTORY RESET CHECK] ERROR invalid location "
+                "rowA=%d colA=%d\r\n",
+                loc.rowA,
+                loc.colA
+            );
+
+            reset_checked = true;
+        }
+        else
+        {
+            raw_adc =
+                samples2[loc.rowA][loc.colA];
+
+            init_adc =
+                initPostionLevel[loc.rowA][loc.colA];
+
+            /*
+             * An erased or unloaded calibration value must never be used
+             * for factory-reset detection.
+             */
+            if (init_adc == 0 ||
+                init_adc == 0xFFFF)
+            {
+                uprintf(
+                    "[FACTORY RESET CHECK] SKIP invalid calibration "
+                    "raw=%d init=%d\r\n",
+                    raw_adc,
+                    init_adc
+                );
+
+                reset_checked = true;
+                reset_pressed_count = 0U;
+            }
+            else
+            {
+                adc_val = raw_adc - init_adc;
+
+                uprintf(
+                    "[FACTORY RESET CHECK] raw=%d init=%d "
+                    "delta=%d trigger=%d count=%u\r\n",
+                    raw_adc,
+                    init_adc,
+                    adc_val,
+                    keyMatrixTriggerLevel,
+                    (unsigned int)reset_pressed_count
+                );
+
+                /*
+                 * Require several consecutive pressed samples to avoid
+                 * reset caused by ADC startup noise.
+                 */
+                if (adc_val > keyMatrixTriggerLevel)
+                {
+                    if (reset_pressed_count < 3U) {
+                        reset_pressed_count++;
+                    }
+
+                    if (reset_pressed_count >= 3U)
+                    {
+                        uprintf(
+                            "[FACTORY RESET CHECK] CONFIRMED "
+                            "CALL perform_factory_reset()\r\n"
+                        );
+
+                        /*
+                         * Allow the USB debug message to be transmitted.
+                         */
+                        chThdSleepMilliseconds(100);
+
+                        reset_checked = true;
+                        perform_factory_reset();
+                    }
+                }
+                else
+                {
+                    uprintf(
+                        "[FACTORY RESET CHECK] NO RESET\r\n"
+                    );
+
+                    reset_pressed_count = 0U;
+                    reset_checked = true;
+                }
+            }
+        }
+    }
+}
+
 #endif // eepromClear
 
 #ifdef minTriggerCheck
@@ -3079,6 +3193,68 @@ static THD_FUNCTION(ADC_ProcessThread, arg)
 
 //	setRunMode(currentLED_RunMode);
 	chThdSleepMilliseconds(500);
+	
+	bool offset_calibration_valid = false;
+
+	uprintf("[ADC CAL] Load calibration data\r\n");
+
+	for (uint16_t i = 0U;
+			 i < (ADC_NUM_CHANNELS * ADC_BUF_DEPTH);
+			 i++)
+	{
+			uint8_t channel =
+					i % ADC_BUF_DEPTH;
+
+			uint8_t group =
+					i / ADC_BUF_DEPTH;
+
+			initPostionLevel[channel][group] =
+					eeprom_read_word(
+							EECONFIG_KEYMAP_OFFSET_CALIBRATION +
+							i * 2U
+					);
+
+			travelPostionLevel[channel][group] =
+					eeprom_read_word(
+							EECONFIG_KEYMAP_TRAVEL_CALIBRATION +
+							i * 2U
+					);
+
+			if (initPostionLevel[channel][group] != 0U &&
+					initPostionLevel[channel][group] != 0xFFFFU)
+			{
+					offset_calibration_valid = true;
+			}
+	}
+
+	if (!offset_calibration_valid)
+	{
+			uprintf(
+					"[ADC CAL] Invalid offset data, start calibration\r\n"
+			);
+
+			uprintf(
+					"[ADC CAL] Keep all keys released\r\n"
+			);
+
+			adcOffsetCalc(true, true, 1500);
+
+			uprintf(
+					"[ADC CAL] Calibration completed "
+					"raw[0][0]=%u init[0][0]=%u\r\n",
+					(unsigned int)samples2[0][0],
+					(unsigned int)initPostionLevel[0][0]
+			);
+	}
+	else
+	{
+			uprintf(
+					"[ADC CAL] Calibration loaded "
+					"raw[0][0]=%u init[0][0]=%u\r\n",
+					(unsigned int)samples2[0][0],
+					(unsigned int)initPostionLevel[0][0]
+			);
+	}
 
 	for (uint16_t i = 0; i < (ADC_NUM_CHANNELS * ADC_BUF_DEPTH); i++)
     {
@@ -3321,7 +3497,46 @@ if (!eepromInitCheck) {
 
     write_trigger_to_eeprom();
     write_Release_to_eeprom();
-    adcOffsetCalc(true, true, 1500);
+		if (!eepromInitCheck)
+		{
+				uprintf("Factory Reset start\r\n");
+
+				write_keymap_to_eeprom();
+				eeconfig_rapidTrigger_init();
+				dynamic_macro_reset_eeprom();
+
+				eeprom_write_word(
+						EECONFIG_KEYMAP_TRIGGER_LEVEL,
+						DEFAULT_TRIGGER_LEVEL
+				);
+
+				eeprom_write_word(
+						EECONFIG_KEYMAP_RELEASE_LEVEL,
+						DEFAULT_RELEASE_LEVEL
+				);
+
+				write_trigger_to_eeprom();
+				write_Release_to_eeprom();
+				eeconfig_rapidTrigger_init();
+				eeconfig_socd_clear();
+
+				/*
+				 * ADC calibration must not run here because the ADC thread
+				 * has not been started yet.
+				 */
+
+				uprintf(
+						"Factory Reset configuration completed\r\n"
+				);
+		}
+
+		chThdCreateStatic(
+				waADC_ProcessThread,
+				sizeof(waADC_ProcessThread),
+				NORMALPRIO - 4,
+				ADC_ProcessThread,
+				NULL
+		);
 
     eeconfig_socd_clear();
 

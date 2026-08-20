@@ -8,7 +8,7 @@
 #define VENDOR_ID       0x195d
 #define PRODUCT_ID      0x2100//0x2092
 #define DEVICE_VER      0x000F//15//0x000E
-#define DEVICE_VER_FIX  0x0A // 08
+#define DEVICE_VER_FIX  0x0B // 08
 
 /*
  * Dead Zone 單位：0.01 mm
