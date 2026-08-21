@@ -1479,7 +1479,13 @@ static void adcerrorcallback(ADCDriver* adcp, adcerror_t err);
 static adcsample_t adcFiltered[ADC_BUF_DEPTH][ADC_NUM_CHANNELS];
 static bool adcFilterReady[ADC_BUF_DEPTH];
 
-#define HIGH_MODE
+#define HIGH_MODE_1
+
+#ifdef  HIGH_MODE_1
+#define ADC_FILTER_DEADBAND       7
+#define ADC_FILTER_MEDIUM_DELTA  16
+#define ADC_FILTER_FAST_DELTA    80
+#endif
 
 #ifdef  HIGH_MODE
 #define ADC_FILTER_DEADBAND       5
