@@ -395,3 +395,6 @@
 #define PREVENT_STUCK_MODIFIERS
 // #define MATRIX_HAS_GHOST
 #endif
+
+uint16_t matrix_get_filtered_adc(uint8_t channel,uint8_t group);
+

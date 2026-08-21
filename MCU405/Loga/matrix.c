@@ -1193,7 +1193,7 @@ static inline void on_key_changed(uint8_t row, uint8_t col, bool pressed)
     uint8_t layer = biton32(layer_state);
     uint16_t keycode = keymaps[layer][row][col];
 
-    uprintf("KEY: kc=%04X pressed=%d\r\n", keycode, pressed);
+    //uprintf("KEY: kc=%04X pressed=%d\r\n", keycode, pressed);
 
     int8_t slot = socd_find_slot_by_keycode(keycode);
 
@@ -1472,6 +1472,155 @@ adcsample_t keyDepth[MATRIX_ROWS][MATRIX_COLS]; // CHANGE BACK
 static int32_t adcsampleIndex = 0, adcUpdateIndex = 0;
 static void adccallback(ADCDriver* adcp);
 static void adcerrorcallback(ADCDriver* adcp, adcerror_t err);
+
+/*
+ * Filtered ADC values used by the keyboard processing logic.
+ */
+static adcsample_t adcFiltered[ADC_BUF_DEPTH][ADC_NUM_CHANNELS];
+static bool adcFilterReady[ADC_BUF_DEPTH];
+
+#define HIGH_MODE
+
+#ifdef  HIGH_MODE
+#define ADC_FILTER_DEADBAND       5
+#define ADC_FILTER_MEDIUM_DELTA  16
+#define ADC_FILTER_FAST_DELTA    64
+#endif
+
+#ifdef  MID_MODE
+#define ADC_FILTER_DEADBAND       3
+#define ADC_FILTER_MEDIUM_DELTA  12
+#define ADC_FILTER_FAST_DELTA    48
+#endif
+
+#ifdef  LOW_MODE
+#define ADC_FILTER_DEADBAND       2
+#define ADC_FILTER_MEDIUM_DELTA  	8
+#define ADC_FILTER_FAST_DELTA    32
+#endif
+
+#define ADC_GAIN_NUMERATOR       30U
+#define ADC_GAIN_DENOMINATOR     10U
+#define ADC_MAX_VALUE ((int32_t)4200)
+
+static inline adcsample_t adc_apply_digital_gain(adcsample_t value)
+{
+    uint32_t amplified;
+
+    amplified = ((uint32_t)value * ADC_GAIN_NUMERATOR) / ADC_GAIN_DENOMINATOR;
+
+    if (amplified > ADC_MAX_VALUE) {amplified = ADC_MAX_VALUE;}
+
+    return (adcsample_t)amplified;
+}
+
+static void adc_filter_update_channel(uint8_t channel)
+{
+    if (channel >= ADC_BUF_DEPTH) {
+        return;
+    }
+
+    if (!adcFilterReady[channel])
+    {
+        for (uint8_t group = 0U;
+             group < ADC_NUM_CHANNELS;
+             group++)
+        {
+					adcFiltered[channel][group] = adc_apply_digital_gain(samples2[channel][group]);
+        }
+
+        adcFilterReady[channel] = true;
+        return;
+    }
+
+    for (uint8_t group = 0U;
+         group < ADC_NUM_CHANNELS;
+         group++)
+    {
+        int32_t raw;
+        int32_t filtered;
+        int32_t difference;
+        int32_t absolute_difference;
+        int32_t correction;
+
+				raw = (int32_t)adc_apply_digital_gain(samples2[channel][group]);
+
+        filtered =
+            (int32_t)adcFiltered[channel][group];
+
+        difference =
+            raw - filtered;
+
+        absolute_difference =
+            difference >= 0 ?
+            difference :
+            -difference;
+
+        /*
+         * Reject very small ADC noise.
+         */
+        if (absolute_difference <=
+            ADC_FILTER_DEADBAND)
+        {
+            continue;
+        }
+
+        /*
+         * Use an adaptive filter:
+         *
+         * Large movement : 1/2 correction
+         * Medium movement: 1/4 correction
+         * Small movement : 1/8 correction
+         */
+        if (absolute_difference >=
+            ADC_FILTER_FAST_DELTA)
+        {
+            correction = difference / 2;
+        }
+        else if (absolute_difference >=
+                 ADC_FILTER_MEDIUM_DELTA)
+        {
+            correction = difference / 4;
+        }
+        else
+        {
+            correction = difference / 8;
+
+            /*
+             * Ensure the filter can still move by one count.
+             */
+            if (correction == 0)
+            {
+                correction =
+                    difference > 0 ? 1 : -1;
+            }
+        }
+
+        filtered += correction;
+
+        if (filtered < 0) {
+            filtered = 0;
+        }
+
+        if (filtered > ADC_MAX_VALUE) {
+            filtered = ADC_MAX_VALUE;
+        }
+
+        /* Store the calculated filtered value. */
+        adcFiltered[channel][group] = (adcsample_t)filtered;
+    }
+}
+
+uint16_t matrix_get_filtered_adc(uint8_t channel,uint8_t group)
+{
+    if (channel >= ADC_BUF_DEPTH || group >= ADC_NUM_CHANNELS)
+    {
+        return 0U;
+    }
+
+    return (uint16_t)adcFiltered[channel][group];
+}
+
 /*
  * ADC streaming callback.
  */
@@ -1660,9 +1809,9 @@ void adcOffsetGet(bool findMax)
     {
         for (uint8_t j = 0; j < ADC_BUF_DEPTH; j++)
         {
-            if (samples2[j][i] > initPostionLevel[j][i])
+            if (adcFiltered[j][i] > initPostionLevel[j][i])
             {
-                initPostionLevel[j][i] = samples2[j][i];
+                initPostionLevel[j][i] = adcFiltered[j][i];
             }
         }
     }
@@ -1698,21 +1847,21 @@ void adcOffsetCalc(bool findMax, bool update, uint16_t samples)
             for (uint8_t j = 0; j < ADC_BUF_DEPTH; j++)
             {
 #ifdef nonOP
-                if (samples2[j][i] > initPostionLevel[j][i])
+                if (adcFiltered[j][i] > initPostionLevel[j][i])
                 {
                     if (k++ < 500U) {
-                        initPostionLevel[j][i] = samples2[j][i] + 3U;
+                        initPostionLevel[j][i] = adcFiltered[j][i] + 3U;
                     } else {
-                        initPostionLevel[j][i] = samples2[j][i] + 5U;
+                        initPostionLevel[j][i] = adcFiltered[j][i] + 5U;
                     }
                 }
 #else
-                if (samples2[j][i] > initPostionLevel[j][i])
+                if (adcFiltered[j][i] > initPostionLevel[j][i])
                 {
 #ifdef minTriggerCheck
-                    initPostionLevel[j][i] = samples2[j][i] + 2U;
+                    initPostionLevel[j][i] = adcFiltered[j][i] + 2U;
 #else
-                    initPostionLevel[j][i] = samples2[j][i] + 5U;
+                    initPostionLevel[j][i] = adcFiltered[j][i] + 5U;
 #endif
                 }
 #endif
@@ -1909,17 +2058,25 @@ static void adccallback(ADCDriver* adcp)
 #ifdef ADC_v5
 static void adccallback(ADCDriver *adcp)
 {
-    (void)adcp;    // 消除 unused parameter 警告
+    uint8_t completed_channel;
+
+    (void)adcp;
+
+    completed_channel =
+        (uint8_t)adcsampleIndex;
+
+    if (completed_channel < ADC_BUF_DEPTH)
+    {
+        adc_filter_update_channel(completed_channel);
+    }
 
     chBSemSignalI(&adcCompleteSem);
-    AdcPortChange(true);
+
     sensorPowerCtrl(false);
     muxSelect(++adcsampleIndex);
 
 #ifndef ADC_Oversample
-    gptStartOneShot(&GPTD9, 14);    // lyon 調整 ADC Timing
-    // maybe change to higher value give it more time to process
-    // original is 7
+    gptStartOneShot(&GPTD9, 14);
 #else
     gptStartOneShot(&GPTD9, 3);
 #endif
@@ -2188,18 +2345,18 @@ if (!reset_checked)
             {
                 case keyMatrixMode_Normal:
                 case keyMatrixMode_InitialPostionCalc:
-                    adcCalc =
-                        samples2[channel][group] -
-                        initPostionLevel[channel][group];
+										adcCalc =
+												(int32_t)adcFiltered[channel][group] -
+												(int32_t)initPostionLevel[channel][group];
                     break;
 
                 case keyMatrixMode_TravelPostionCalc:
-                    if (travelPostionLevel[channel][group] <
-                        samples2[channel][group])
-                    {
-                        travelPostionLevel[channel][group] =
-                            samples2[channel][group];
-                    }
+											if (travelPostionLevel[channel][group] <
+													adcFiltered[channel][group])
+											{
+													travelPostionLevel[channel][group] =
+															adcFiltered[channel][group];
+											}
 
                     adcCalc =
                         travelPostionLevel[channel][group] -
@@ -2931,7 +3088,7 @@ if (!reset_checked)
                     matrix_temp[row] &=
                         ~key_mask;
                 }
-
+#ifndef NO_PRINT
                 {
                     const bool now_pressed =
                         (matrix_temp[row] &
@@ -2987,7 +3144,7 @@ if (!reset_checked)
                         );
                     }
                 }
-
+#endif
 #ifdef nonOP
                 if (keyScanEffect)
                 {

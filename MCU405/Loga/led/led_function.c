@@ -28,7 +28,7 @@
 
 //#include "driver/led_RGBTable.h"
 
-//#define NO_PRINT
+#define NO_PRINT
 //#define multiChannelARGB
 
 #define LED_SPI_Port1					SPID1
@@ -1409,13 +1409,26 @@ static THD_FUNCTION(LED_DynamaticLighting, arg)
                             keyLocation = matrixAnalogRelocate[dynamaticReciveBuff[2]][i];
                             switch (dynamaticReciveBuff[3])
                             {
-                                case 0:
-                                    keycode = samples2[keyLocation.colA][keyLocation.rowA] - initPostionLevel[keyLocation.colA][keyLocation.rowA];
-                                    if ((int16_t)keycode < 0) { keycode = 0; }
-                                    break;
-                                case 1:
-                                    keycode = samples2[keyLocation.colA][keyLocation.rowA];
-                                    break;
+																case 0:
+																{
+																		uint16_t filtered_adc;
+
+																		filtered_adc = matrix_get_filtered_adc(keyLocation.colA,keyLocation.rowA);
+
+																		if (filtered_adc > initPostionLevel[keyLocation.colA][keyLocation.rowA])
+																		{
+																				keycode = filtered_adc - initPostionLevel[keyLocation.colA][keyLocation.rowA];
+																		}
+																		else
+																		{
+																				keycode = 0U;
+																		}
+																		break;
+																}
+
+																case 1:
+																		keycode = matrix_get_filtered_adc(keyLocation.colA,keyLocation.rowA);
+																		break;
                                 case 2:
 
                                     keycode = initPostionLevel[keyLocation.colA][keyLocation.rowA];
@@ -1800,13 +1813,26 @@ bool raw_hid_receive_kb(uint8_t *data, uint8_t length){
 								keyLocation = matrixAnalogRelocate[row][col];
 								switch (command_data[1])
 								{//
-									case id_key_levels:				//key
-										keycode = samples2[keyLocation.colA][keyLocation.rowA] - initPostionLevel[keyLocation.colA][keyLocation.rowA];
-										if ((int16_t)keycode < 0) { keycode = 0; }
-										break;
-									case id_raw_levels:				//Raw
-										keycode = samples2[keyLocation.colA][keyLocation.rowA];
-										break;
+									case id_key_levels:
+									{
+											uint16_t filtered_adc;
+
+											filtered_adc = matrix_get_filtered_adc(keyLocation.colA,keyLocation.rowA);
+
+											if (filtered_adc > initPostionLevel[keyLocation.colA][keyLocation.rowA])
+											{
+													keycode = filtered_adc - initPostionLevel[keyLocation.colA][keyLocation.rowA];
+											}
+											else
+											{
+													keycode = 0U;
+											}
+											break;
+									}
+
+									case id_raw_levels:
+											keycode = matrix_get_filtered_adc(keyLocation.colA,keyLocation.rowA);
+											break;
 									case id_init_levels:				//Init
 										keycode = initPostionLevel[keyLocation.colA][keyLocation.rowA];
 										break;
