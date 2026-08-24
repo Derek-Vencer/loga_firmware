@@ -4184,6 +4184,19 @@ static void eeprom_write8_verify(uint8_t *addr, uint8_t value)
 }
 */
 
+static void save_mosart_color_to_eeprom(void)
+{
+    /*
+     * Keep the global startup color synchronized
+     * with the adjusted MosArt color.
+     */
+    c = mosArt.LED;
+    eeprom_update_byte(KB_COLOR_RED_ADDR,mosArt.LED.red);
+    eeprom_update_byte(KB_COLOR_GREEN_ADDR,mosArt.LED.green);
+    eeprom_update_byte(KB_COLOR_BLUE_ADDR,mosArt.LED.blue);
+    uprintf("[RGB SAVE] R=%u G=%u B=%u\r\n",(unsigned int)mosArt.LED.red,(unsigned int)mosArt.LED.green,(unsigned int)mosArt.LED.blue);
+}
+
 static void plusHue(led_config_t in)
 {
     current_hsv = rgb_to_hsv(in);
@@ -4236,6 +4249,146 @@ bool hook_matrix_change(keyrecord_t record)
 //    action_t action = layer_switch_get_action(record.event.key);
 //    uint8_t code = action.key.code;
 //    uprintf ("action keycode:%X modes:%X kid_id:%X\r\n",code,action.key.mods,action.kind.id);
+	
+		switch (keycode)
+    {
+        case KC_PHUE:
+            if (record.event.pressed)
+            {
+                plusHue(mosArt.LED);
+                save_mosart_color_to_eeprom();
+
+                uprintf(
+                    "[RGB KEY] PHUE press\r\n"
+                );
+            }
+            else
+            {
+                uprintf(
+                    "[RGB KEY] PHUE release\r\n"
+                );
+            }
+
+            return false;
+
+        case KC_MHUE:
+            if (record.event.pressed)
+            {
+                minusHue(mosArt.LED);
+                save_mosart_color_to_eeprom();
+
+                uprintf(
+                    "[RGB KEY] MHUE press\r\n"
+                );
+            }
+            else
+            {
+                uprintf(
+                    "[RGB KEY] MHUE release\r\n"
+                );
+            }
+
+            return false;
+
+        case KC_PSAT:
+            if (record.event.pressed)
+            {
+                plusSat(mosArt.LED);
+                save_mosart_color_to_eeprom();
+
+                uprintf(
+                    "[RGB KEY] PSAT press\r\n"
+                );
+            }
+            else
+            {
+                uprintf(
+                    "[RGB KEY] PSAT release\r\n"
+                );
+            }
+
+            return false;
+
+        case KC_MSAT:
+            if (record.event.pressed)
+            {
+                minusSat(mosArt.LED);
+                save_mosart_color_to_eeprom();
+
+                uprintf(
+                    "[RGB KEY] MSAT press\r\n"
+                );
+            }
+            else
+            {
+                uprintf(
+                    "[RGB KEY] MSAT release\r\n"
+                );
+            }
+
+            return false;
+
+        default:
+            break;
+    }
+
+		/*
+		 * Mac mode:
+		 *
+		 * Physical Left Win -> Left Alt / Option
+		 * Physical Left Alt -> Left GUI / Command
+		 *
+		 * Windows mode:
+		 * Keep the original key mapping.
+		 */
+		if (isMac)
+		{
+				switch (keycode)
+				{
+						case KC_LGUI:
+								if (record.event.pressed)
+								{
+										register_code(KC_LALT);
+
+										uprintf(
+												"[MAC MOD] Physical LGUI -> LALT press\r\n"
+										);
+								}
+								else
+								{
+										unregister_code(KC_LALT);
+
+										uprintf(
+												"[MAC MOD] Physical LGUI -> LALT release\r\n"
+										);
+								}
+
+								return false;
+
+						case KC_LALT:
+								if (record.event.pressed)
+								{
+										register_code(KC_LGUI);
+
+										uprintf(
+												"[MAC MOD] Physical LALT -> LGUI press\r\n"
+										);
+								}
+								else
+								{
+										unregister_code(KC_LGUI);
+
+										uprintf(
+												"[MAC MOD] Physical LALT -> LGUI release\r\n"
+										);
+								}
+
+								return false;
+
+						default:
+								break;
+				}
+		}
 
     if (record.event.pressed && (currentLED_RunMode.mode == 5 )) { //|| currentLED_RunMode.mode == 7
         reactive_level[record.event.key.row][record.event.key.col] = REACTIVE_MAX;
@@ -4292,7 +4445,8 @@ bool hook_matrix_change(keyrecord_t record)
 
 		if (record.event.pressed){
 			//uprintf ("keymatrix change pressed code:%04X\r\n",keycode);
-			switch(keycode){
+			switch(keycode){		
+			
 #ifdef buttonLock
 				case KC_LGUI://KC_LALT:
 					if(winLock){
@@ -4350,18 +4504,6 @@ bool hook_matrix_change(keyrecord_t record)
 					// hsv = rgb_to_hsv(mosArt.LED);
 					// hsv.h += 2;   // ??????
 					// mosArt.LED = hsv_to_rgb(hsv);
-				break;
-				case KC_MSAT:
-					minusSat(mosArt.LED);
-				break;
-				case KC_PSAT:
-					plusSat(mosArt.LED);
-				break;
-				case KC_MHUE:
-					minusHue(mosArt.LED);
-				break;
-				case KC_PHUE:
-					plusHue(mosArt.LED);
 				break;
 				case KC_LM1:
 					if(isCtrl){
@@ -4685,58 +4827,47 @@ bool hook_matrix_change(keyrecord_t record)
 					return false;
 				}
 			break;
+				
 			case KC_MAC:
-				isMac = 1;
-				eeprom_update_byte((uint8_t *)EECONFIG_MAC_MODE, isMac);
-			break;
+					/*
+					 * Release any active modifiers before changing mode.
+					 */
+					clear_keyboard();
+
+					isMac = 1;
+
+					eeprom_update_byte(
+							(uint8_t *)EECONFIG_MAC_MODE,
+							isMac
+					);
+
+					uprintf(
+							"[OS MODE] MAC enabled, "
+							"LGUI/LALT swapped\r\n"
+					);
+
+					return false;
+
 			case KC_WINDOW:
-				isMac = 0;
-				eeprom_update_byte((uint8_t *)EECONFIG_MAC_MODE, isMac);
-			break;
-//			case KC_BRIU:
-//				send_consumer(0x00BD);
-//				break;
-//				case KC_RGB_TOG:
-//				//case	KC_X:
-//                    if (!keyScanEffect)
-//                    {
-//                        currentLED_RunMode.type = offMode;
-//                        keyScanEffect = true;
-//                    }
-//                    else
-//                    {
-//                    	keyScanEffect = false;
-//                    	currentLED_RunMode.type = normalMode;
-//                    }
-//                    setRunMode(currentLED_RunMode);
-//                    //keycodeOutput = !keycodeOutput;
-//                    resault = false;
-//					break;
+					/*
+					 * Release any remapped modifier before restoring
+					 * the normal Windows layout.
+					 */
+					clear_keyboard();
 
-//				case KC_1:
-//					for (uint16_t i=0;i<50;i++){
-//					tap_code16(0x0014);
-//					}
-//					return false;
-//					break;
+					isMac = 0;
 
-//				case KC_UP:
-//					rainbowBase++;
-//					break;
-//				case KC_DOWN:
-//					rainbowBase--;
-//					break;
+					eeprom_update_byte(
+							(uint8_t *)EECONFIG_MAC_MODE,
+							isMac
+					);
 
-//				case KC_UP:
-//					rainbowBase++;
-//					uprintf ("%3d\r\n",rainbowBase);
-//					break;
-//				case KC_DOWN:
-//					rainbowBase--;
-//					uprintf ("%3d\r\n",rainbowBase);
-//					break;
+					uprintf(
+							"[OS MODE] WINDOWS enabled, "
+							"LGUI/LALT normal\r\n"
+					);
 
-
+					return false;
 
 				case KC_RGB_TOG:
 //					palSetPad(GPIOF, 7);
@@ -4925,12 +5056,14 @@ bool hook_matrix_change(keyrecord_t record)
 							if (currentLED_RunMode.speed > 0) {
 								--currentLED_RunMode.speed;
 							}
+							uprintf ("RGB Speed --:%d\r\n",currentLED_RunMode.speed);
 							break;
 						case KC_RGB_SPD:
 						case KC_RAPID_LVD:
 							if (currentLED_RunMode.speed < 100) {
 								++currentLED_RunMode.speed;
 							}
+							uprintf ("RGB Speed ++:%d\r\n",currentLED_RunMode.speed);
 							break;
 					}
 						if (currentLED_RunMode.brightness > 100){
@@ -4939,8 +5072,35 @@ bool hook_matrix_change(keyrecord_t record)
 						if (currentLED_RunMode.speed > 100){
 							currentLED_RunMode.speed = 100;
 						}
-						LED_SpeedChange(currentLED_RunMode.brightness, currentLED_RunMode.speed);
-						//setRunMode(currentLED_RunMode);
+						/*
+						 * Keep keyboard brightness behavior consistent
+						 * with API command 0x020C.
+						 */
+						if (currentLED_RunMode.brightness == 0U)
+						{
+								uprintf(
+										"[RGB KEY] brightness=0 -> offMode\r\n"
+								);
+
+								currentLED_RunMode.type = offMode;
+						}
+						else if (currentLED_RunMode.type == offMode)
+						{
+								uprintf(
+										"[RGB KEY] brightness=%u -> normalMode\r\n",
+										(unsigned int)
+												currentLED_RunMode.brightness
+								);
+
+								currentLED_RunMode.type = normalMode;
+						}
+
+						LED_SpeedChange(
+								currentLED_RunMode.brightness,
+								currentLED_RunMode.speed
+						);
+
+						setRunMode(currentLED_RunMode);
 						resault = false;
 						break;
 					}
