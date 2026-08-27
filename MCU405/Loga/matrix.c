@@ -1505,7 +1505,7 @@ static bool adcFilterReady[ADC_BUF_DEPTH];
 #define ADC_FILTER_FAST_DELTA    32
 #endif
 
-#define ADC_GAIN_NUMERATOR       30U
+#define ADC_GAIN_NUMERATOR       40U
 #define ADC_GAIN_DENOMINATOR     10U
 #define ADC_MAX_VALUE ((int32_t)4200)
 
