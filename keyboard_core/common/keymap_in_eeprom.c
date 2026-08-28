@@ -101,24 +101,26 @@ void write_keymap_to_eeprom(void) {
     eeconfig_keyBuffer_init();
 }
 
-void write_trigger_to_eeprom(void){
-    for (uint8_t layer=0;layer<KEYMAPS_COUNT;layer++){
-        for (uint8_t row=0;row<MATRIX_ROWS;row++){
-            for (uint8_t col=0;col<MATRIX_COLS;col++){
-                eeprom_write_word(EECONFIG_TRIGGER_LEVEL + TRIGGER_OFFSET(row,col), keyMatrixTriggerLevel);
-                eepromTriggerBuffer[row][col] = keyMatrixTriggerLevel;
-            }
+void write_trigger_to_eeprom(void)
+{
+    for (uint8_t row = 0;row < MATRIX_ROWS;row++)
+    {
+        for (uint8_t col = 0;col < MATRIX_COLS;col++)
+        {
+            eeprom_write_word(EECONFIG_TRIGGER_LEVEL + TRIGGER_OFFSET(row, col),keyMatrixTriggerLevel);
+            eepromTriggerBuffer[row][col] = keyMatrixTriggerLevel;
         }
     }
 }
 
-void write_Release_to_eeprom(void){
-    for (uint8_t layer=0;layer<KEYMAPS_COUNT;layer++){
-        for (uint8_t row=0;row<MATRIX_ROWS;row++){
-            for (uint8_t col=0;col<MATRIX_COLS;col++){
-                eeprom_write_word(EECONFIG_RELEASE_LEVEL + TRIGGER_OFFSET(row,col), keyMatrixReleaseLevel);
-                eepromReleaseBuffer[row][col] = keyMatrixReleaseLevel;
-            }
+void write_Release_to_eeprom(void)
+{
+    for (uint8_t row = 0;row < MATRIX_ROWS;row++)
+    {
+        for (uint8_t col = 0;col < MATRIX_COLS;col++)
+        {
+            eeprom_write_word(EECONFIG_RELEASE_LEVEL + TRIGGER_OFFSET(row, col),keyMatrixReleaseLevel);
+            eepromReleaseBuffer[row][col] = keyMatrixReleaseLevel;
         }
     }
 }
@@ -132,17 +134,45 @@ void eeconfig_write_keymap_fn_action(uint8_t index, uint16_t fn_action) {
     return eeprom_write_word(EECONFIG_KEYMAP_FN_ACTIONS + index, fn_action);
 }
 
-void eeconfig_keyBuffer_init(void){
-    //uprintf ("key buffer init\r\n");
-    for (uint8_t layer=0;layer<KEYMAPS_COUNT;layer++){
-        for (uint8_t row=0;row<MATRIX_ROWS;row++){
-            for (uint8_t col=0;col<MATRIX_COLS;col++){
+void eeconfig_keyBuffer_init(void)
+{
+    /*
+     * Keymap depends on layer.
+     */
+    for (uint8_t layer = 0;layer < KEYMAPS_COUNT;layer++)
+    {
+        for (uint8_t row = 0;row < MATRIX_ROWS;row++)
+        {
+            for (uint8_t col = 0;col < MATRIX_COLS;col++)
+            {
                 eepromKeyBuffer[layer][row][col] = eeconfig_read_keymap_key(layer,row,col);
-                eepromTriggerBuffer[row][col] = eeprom_read_word(EECONFIG_TRIGGER_LEVEL + TRIGGER_OFFSET(row,col));
-                eepromReleaseBuffer[row][col] = eeprom_read_word(EECONFIG_RELEASE_LEVEL + TRIGGER_OFFSET(row,col));
             }
         }
     }
+
+    /*
+     * Trigger and Release belong to physical keys,
+     * so they do not have a layer dimension.
+     */
+    for (uint8_t row = 0;row < MATRIX_ROWS;row++)
+    {
+        for (uint8_t col = 0;col < MATRIX_COLS;col++)
+        {
+            eepromTriggerBuffer[row][col] = eeprom_read_word(EECONFIG_TRIGGER_LEVEL + TRIGGER_OFFSET(row, col));
+            eepromReleaseBuffer[row][col] = eeprom_read_word(EECONFIG_RELEASE_LEVEL + TRIGGER_OFFSET(row, col));
+        }
+    }
+		
+		uprintf(
+					"[BOOT RELEASE] RAM=%u EEPROM=%u\r\n",
+					(unsigned int)
+							eeconfig_read_Release(5, 5),
+					(unsigned int)
+							eeprom_read_word(
+									EECONFIG_RELEASE_LEVEL +
+											TRIGGER_OFFSET(5, 5)
+							)
+			);
 }
 
 void eeconfig_rapidTrigger_init(void){

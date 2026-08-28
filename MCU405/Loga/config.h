@@ -33,7 +33,7 @@
 
 //#define minTriggerCheck
 #define DEFAULT_TRIGGER_LEVEL	150
-#define DEFAULT_RELEASE_LEVEL	0
+#define DEFAULT_RELEASE_LEVEL	10
 
 /* key matrix size */
 #define MATRIX_ROWS 6

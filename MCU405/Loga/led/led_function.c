@@ -1076,9 +1076,9 @@ static THD_FUNCTION(LED_DynamaticLighting, arg)
 					break;
 
                     case apiFactory_Boot:
-    			        currentLED_RunMode.type = offMode;
-    			        setRunMode(currentLED_RunMode);
-    		            chThdSleepMilliseconds(50);
+													currentLED_RunMode.type = offMode;
+													setRunMode(currentLED_RunMode);
+													chThdSleepMilliseconds(50);
                         switch (lamp_array_data_report.data[1])
                         {
                             case 0x00:
@@ -1093,7 +1093,7 @@ static THD_FUNCTION(LED_DynamaticLighting, arg)
                             case 0x02:
                                 //uprintf("Enter DFU Bootloader\r\n");
                                 *((uint32_t *)(0x2000FFF0)) = 0xE0351AE;
-								NVIC_SystemReset();
+																NVIC_SystemReset();
                                 break;
                         }
                         break;
@@ -1111,29 +1111,42 @@ static THD_FUNCTION(LED_DynamaticLighting, arg)
                                 case 0x02:
                                     break;
                             }
-        		            eeconfig_rapidTrigger_init();
-        		            dynamic_macro_reset_eeprom();
-        			        currentLED_RunMode.type = offMode;
-        			        setRunMode(currentLED_RunMode);
+														eeconfig_rapidTrigger_init();
+														dynamic_macro_reset_eeprom();
+														currentLED_RunMode.type = offMode;
+														setRunMode(currentLED_RunMode);
 #ifdef minTriggerCheck
 
                             keyMatrixTriggerLevel = 3;
-							keyMatrixReleaseLevel = 0;
+														keyMatrixReleaseLevel = 0;
 #else
                             keyMatrixTriggerLevel = DEFAULT_TRIGGER_LEVEL;
-							keyMatrixReleaseLevel = DEFAULT_RELEASE_LEVEL;
+														keyMatrixReleaseLevel = DEFAULT_RELEASE_LEVEL;
 #endif
-							eeprom_write_word(EECONFIG_KEYMAP_TRIGGER_LEVEL,(uint16_t)keyMatrixTriggerLevel);
+														eeprom_write_word(EECONFIG_KEYMAP_TRIGGER_LEVEL,(uint16_t)keyMatrixTriggerLevel);
 
-							eeprom_write_word(EECONFIG_KEYMAP_RELEASE_LEVEL,(uint16_t)keyMatrixReleaseLevel);
+														eeprom_write_word(EECONFIG_KEYMAP_RELEASE_LEVEL,(uint16_t)keyMatrixReleaseLevel);
 
-        		            write_keymap_to_eeprom();
-        		            write_trigger_to_eeprom();
-        		            write_Release_to_eeprom();
-        		            eeconfig_rapidTrigger_init();
+														write_keymap_to_eeprom();
+														write_trigger_to_eeprom();
+														write_Release_to_eeprom();
+														
+														uprintf(
+																"[FACTORY RELEASE] RAM=%u EEPROM=%u\r\n",
+																(unsigned int)
+																		eeconfig_read_Release(5, 5),
+																(unsigned int)
+																		eeprom_read_word(
+																				EECONFIG_RELEASE_LEVEL +
+																						TRIGGER_OFFSET(5, 5)
+																		)
+														);
+
+														chThdSleepMilliseconds(100);		
+														eeconfig_rapidTrigger_init();
                             NVIC_SystemReset();
 
-                            break;
+												break;
 
                     case apiReamp_Version:
                         //uprintf("Set Reamp Version No\r\n");

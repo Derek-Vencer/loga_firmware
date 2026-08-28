@@ -128,7 +128,7 @@ typedef struct {
 
 #define ReleaseMax	400
 #define ReleaseMin	DEFAULT_RELEASE_LEVEL
-#define ReleaseInitial 5
+#define ReleaseInitial DEFAULT_RELEASE_LEVEL
 
 #ifdef __cplusplus
 }
