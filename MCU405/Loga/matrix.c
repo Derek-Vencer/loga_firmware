@@ -2499,7 +2499,14 @@ if (!reset_checked)
                 (int32_t)travel -
                 (int32_t)init;
 
-            adcPre = adc_linearize_travel(adcCalc, range);
+            if (adcCalc < 0 || range <= 0) {
+                adcPre = 0;
+            } else {
+                adcPre =
+                    (int32_t)adcCalc *
+                    TRAVEL_STEPS /
+                    range;
+            }
 
             if (adcPre < 0) {
                 adcPre = 0;
