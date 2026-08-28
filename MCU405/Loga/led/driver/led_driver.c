@@ -38,6 +38,21 @@ mutex_t ledWriteMutex;
 uint8_t spi_buffer_TX[182]; // lyon 100 -> 182
 uint8_t spi_buffer_RX[182];
 
+extern uint8_t normalBrightness;
+
+static uint8_t led_boot_current_level(void)
+{
+	uint8_t brightness = normalBrightness;
+
+	if (brightness > 100U) {
+		brightness = 100U;
+	}
+	if (brightness == 0U) {
+		return 0U;
+	}
+	return (uint8_t)(((uint16_t)brightness * 63U + 99U) / 100U);
+}
+
 
 //extern uint8_t ledDriverData[LED_DriverCount][PWM_FRAME_LENGTH+2];
 
@@ -385,9 +400,10 @@ void LED_SledInit(uint8_t port) {
 					| mskVAF3));
 	//================================================================
 
-	//Setting LED driving current = 20mA and Enable current control
+	/* Apply the restored brightness as part of the driver's own initial
+	 * register sequence; do not start a second SPI transaction from a task. */
 	SPI_W_3BYTE(port, SPI_FRAME_FUNCTION_PAGE, CURRENT_CTL_REG,
-			(mskCURRENT_CTL_EN | CONST_CURRENT_STEP_21mA));
+			(mskCURRENT_CTL_EN | led_boot_current_level()));
 
 	//Init Frame1Page(Clear all Ram)
 	LED_ClearFrame1Page(port);

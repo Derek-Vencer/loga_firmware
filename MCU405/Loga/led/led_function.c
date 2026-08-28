@@ -637,6 +637,9 @@ static THD_FUNCTION(LED_ModesThread, arg)
 		switch (effectStatus.runMode)
 		{
 			case normalMode:
+				/* This thread owns normal-mode startup sequencing.  Apply the
+				 * restored current before the first effect schedules PWM updates. */
+				//LED_CurrentAdjuest(normalBrightness);
 				LED_Effect(LED_PresetMode[normalEffect].effect,
 						LED_PresetMode[normalEffect].enable,
 						0,
