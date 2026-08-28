@@ -1672,7 +1672,15 @@ uint16_t matrix_get_filtered_adc(uint8_t channel,uint8_t group)
     return (uint16_t)adcFiltered[channel][group];
 }
 
-/* Return an ADC-scale value whose calibrated travel is linearized. */
+/*
+ * Return an ADC-scale value whose calibrated travel is linearized.
+ *
+ * Do not clamp values below init to init.  initPostionLevel is a trigger
+ * calibration reference, not the first valid display sample.  Clamping here
+ * hid real ADC movement at the beginning of travel as a flat segment in the
+ * PC curve viewer.  The key-scan trigger path keeps its existing reference
+ * and dead-band behaviour.
+ */
 uint16_t matrix_get_linearized_adc(uint8_t channel, uint8_t group)
 {
     int32_t raw;
@@ -1692,6 +1700,10 @@ uint16_t matrix_get_linearized_adc(uint8_t channel, uint8_t group)
     range = travel - init;
 
     if (range <= 0) {
+        return (uint16_t)raw;
+    }
+
+    if (raw <= init) {
         return (uint16_t)raw;
     }
 
