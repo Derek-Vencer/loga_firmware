@@ -8,7 +8,7 @@
 #define VENDOR_ID       0x195d
 #define PRODUCT_ID      0x2100//0x2092
 #define DEVICE_VER      0x000F//15//0x000E
-#define DEVICE_VER_FIX  0x0E // 08
+#define DEVICE_VER_FIX  0x0F // 08
 
 /*
  * Dead Zone 單位：0.01 mm
@@ -397,4 +397,5 @@
 #endif
 
 uint16_t matrix_get_filtered_adc(uint8_t channel,uint8_t group);
+uint16_t matrix_get_linearized_adc(uint8_t channel,uint8_t group);
 
