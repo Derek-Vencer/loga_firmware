@@ -2243,6 +2243,9 @@ static void eeclr_task(void)
 		currentLED_RunMode.type = offMode;
 		setRunMode(currentLED_RunMode);
 		eeprom_update_byte((uint8_t *)KB_COLOR_MODE_ADDR, currentLED_RunMode.mode);
+		eeprom_update_byte(KB_COLOR_BRIGHTNESS_ADDR, 30U);
+		eeprom_update_byte(KB_COLOR_BRIGHTNESS_MAGIC_ADDR,
+		                   KB_COLOR_BRIGHTNESS_MAGIC);
 		eeprom_update_byte((uint8_t *)EECONFIG_POLLING_RATE, 0x00);
 		uprintf (".");
 		eeconfig_rapidTrigger_init();
@@ -4355,11 +4358,14 @@ bool hook_matrix_change(keyrecord_t record)
 //    uint8_t code = action.key.code;
 //    uprintf ("action keycode:%X modes:%X kid_id:%X\r\n",code,action.key.mods,action.kind.id);
 	
+		static bool rgb_hue_key_held = false;
+
 		switch (keycode)
     {
         case KC_PHUE:
             if (record.event.pressed)
             {
+				rgb_hue_key_held = true;
                 plusHue(mosArt.LED);
                 save_mosart_color_to_eeprom();
 
@@ -4369,6 +4375,7 @@ bool hook_matrix_change(keyrecord_t record)
             }
             else
             {
+				rgb_hue_key_held = false;
                 uprintf(
                     "[RGB KEY] PHUE release\r\n"
                 );
@@ -4379,6 +4386,7 @@ bool hook_matrix_change(keyrecord_t record)
         case KC_MHUE:
             if (record.event.pressed)
             {
+				rgb_hue_key_held = true;
                 minusHue(mosArt.LED);
                 save_mosart_color_to_eeprom();
 
@@ -4388,6 +4396,7 @@ bool hook_matrix_change(keyrecord_t record)
             }
             else
             {
+				rgb_hue_key_held = false;
                 uprintf(
                     "[RGB KEY] MHUE release\r\n"
                 );
@@ -5142,6 +5151,14 @@ bool hook_matrix_change(keyrecord_t record)
 
 				case KC_RGB_VAI ... KC_RGB_SPD:
 			//if (!rapidKeyEnable && currentLED_RunMode.type == normalMode){
+				if (rgb_hue_key_held &&
+					(keycode == KC_RGB_VAI || keycode == KC_RGB_VAD))
+				{
+					uprintf("[RGB KEY] ignore ghost brightness KC=%04X\r\n",
+						(unsigned int)keycode);
+					return false;
+				}
+
 				if (!rapidKeyEnable){
 					switch (keycode){
 						case KC_RGB_VAI:

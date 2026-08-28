@@ -779,6 +779,14 @@ static THD_FUNCTION(LED_EffectThread, arg)
 void LED_SpeedChange(int8_t brightness, uint8_t speed){
 	currentLED_RunMode.brightness = led_clamp_percent((uint8_t)brightness);
 	currentLED_RunMode.speed = led_clamp_percent(speed);
+	normalBrightness = currentLED_RunMode.brightness;
+
+	/* Fn, VIA and the lighting API all use this function for brightness. */
+	eeprom_update_byte(KB_COLOR_BRIGHTNESS_ADDR,
+	                   currentLED_RunMode.brightness);
+	eeprom_update_byte(KB_COLOR_BRIGHTNESS_MAGIC_ADDR,
+	                   KB_COLOR_BRIGHTNESS_MAGIC);
+
 	LED_CurrentAdjuest(currentLED_RunMode.brightness);
 	switch (effectStatus.runMode)
 	{
@@ -2166,15 +2174,28 @@ bool setRunMode(led_runMode_t runMode)
 void LED_init(void)
 {
     uint8_t ee_mode;
+    uint8_t ee_brightness;
 
     c.red   = eeprom_read_byte(KB_COLOR_RED_ADDR);
     c.green = eeprom_read_byte(KB_COLOR_GREEN_ADDR);
     c.blue  = eeprom_read_byte(KB_COLOR_BLUE_ADDR);
     ee_mode = eeprom_read_byte(KB_COLOR_MODE_ADDR);
+    ee_brightness = eeprom_read_byte(KB_COLOR_BRIGHTNESS_ADDR);
+
+    /* Firmware before this version has no saved-brightness marker. */
+    if (ee_brightness <= 100U)
+    {
+        normalBrightness = ee_brightness;
+    }
+    else
+    {
+        normalBrightness = 30U;
+    }
 
     uprintf("\r\n");
     uprintf("========== LED EEPROM ==========\r\n");
     uprintf("Mode  : %3u (0x%02X)\r\n", ee_mode, ee_mode);
+    uprintf("Bright: %3u%%\r\n", normalBrightness);
     uprintf(
         "Color : R=%3u (0x%02X) G=%3u (0x%02X) B=%3u (0x%02X)\r\n",
         c.red,

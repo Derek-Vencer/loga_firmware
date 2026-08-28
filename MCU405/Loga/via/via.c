@@ -162,6 +162,10 @@ static void factory_reset_execute(void)
         currentLED_RunMode.mode
     );
 
+    eeprom_update_byte(KB_COLOR_BRIGHTNESS_ADDR, 30U);
+    eeprom_update_byte(KB_COLOR_BRIGHTNESS_MAGIC_ADDR,
+                       KB_COLOR_BRIGHTNESS_MAGIC);
+
     eeprom_update_byte(
         (uint8_t *)EECONFIG_POLLING_RATE,
         0x00U

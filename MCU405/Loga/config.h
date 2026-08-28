@@ -83,6 +83,10 @@
     ((uint8_t *)0x0075)
 #define SOCD_SETTING_MAGIC_ADDR       ((uint8_t *)0x0076)
 #define SOCD_SETTING_MAGIC            0xA6
+/* RGB brightness is stored separately from the effect/color settings. */
+#define KB_COLOR_BRIGHTNESS_ADDR       ((uint8_t *)0x0077)
+#define KB_COLOR_BRIGHTNESS_MAGIC_ADDR ((uint8_t *)0x0078)
+#define KB_COLOR_BRIGHTNESS_MAGIC      0xB7
 #define KB_COLOR_RED_ADDR \
     ((uint8_t *)0x007B)
 #define KB_COLOR_GREEN_ADDR \
@@ -93,6 +97,8 @@
     ((uint8_t *)0x007E)
 #define KB_COLOR_MAGIC_ADDR  0x007F
 #define KB_COLOR_MAGIC    0x7F
+#undef KB_COLOR_BRIGHTNESS_ADDR
+#define KB_COLOR_BRIGHTNESS_ADDR ((uint8_t *)KB_COLOR_MAGIC_ADDR)
 
 #define KEYMAP_SIZE (sizeof(uint16_t) * FN_ACTIONS_COUNT + sizeof(uint16_t) * KEYS_COUNT)
 
