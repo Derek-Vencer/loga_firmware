@@ -87,8 +87,28 @@ static void ledDriver_end(SPIDriver *spip)
 }
 
 void SPI_W_3BYTE(uint8_t port, uint8_t bPage, uint8_t bAddr, uint8_t bData) {
-	spi_buffer_TX[2] = bData;
-	SPI_W_NBYTE(port, bPage, bAddr, 1);
+	/*
+	 * Do not use spi_buffer_TX for register writes.
+	 *
+	 * The LED effect task updates that shared PWM buffer while this function
+	 * is called from the HID brightness command path.  Previously bData was
+	 * written before SPI_W_NBYTE() acquired ledWriteMutex, allowing an LED
+	 * frame update to overwrite the command being sent.  Debug UART output
+	 * only hid this timing race.
+	 */
+	uint8_t command[3] = { (uint8_t)(0x20U | bPage), bAddr, bData };
+
+	chMtxLock(&ledWriteMutex);
+	currentPort = port;
+	if (lastPort != currentPort) {
+		spiStart(&SPI_LED_DRIVER, &ledDriver_spiConfig[currentPort]);
+		lastPort = port;
+	}
+
+	spiSelect(&SPI_LED_DRIVER);
+	spiStartSend(&SPI_LED_DRIVER, sizeof(command), command);
+	chBSemWait(&ledDriver_Sem);
+	chMtxUnlock(&ledWriteMutex);
 }
 
 void SPI_W_NBYTE(uint8_t port, uint8_t bPage, uint8_t bStart_Addr, uint8_t blength) {

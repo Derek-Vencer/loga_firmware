@@ -1523,6 +1523,9 @@ static void adcerrorcallback(ADCDriver* adcp, adcerror_t err);
  */
 static adcsample_t adcFiltered[ADC_BUF_DEPTH][ADC_NUM_CHANNELS];
 static bool adcFilterReady[ADC_BUF_DEPTH];
+/* Per-key display origin captured while the key is released. */
+static adcsample_t adcDisplayOrigin[ADC_BUF_DEPTH][ADC_NUM_CHANNELS];
+static bool adcDisplayOriginValid[ADC_BUF_DEPTH][ADC_NUM_CHANNELS];
 
 #define HIGH_MODE_1
 
@@ -1675,16 +1678,13 @@ uint16_t matrix_get_filtered_adc(uint8_t channel,uint8_t group)
 /*
  * Return an ADC-scale value whose calibrated travel is linearized.
  *
- * Do not clamp values below init to init.  initPostionLevel is a trigger
- * calibration reference, not the first valid display sample.  Clamping here
- * hid real ADC movement at the beginning of travel as a flat segment in the
- * PC curve viewer.  The key-scan trigger path keeps its existing reference
- * and dead-band behaviour.
+ * The display origin is learned per key from its released ADC value.  This
+ * avoids a discontinuity at initPostionLevel, which is only a trigger
+ * calibration reference.  The key-scan trigger path is unchanged.
  */
 uint16_t matrix_get_linearized_adc(uint8_t channel, uint8_t group)
 {
     int32_t raw;
-    int32_t init;
     int32_t travel;
     int32_t range;
     int32_t linear_steps;
@@ -1695,20 +1695,32 @@ uint16_t matrix_get_linearized_adc(uint8_t channel, uint8_t group)
     }
 
     raw = (int32_t)adcFiltered[channel][group];
-    init = (int32_t)initPostionLevel[channel][group];
     travel = (int32_t)travelPostionLevel[channel][group];
-    range = travel - init;
+
+    if (!adcDisplayOriginValid[channel][group]) {
+        /*
+         * Existing EEPROM calibration is raw released ADC plus the small
+         * trigger guard. Recover its raw endpoint until a new calibration
+         * explicitly refreshes it below.
+         */
+        int32_t calibrated_origin =
+            (int32_t)initPostionLevel[channel][group] - 5;
+
+        adcDisplayOrigin[channel][group] =
+            (adcsample_t)(calibrated_origin > 0 ? calibrated_origin : raw);
+        adcDisplayOriginValid[channel][group] = true;
+    }
+
+    range = travel - (int32_t)adcDisplayOrigin[channel][group];
 
     if (range <= 0) {
         return (uint16_t)raw;
     }
 
-    if (raw <= init) {
-        return (uint16_t)raw;
-    }
-
-    linear_steps = adc_linearize_travel(raw - init, range);
-    linear_adc = init +
+    linear_steps = adc_linearize_travel(
+        raw - (int32_t)adcDisplayOrigin[channel][group],
+        range);
+    linear_adc = (int32_t)adcDisplayOrigin[channel][group] +
                  (linear_steps * range + (TRAVEL_STEPS / 2)) /
                  TRAVEL_STEPS;
 
@@ -1927,6 +1939,8 @@ void adcOffsetCalc(bool findMax, bool update, uint16_t samples)
     (void)findMax;
 
     memset(initPostionLevel, 0, sizeof(initPostionLevel));
+    memset(adcDisplayOrigin, 0, sizeof(adcDisplayOrigin));
+    memset(adcDisplayOriginValid, 0, sizeof(adcDisplayOriginValid));
 
     adcUpdateIndex = 0;
     SampleTimer = timer_read();
@@ -1949,6 +1963,8 @@ void adcOffsetCalc(bool findMax, bool update, uint16_t samples)
 #ifdef nonOP
                 if (adcFiltered[j][i] > initPostionLevel[j][i])
                 {
+                    adcDisplayOrigin[j][i] = adcFiltered[j][i];
+                    adcDisplayOriginValid[j][i] = true;
                     if (k++ < 500U) {
                         initPostionLevel[j][i] = adcFiltered[j][i] + 3U;
                     } else {
@@ -1958,6 +1974,8 @@ void adcOffsetCalc(bool findMax, bool update, uint16_t samples)
 #else
                 if (adcFiltered[j][i] > initPostionLevel[j][i])
                 {
+                    adcDisplayOrigin[j][i] = adcFiltered[j][i];
+                    adcDisplayOriginValid[j][i] = true;
 #ifdef minTriggerCheck
                     initPostionLevel[j][i] = adcFiltered[j][i] + 2U;
 #else
