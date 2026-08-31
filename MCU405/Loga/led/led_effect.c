@@ -2268,6 +2268,28 @@ void led_set_effect_color(uint8_t red, uint8_t green, uint8_t blue)
     mosArt.LED = new_color;
 
     /*
+     * setRunMode() starts the currently selected effect from
+     * LED_PresetMode[normalEffect].color.  Sync this entry as well, so a
+     * brightness change cannot re-apply the colour from before the last
+     * Hue/Saturation adjustment.
+     */
+    if ((currentLED_RunMode.type == normalMode) &&
+        (normalEffect >= 0) &&
+        ((uint8_t)normalEffect <= LED_PresetModeIndex) &&
+        (LED_PresetMode[(uint8_t)normalEffect].colorMode == single))
+    {
+        LED_PresetMode[(uint8_t)normalEffect].color = new_color;
+
+        uprintf(
+            "[LED] Active preset index=%u color=%u/%u/%u\r\n",
+            (unsigned int)normalEffect,
+            new_color.red,
+            new_color.green,
+            new_color.blue
+        );
+    }
+
+    /*
      * 更新所有 Reactive preset 的顏色。
      */
     for (index = 0U; index <= LED_PresetModeIndex; index++)

@@ -4245,7 +4245,14 @@ static void save_mosart_color_to_eeprom(void)
      * Keep the global startup color synchronized
      * with the adjusted MosArt color.
      */
-    c = mosArt.LED;
+    /*
+     * Brightness changes restart the active preset through setRunMode().
+     * Keep that preset in sync with the colour just selected, otherwise the
+     * restart restores its older colour.
+     */
+    led_set_effect_color(mosArt.LED.red,
+                         mosArt.LED.green,
+                         mosArt.LED.blue);
     eeprom_update_byte(KB_COLOR_RED_ADDR,mosArt.LED.red);
     eeprom_update_byte(KB_COLOR_GREEN_ADDR,mosArt.LED.green);
     eeprom_update_byte(KB_COLOR_BLUE_ADDR,mosArt.LED.blue);
