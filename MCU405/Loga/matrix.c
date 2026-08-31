@@ -1557,21 +1557,52 @@ static bool adcFilterReady[ADC_BUF_DEPTH];
 #define ADC_FILTER_FAST_DELTA    32
 #endif
 
-#define ADC_GAIN_NUMERATOR       33U
+
+/*
+ * Per-ADC-port digital gain numerators.
+ * group = ADC port index.
+ */
+#define ADC_GAIN_NUMERATOR_PORT0 33U
+#define ADC_GAIN_NUMERATOR_PORT1 30U
+#define ADC_GAIN_NUMERATOR_PORT2 40U
+#define ADC_GAIN_NUMERATOR_PORT3 33U
+#define ADC_GAIN_NUMERATOR_PORT4 33U
+#define ADC_GAIN_NUMERATOR_PORT5 33U
+#define ADC_GAIN_NUMERATOR_PORT6 33U
+
 #define ADC_GAIN_DENOMINATOR     10U
 #define ADC_MAX_VALUE ((int32_t)4200)
 
-static inline adcsample_t adc_apply_digital_gain(adcsample_t value)
+static const uint16_t adc_gain_numerator[ADC_NUM_CHANNELS] = {
+    ADC_GAIN_NUMERATOR_PORT0,
+    ADC_GAIN_NUMERATOR_PORT1,
+    ADC_GAIN_NUMERATOR_PORT2,
+    ADC_GAIN_NUMERATOR_PORT3,
+    ADC_GAIN_NUMERATOR_PORT4,
+    ADC_GAIN_NUMERATOR_PORT5,
+    ADC_GAIN_NUMERATOR_PORT6
+};
+
+static inline adcsample_t adc_apply_digital_gain(
+    uint8_t port,
+    adcsample_t value)
 {
     uint32_t amplified;
 
-    amplified = ((uint32_t)value * ADC_GAIN_NUMERATOR) / ADC_GAIN_DENOMINATOR;
+    if (port >= ADC_NUM_CHANNELS) {
+        return value;
+    }
 
-    if (amplified > ADC_MAX_VALUE) {amplified = ADC_MAX_VALUE;}
+    amplified =
+        ((uint32_t)value * adc_gain_numerator[port]) /
+        ADC_GAIN_DENOMINATOR;
+
+    if (amplified > ADC_MAX_VALUE) {
+        amplified = ADC_MAX_VALUE;
+    }
 
     return (adcsample_t)amplified;
 }
-
 static void adc_filter_update_channel(uint8_t channel)
 {
     if (channel >= ADC_BUF_DEPTH) {
@@ -1584,7 +1615,11 @@ static void adc_filter_update_channel(uint8_t channel)
              group < ADC_NUM_CHANNELS;
              group++)
         {
-					adcFiltered[channel][group] = adc_apply_digital_gain(samples2[channel][group]);
+            adcFiltered[channel][group] =
+                adc_apply_digital_gain(
+                    group,
+                    samples2[channel][group]
+                );
         }
 
         adcFilterReady[channel] = true;
@@ -1601,56 +1636,32 @@ static void adc_filter_update_channel(uint8_t channel)
         int32_t absolute_difference;
         int32_t correction;
 
-				raw = (int32_t)adc_apply_digital_gain(samples2[channel][group]);
+        raw = (int32_t)adc_apply_digital_gain(
+            group,
+            samples2[channel][group]
+        );
 
-        filtered =
-            (int32_t)adcFiltered[channel][group];
-
-        difference =
-            raw - filtered;
-
+        filtered = (int32_t)adcFiltered[channel][group];
+        difference = raw - filtered;
         absolute_difference =
-            difference >= 0 ?
-            difference :
-            -difference;
+            difference >= 0 ? difference : -difference;
 
-        /*
-         * Reject very small ADC noise.
-         */
-        if (absolute_difference <=
-            ADC_FILTER_DEADBAND)
-        {
+        if (absolute_difference <= ADC_FILTER_DEADBAND) {
             continue;
         }
 
-        /*
-         * Use an adaptive filter:
-         *
-         * Large movement : 1/2 correction
-         * Medium movement: 1/4 correction
-         * Small movement : 1/8 correction
-         */
-        if (absolute_difference >=
-            ADC_FILTER_FAST_DELTA)
-        {
+        if (absolute_difference >= ADC_FILTER_FAST_DELTA) {
             correction = difference / 2;
         }
-        else if (absolute_difference >=
-                 ADC_FILTER_MEDIUM_DELTA)
-        {
+        else if (absolute_difference >= ADC_FILTER_MEDIUM_DELTA) {
             correction = difference / 4;
         }
         else
         {
             correction = difference / 8;
 
-            /*
-             * Ensure the filter can still move by one count.
-             */
-            if (correction == 0)
-            {
-                correction =
-                    difference > 0 ? 1 : -1;
+            if (correction == 0) {
+                correction = difference > 0 ? 1 : -1;
             }
         }
 
@@ -1664,7 +1675,6 @@ static void adc_filter_update_channel(uint8_t channel)
             filtered = ADC_MAX_VALUE;
         }
 
-        /* Store the calculated filtered value. */
         adcFiltered[channel][group] = (adcsample_t)filtered;
     }
 }
