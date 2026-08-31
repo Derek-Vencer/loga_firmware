@@ -1328,6 +1328,8 @@ void hook_early_init(void)
     eepromInitCheck = keymap_in_eeprom_init();
 
     dynamic_macro_load_eeprom_all();
+    /* Load App-managed ADC gains before ADC filtering starts. */
+    adc_gain_load_from_eeprom();
 
 		// Trigger level
 		keyMatrixTriggerLevel = eeprom_read_word(EECONFIG_KEYMAP_TRIGGER_LEVEL);
@@ -1573,16 +1575,6 @@ static bool adcFilterReady[ADC_BUF_DEPTH];
 #define ADC_GAIN_DENOMINATOR     10U
 #define ADC_MAX_VALUE ((int32_t)4200)
 
-static const uint16_t adc_gain_numerator[ADC_NUM_CHANNELS] = {
-    ADC_GAIN_NUMERATOR_PORT0,
-    ADC_GAIN_NUMERATOR_PORT1,
-    ADC_GAIN_NUMERATOR_PORT2,
-    ADC_GAIN_NUMERATOR_PORT3,
-    ADC_GAIN_NUMERATOR_PORT4,
-    ADC_GAIN_NUMERATOR_PORT5,
-    ADC_GAIN_NUMERATOR_PORT6
-};
-
 static inline adcsample_t adc_apply_digital_gain(
     uint8_t port,
     adcsample_t value)
@@ -1594,7 +1586,7 @@ static inline adcsample_t adc_apply_digital_gain(
     }
 
     amplified =
-        ((uint32_t)value * adc_gain_numerator[port]) /
+        ((uint32_t)value * adc_gain_get(port)) /
         ADC_GAIN_DENOMINATOR;
 
     if (amplified > ADC_MAX_VALUE) {

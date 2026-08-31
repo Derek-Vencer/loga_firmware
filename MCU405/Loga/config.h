@@ -200,6 +200,15 @@
     (DEAD_ZONE_BOTTOM_ADDR + 1)
 
 /*
+ * ADC gain is deliberately stored in a dedicated EEPROM page.  Factory
+ * reset does not reference this address, so only the companion App can
+ * replace the saved port gains.
+ */
+#define EECONFIG_ADC_GAIN_MAGIC_ADDR ((uint8_t *)(uintptr_t)0xFF70U)
+#define EECONFIG_ADC_GAIN_DATA_ADDR  ((uint8_t *)(uintptr_t)0xFF71U)
+#define EECONFIG_ADC_GAIN_MAGIC      0xA7U
+
+/*
  * New macro EEPROM region.
  *
  * config.h only defines the start address.
@@ -403,4 +412,7 @@
 #endif
 
 uint16_t matrix_get_filtered_adc(uint8_t channel,uint8_t group);
+void adc_gain_load_from_eeprom(void);
+bool adc_gain_set(uint8_t port, uint8_t gain);
+uint8_t adc_gain_get(uint8_t port);
 

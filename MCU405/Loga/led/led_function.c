@@ -28,7 +28,7 @@
 
 //#include "driver/led_RGBTable.h"
 
-//#define NO_PRINT
+#define NO_PRINT
 //#define multiChannelARGB
 
 #define LED_SPI_Port1					SPID1
@@ -1895,6 +1895,30 @@ bool raw_hid_receive_kb(uint8_t *data, uint8_t length){
 					break;
 
 				}
+		break;
+
+		case id_adc_gain_value:
+			/*
+			 * App protocol:
+			 * request:  data[1]=operation (0: read, 1: write),
+			 *           data[2]=port, data[3]=gain numerator (write only)
+			 * response: data[1]=status, data[2]=port count,
+			 *           data[3..9]=gain numerators for ports 0..6.
+			 */
+			if (command_data[0] == 1U) {
+				command_data[0] = adc_gain_set(command_data[1], command_data[2]) ? 0U : 1U;
+			}
+			else if (command_data[0] == 0U) {
+				command_data[0] = 0U;
+			}
+			else {
+				command_data[0] = 2U;
+			}
+
+			command_data[1] = ADC_NUM_CHANNELS;
+			for (uint8_t port = 0U; port < ADC_NUM_CHANNELS; port++) {
+				command_data[2U + port] = adc_gain_get(port);
+			}
 		break;
 		case 0xee:
 			break;

@@ -473,6 +473,40 @@ static void ione_send_stream_packet(
     chThdSleepMilliseconds(1);
 }
 
+static uint16_t adc_gain_runtime[ADC_NUM_CHANNELS] = {33U, 33U, 33U, 33U, 33U, 33U, 33U};
+
+void adc_gain_load_from_eeprom(void)
+{
+    uint8_t port;
+    if (eeprom_read_byte(EECONFIG_ADC_GAIN_MAGIC_ADDR) != EECONFIG_ADC_GAIN_MAGIC) {
+        uprintf("[ADC GAIN] EEPROM record not found; using defaults\r\n");
+        return;
+    }
+    for (port = 0U; port < ADC_NUM_CHANNELS; port++) {
+        uint8_t gain = eeprom_read_byte(EECONFIG_ADC_GAIN_DATA_ADDR + port);
+        if (gain >= 10U && gain <= 60U) adc_gain_runtime[port] = gain;
+    }
+    uprintf("[ADC GAIN] loaded P0=%u P1=%u P2=%u P3=%u P4=%u P5=%u P6=%u\r\n",
+            adc_gain_runtime[0], adc_gain_runtime[1], adc_gain_runtime[2],
+            adc_gain_runtime[3], adc_gain_runtime[4], adc_gain_runtime[5],
+            adc_gain_runtime[6]);
+}
+
+bool adc_gain_set(uint8_t port, uint8_t gain)
+{
+    if (port >= ADC_NUM_CHANNELS || gain < 10U || gain > 60U) return false;
+    adc_gain_runtime[port] = gain;
+    eeprom_update_byte(EECONFIG_ADC_GAIN_DATA_ADDR + port, gain);
+    eeprom_update_byte(EECONFIG_ADC_GAIN_MAGIC_ADDR, EECONFIG_ADC_GAIN_MAGIC);
+    uprintf("[ADC GAIN] saved P%u=%u\r\n", port, gain);
+    return true;
+}
+
+uint8_t adc_gain_get(uint8_t port)
+{
+    return (port < ADC_NUM_CHANNELS) ? (uint8_t)adc_gain_runtime[port] : 0U;
+}
+
 bool raw_hid_receive_ione(uint8_t *data, uint8_t length)
 {
     uint8_t *data_start;
@@ -1038,7 +1072,7 @@ bool raw_hid_receive_ione(uint8_t *data, uint8_t length)
 											uprintf("Mode = Multimedia\r\n");
 											break;
 
-									default:
+		default:
 											uprintf("Mode = Unknown (%u)\r\n", knob_mode);
 											break;
 							}
@@ -3599,6 +3633,36 @@ break;
             *payload_length = 1U;
         }
         break;
+
+        case ione_api_cmd_get_adc_port_gain:
+            if (*payload_length == 0U) {
+                *send_status = ione_api_status_success;
+                for (uint8_t port = 0U; port < ADC_NUM_CHANNELS; port++) {
+                    send_data[port] = adc_gain_get(port);
+                }
+                *payload_length = (uint8_t)(1U + ADC_NUM_CHANNELS);
+            }
+            else {
+                *send_status = ione_api_status_fail;
+                *payload_length = 1U;
+            }
+            break;
+
+        case ione_api_cmd_set_adc_port_gain:
+            if ((*payload_length == 2U) &&
+                adc_gain_set(recive_payload[0], recive_payload[1])) {
+                *send_status = ione_api_status_success;
+                for (uint8_t port = 0U; port < ADC_NUM_CHANNELS; port++) {
+                    send_data[port] = adc_gain_get(port);
+                }
+                *payload_length = (uint8_t)(1U + ADC_NUM_CHANNELS);
+            }
+            else {
+                *send_status = ione_api_status_fail;
+                *payload_length = 1U;
+            }
+            break;
+
         		default:
 
 				uprintf("Unknown Command : 0x%04X\r\n", command_id);
@@ -3744,6 +3808,14 @@ void raw_hid_receive(uint8_t *data, uint8_t length) {
         }
         case id_lighting_set_value:
         	switch (command_data[0]){
+				/*
+				 * The Windows ADC viewer uses feature report 0x07.
+				 * Its command byte therefore arrives as this Lighting
+				 * sub-command; forward 0x22 to the keyboard handler.
+				 */
+				case id_adc_gain_value:
+					raw_hid_receive_kb(&data[1], (uint8_t)(length - 1U));
+					break;
         		case id_light_runMode:
         			setLightRunMode(command_data[1]);
         			break;

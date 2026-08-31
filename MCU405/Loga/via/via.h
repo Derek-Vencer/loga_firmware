@@ -83,6 +83,7 @@ enum via_command_id {
 
 	id_get_TMR_value						= 0x20,
 	id_set_TMR_value						= 0x21,
+	id_adc_gain_value						= 0x22,
 //	id_get_rapid_trigger					= 0x22,
 //	id_set_rapid_tirgger					= 0x23,
     id_vial_prefix                          = 0xFE,
@@ -233,6 +234,8 @@ enum ione_api_command {
 	ione_api_cmd_factory_reset_and_system_reset = 0x020A,
 	ione_api_cmd_set_lighting_value     				= 0x020C,
 	ione_api_cmd_get_lighting_value     				= 0x028C,
+	ione_api_cmd_set_adc_port_gain      				= 0x0211,
+	ione_api_cmd_get_adc_port_gain      				= 0x0291,
 	ione_api_cmd_set_test_mode									= 0x0700,
 
 
