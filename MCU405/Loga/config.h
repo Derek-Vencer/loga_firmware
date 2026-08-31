@@ -403,5 +403,4 @@
 #endif
 
 uint16_t matrix_get_filtered_adc(uint8_t channel,uint8_t group);
-uint16_t matrix_get_linearized_adc(uint8_t channel,uint8_t group);
 

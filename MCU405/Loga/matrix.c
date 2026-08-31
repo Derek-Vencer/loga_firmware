@@ -48,51 +48,6 @@ extern socd_policy_t g_policy;
 #define TRAVEL_STEPS 350
 
 /*
- * Hall sensor output is approximately a convex (about x^1.8) function of
- * key travel. The table applies its inverse curve (about x^0.55) to the
- * calibrated 0..TRAVEL_STEPS ADC range with integer-only interpolation.
- */
-#define ADC_LINEAR_CURVE_SEGMENTS 16U
-static const uint16_t adc_linear_curve[ADC_LINEAR_CURVE_SEGMENTS + 1U] = {
-    0U, 76U, 112U, 139U, 163U, 185U, 204U, 222U, 239U,
-    255U, 270U, 285U, 299U, 312U, 325U, 338U, 350U
-};
-
-static int32_t adc_linearize_travel(int32_t adc_delta, int32_t adc_range)
-{
-    uint32_t raw_steps;
-    uint32_t scaled_index;
-    uint32_t index;
-    uint32_t fraction;
-    int32_t low;
-    int32_t high;
-
-    if (adc_delta <= 0 || adc_range <= 0) {
-        return 0;
-    }
-
-    if (adc_delta >= adc_range) {
-        return TRAVEL_STEPS;
-    }
-
-    raw_steps = ((uint32_t)adc_delta * TRAVEL_STEPS) /
-                (uint32_t)adc_range;
-    scaled_index = raw_steps * ADC_LINEAR_CURVE_SEGMENTS;
-    index = scaled_index / TRAVEL_STEPS;
-    fraction = scaled_index % TRAVEL_STEPS;
-
-    if (index >= ADC_LINEAR_CURVE_SEGMENTS) {
-        return TRAVEL_STEPS;
-    }
-
-    low = adc_linear_curve[index];
-    high = adc_linear_curve[index + 1U];
-
-    return low + ((high - low) * (int32_t)fraction +
-                  (TRAVEL_STEPS / 2)) / TRAVEL_STEPS;
-}
-
-/*
  * Missing declarations used by matrix.c.
  */
 //uint8_t get_highest_layer(layer_state_t state);
@@ -1605,8 +1560,6 @@ static bool adcFilterReady[ADC_BUF_DEPTH];
 #define ADC_GAIN_NUMERATOR       33U
 #define ADC_GAIN_DENOMINATOR     10U
 #define ADC_MAX_VALUE ((int32_t)4200)
-/* initPostionLevel includes this trigger guard after calibration. */
-#define ADC_DISPLAY_START_GUARD  5U
 
 static inline adcsample_t adc_apply_digital_gain(adcsample_t value)
 {
@@ -1724,66 +1677,6 @@ uint16_t matrix_get_filtered_adc(uint8_t channel,uint8_t group)
     }
 
     return (uint16_t)adcFiltered[channel][group];
-}
-
-/*
- * Return an ADC-scale value whose calibrated travel is linearized.
- *
- * Each key is normalized between its own calibrated released and bottom
- * endpoints.  Do not learn or update an origin while scanning: that made the
- * displayed curve depend on the scan history and created a false flat zone.
- */
-uint16_t matrix_get_linearized_adc(uint8_t channel, uint8_t group)
-{
-    int32_t raw;
-    int32_t start;
-    int32_t travel;
-    int32_t range;
-    int32_t linear_steps;
-    int32_t linear_adc;
-
-    if (channel >= ADC_BUF_DEPTH || group >= ADC_NUM_CHANNELS) {
-        return 0U;
-    }
-
-    raw = (int32_t)adcFiltered[channel][group];
-    start = (int32_t)initPostionLevel[channel][group] -
-            (int32_t)ADC_DISPLAY_START_GUARD;
-    travel = (int32_t)travelPostionLevel[channel][group];
-
-    if (start < 0) {
-        start = 0;
-    }
-
-    range = travel - start;
-
-    if (range <= 0) {
-        return (uint16_t)raw;
-    }
-
-    /* Clamp only at the physical calibration endpoints. */
-    if (raw <= start) {
-        return (uint16_t)start;
-    }
-
-    if (raw >= travel) {
-        return (uint16_t)travel;
-    }
-
-    linear_steps = adc_linearize_travel(
-        raw - start,
-        range);
-    linear_adc = start +
-                 (linear_steps * range + (TRAVEL_STEPS / 2)) /
-                 TRAVEL_STEPS;
-
-    if (linear_adc < 0) {
-        linear_adc = 0;
-    } else if (linear_adc > ADC_MAX_VALUE) {
-        linear_adc = ADC_MAX_VALUE;
-    }
-
-    return (uint16_t)linear_adc;
 }
 
 /*
