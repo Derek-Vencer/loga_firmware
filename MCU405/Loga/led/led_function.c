@@ -28,7 +28,7 @@
 
 //#include "driver/led_RGBTable.h"
 
-#define NO_PRINT
+//#define NO_PRINT
 //#define multiChannelARGB
 
 #define LED_SPI_Port1					SPID1
@@ -1426,7 +1426,7 @@ static THD_FUNCTION(LED_DynamaticLighting, arg)
 																{
 																		uint16_t filtered_adc;
 
-																		filtered_adc = matrix_get_filtered_adc(keyLocation.colA,keyLocation.rowA);
+												filtered_adc = matrix_get_linearized_adc(keyLocation.colA,keyLocation.rowA);
 
 																		if (filtered_adc > initPostionLevel[keyLocation.colA][keyLocation.rowA])
 																		{
@@ -1440,7 +1440,7 @@ static THD_FUNCTION(LED_DynamaticLighting, arg)
 																}
 
 																case 1:
-																		keycode = matrix_get_filtered_adc(keyLocation.colA,keyLocation.rowA);
+												keycode = matrix_get_linearized_adc(keyLocation.colA,keyLocation.rowA);
 																		break;
                                 case 2:
 
@@ -1830,7 +1830,7 @@ bool raw_hid_receive_kb(uint8_t *data, uint8_t length){
 									{
 											uint16_t filtered_adc;
 
-											filtered_adc = matrix_get_filtered_adc(keyLocation.colA,keyLocation.rowA);
+											filtered_adc = matrix_get_linearized_adc(keyLocation.colA,keyLocation.rowA);
 
 											if (filtered_adc > initPostionLevel[keyLocation.colA][keyLocation.rowA])
 											{
@@ -1844,7 +1844,7 @@ bool raw_hid_receive_kb(uint8_t *data, uint8_t length){
 									}
 
 									case id_raw_levels:
-											keycode = matrix_get_filtered_adc(keyLocation.colA,keyLocation.rowA);
+											keycode = matrix_get_linearized_adc(keyLocation.colA,keyLocation.rowA);
 											break;
 									case id_init_levels:				//Init
 										keycode = initPostionLevel[keyLocation.colA][keyLocation.rowA];
