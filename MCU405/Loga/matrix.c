@@ -48,12 +48,6 @@ extern socd_policy_t g_policy;
 #define TRAVEL_STEPS 350
 
 /*
- * A calibration span smaller than this is not reliable enough to correct.
- * In that case the unmodified filtered ADC value is reported instead.
- */
-#define ADC_LINEARIZATION_MIN_RANGE 32U
-
-/*
  * Missing declarations used by matrix.c.
  */
 //uint8_t get_highest_layer(layer_state_t state);
@@ -1685,67 +1679,6 @@ uint16_t matrix_get_filtered_adc(uint8_t channel,uint8_t group)
     }
 
     return (uint16_t)adcFiltered[channel][group];
-}
-
-/*
- * Return a display-only, per-key linearized ADC value.
- *
- * The Hall sensor curve is approximately quadratic: raw_delta is
- * proportional to travel^2.  The inverse square-root transformation below
- * makes the reported ADC value proportional to travel while retaining each
- * key's own calibrated rest level and full-travel level.  No trigger or
- * release decision uses this value, so changing the displayed curve cannot
- * cause keys to actuate unexpectedly.
- */
-uint16_t matrix_get_linearized_adc(uint8_t channel, uint8_t group)
-{
-    uint32_t raw;
-    uint32_t initial;
-    uint32_t bottom;
-    uint32_t range;
-    uint32_t delta;
-    uint32_t corrected_delta;
-
-    if (channel >= ADC_BUF_DEPTH || group >= ADC_NUM_CHANNELS)
-    {
-        return 0U;
-    }
-
-    raw = (uint32_t)adcFiltered[channel][group];
-    initial = (uint32_t)initPostionLevel[channel][group];
-    bottom = (uint32_t)travelPostionLevel[channel][group];
-
-    if (bottom <= initial)
-    {
-        return (uint16_t)raw;
-    }
-
-    range = bottom - initial;
-    if (range < ADC_LINEARIZATION_MIN_RANGE)
-    {
-        return (uint16_t)raw;
-    }
-
-    if (raw <= initial)
-    {
-        return (uint16_t)initial;
-    }
-
-    if (raw >= bottom)
-    {
-        return (uint16_t)bottom;
-    }
-
-    delta = raw - initial;
-    corrected_delta = (uint32_t)((sqrtf((float)delta / (float)range) *
-                                  (float)range) + 0.5f);
-
-    if (corrected_delta > range)
-    {
-        corrected_delta = range;
-    }
-
-    return (uint16_t)(initial + corrected_delta);
 }
 
 /*
