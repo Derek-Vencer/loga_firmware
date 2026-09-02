@@ -37,6 +37,8 @@ static bool led_pos_inited = false;
 static int16_t led_center_x = 0;
 static int16_t led_center_y = 0;
 
+static void calculate_mosart_breath_volume(uint8_t speed,uint16_t timebase,uint8_t *bright);
+
 static void led_pos_init_from_remap(void)
 {
     const int16_t pitch_x = 16;
@@ -699,11 +701,10 @@ static uint8_t mosart_effective_speed(uint8_t mode, uint8_t speed)
 
 static uint8_t mosart_update_interval(uint8_t mode)
 {
-    if (mode == mosArtBreath || mode == mosArtWave) {
-        return 50u;
-    }
+    (void)mode;
 
-    return 33u;
+    /* All MosArt animations refresh at 100 Hz. */
+    return 10U;
 }
 
 /*
@@ -776,66 +777,104 @@ static THD_FUNCTION(LED_EffectThread, arg)
 
 }
 
-void LED_SpeedChange(int8_t brightness, uint8_t speed){
-	currentLED_RunMode.brightness = led_clamp_percent((uint8_t)brightness);
-	currentLED_RunMode.speed = led_clamp_percent(speed);
-	normalBrightness = currentLED_RunMode.brightness;
+void LED_SpeedChange(int8_t brightness, uint8_t speed)
+{
+    currentLED_RunMode.brightness =
+        led_clamp_percent((uint8_t)brightness);
 
-	/* Fn, VIA and the lighting API all use this function for brightness. */
-	eeprom_update_byte(KB_COLOR_BRIGHTNESS_ADDR,
-	                   currentLED_RunMode.brightness);
-	eeprom_update_byte(KB_COLOR_BRIGHTNESS_MAGIC_ADDR,
-	                   KB_COLOR_BRIGHTNESS_MAGIC);
+    currentLED_RunMode.speed =
+        led_clamp_percent(speed);
 
-	LED_CurrentAdjuest(currentLED_RunMode.brightness);
-	switch (effectStatus.runMode)
-	{
-		case normalMode:
-			switch (LED_PresetMode[normalEffect].effect){
-				case EffectTypeRandColor:
-//					effectStatus.speed = speed * ledUpdateInterval;
-//					randColor.brightness = brightness;
-					break;
-		        case EffectTypeMosArt:
-					mosArt.Brightness = brightness;
-//					effectStatus.speed = 33;
-		        	break;
-		        case EffectTypeRainbowFlow:
-	                ranbowFlow.Brightness = brightness;
-//	                effectStatus.speed = speed * (ledUpdateInterval);
-		        	break;
-		        case EffectTypeKeytest:
-		        	break;
-		        case EffectTypeColorBrith:
-		        	break;
-		        case EffectTypeChangeProfile:
-		        	break;
-		        case EffectTypeOff:
-		        	break;
+    normalBrightness =
+        currentLED_RunMode.brightness;
+
+    normalSpeed =
+        currentLED_RunMode.speed;
+
+    /*
+     * Save both brightness and speed.
+     */
+    eeprom_update_byte(
+        KB_COLOR_BRIGHTNESS_ADDR,
+        currentLED_RunMode.brightness
+    );
+
+    eeprom_update_byte(
+        KB_COLOR_BRIGHTNESS_MAGIC_ADDR,
+        KB_COLOR_BRIGHTNESS_MAGIC
+    );
+
+    eeprom_update_byte(
+        KB_COLOR_SPEED_ADDR,
+        currentLED_RunMode.speed
+    );
+
+    LED_CurrentAdjuest(
+        currentLED_RunMode.brightness
+    );
+
+    switch (effectStatus.runMode)
+    {
+        case normalMode:
+            switch (LED_PresetMode[normalEffect].effect)
+            {
+                case EffectTypeRandColor:
+                    break;
+
+                case EffectTypeMosArt:
+                    mosArt.Brightness =
+                        currentLED_RunMode.brightness;
+                    break;
+
+                case EffectTypeRainbowFlow:
+                    ranbowFlow.Brightness =
+                        currentLED_RunMode.brightness;
+                    break;
+
+                case EffectTypeKeytest:
+                case EffectTypeColorBrith:
+                case EffectTypeChangeProfile:
+                case EffectTypeOff:
+                    break;
+
                 case EffectTypeWheel:
-                    currentLED_RunMode.brightness = brightness;
-                    currentLED_RunMode.speed = speed;
-                    break;
                 case EffectTypeReactive:
-                    currentLED_RunMode.brightness = brightness;
-                    currentLED_RunMode.speed = speed;
-                    break;
                 case EffectTypeStarlight:
-                    currentLED_RunMode.brightness = brightness;
-                    currentLED_RunMode.speed = speed;
-                    break;
                 case EffectTypeRipple:
-                    currentLED_RunMode.brightness = brightness;
-                    currentLED_RunMode.speed = speed;
-                    break;
-			}
-            effectStatus.speed = led_speed_percent_to_interval(speed);
-			break;
-		case demoMode:
-			break;
-	}
-}
+                    currentLED_RunMode.brightness =
+                        led_clamp_percent(
+                            (uint8_t)brightness
+                        );
 
+                    currentLED_RunMode.speed =
+                        led_clamp_percent(speed);
+                    break;
+
+                default:
+                    break;
+            }
+
+            effectStatus.speed =
+                led_speed_percent_to_interval(
+                    currentLED_RunMode.speed
+                );
+            break;
+
+        case demoMode:
+        default:
+            break;
+    }
+
+    uprintf(
+        "[LED SPEED] brightness=%u speed=%u "
+        "interval=%u effect=%u mode=%u\r\n",
+        (unsigned int)currentLED_RunMode.brightness,
+        (unsigned int)currentLED_RunMode.speed,
+        (unsigned int)effectStatus.speed,
+        (unsigned int)LED_PresetMode[normalEffect].effect,
+        (unsigned int)effectStatus.runMode
+    );
+}
 
 bool LED_Effect(uint8_t effect, bool enable, uint32_t interval, uint8_t colorMode, uint8_t mode, led_config_t color, uint8_t brightness, uint8_t speed, bool direction)
 {
@@ -883,8 +922,9 @@ bool LED_Effect(uint8_t effect, bool enable, uint32_t interval, uint8_t colorMod
                 // mosArt.Speed = --speed;
 //                mosArt.Brightness = brightness;
                 effectStatus.speed = mosart_update_interval(mode);
-                mosArt.TimerBase = 0;
-                mosArt.enable = true;
+								mosArt.TimerBase = 0U;
+								mosArt.TimerFraction = 0U;
+								mosArt.enable = true;
                 switch (colorMode)
                 {
                     case single:
@@ -1271,133 +1311,114 @@ bool effectMosArtProcess(void)
     uint8_t bright;
     uint8_t effect_speed;
     led_config_t ledTemp;
+
     if (mosArt.enable)
     {
-        effect_speed = mosart_effective_speed(mosArt.Mode, mosArt.Speed);
-    	if (effectStatus.interval!=0 && (get_system_time_ticks()-effectStatus.timeStamp>effectStatus.interval)){
+        effect_speed = mosart_effective_speed(mosArt.Mode,mosArt.Speed);
+
+        if ((effectStatus.interval != 0U) && ((get_system_time_ticks() - effectStatus.timeStamp) > effectStatus.interval))
+        {
             chVTReset(&randColor_vt);
             mosArt.enable = false;
-//            LED_FadoutEffect(LedNumbers,100);
-//            chThdSleepMilliseconds(150);
+
             ledAllOff(false);
+
             effectStatus.effect = EffectIdle;
-            if (effectStatus.runMode == demoMode){
-            	chBSemSignal(&ledRunmodeSem);
+
+            if (effectStatus.runMode == demoMode)
+            {
+                chBSemSignal(&ledRunmodeSem);
             }
+
             return false;
         }
+
         switch (mosArt.Mode)
         {
-            case 0:
-                bright = 255;
-                break;
-            case 1:
-                calculate_breath_volume(effect_speed, mosArt.TimerBase, &bright);
+            case mosArtStatic:
+                bright = 255U;
                 break;
 
-            case 2:
-                Calculate_Flashing_Volume(mosArt.Speed, mosArt.TimerBase, &bright);
+            case mosArtBreath:
+                calculate_mosart_breath_volume(effect_speed,mosArt.TimerBase,&bright);
                 break;
-						case 3: // WAVE
-						{
-								/*
-								 * 橫向波長：每 12 column 完成一個波形週期。
-								 * 縱向波長設為 0，表示不同 row 不加入相位差。
-								 */
-								const uint8_t  WAVE_WAVELENGTH_COLS = 12U;
-								const uint16_t TIMEBASE_STEP        = 3U;
 
-								const uint16_t phase_step_col =
-										(uint16_t)(256U / WAVE_WAVELENGTH_COLS);
+            case mosArtFlash:
+                Calculate_Flashing_Volume(mosArt.Speed,mosArt.TimerBase,&bright);
+                break;
 
-								const uint16_t phase_step_row = 0U;
+            case mosArtWave:
+            {
+                const uint8_t WAVE_WAVELENGTH_COLS = 12U;
+                const uint16_t phase_step_col = (uint16_t)(256U / WAVE_WAVELENGTH_COLS);
+                const uint16_t phase_step_row = 0U;
+                const uint16_t frameTimebase = mosArt.TimerBase;
+                led_config_t baseColor = mosArt.LED;
 
-								led_config_t baseColor = mosArt.LED;
+                if (mosArt.Rainbow != 0U)
+                {
+                    Calculate_Colorful_Color(0U,frameTimebase,&baseColor);
+                }
 
-								/*
-								 * 若啟用彩虹模式，先取得目前時間點的基礎顏色。
-								 */
-								if (mosArt.Rainbow != 0U) {
-										Calculate_Colorful_Color(
-												0U,
-												mosArt.TimerBase,
-												&baseColor
-										);
-								}
+                for (uint8_t col = 0U;col < LED_MATRIX_COLS;col++)
+                {
+                    for (uint8_t row = 0U;row < LED_MATRIX_ROWS;row++)
+                    {
+                        uint16_t localTimebase = frameTimebase;
 
-								const uint16_t frameTimebase = mosArt.TimerBase;
+                        uint8_t breathBrightness = 0U;
+                        led_config_t pixelColor;
+                        localTimebase += (uint16_t)col * phase_step_col;
+                        localTimebase += (uint16_t)row * phase_step_row;
+                        calculate_mosart_breath_volume(effect_speed,localTimebase,&breathBrightness);
+                        pixelColor.red = (uint8_t)(((uint32_t)baseColor.red * breathBrightness) / 255U);
+                        pixelColor.green = (uint8_t)(((uint32_t)baseColor.green * breathBrightness) / 255U);
+                        pixelColor.blue = (uint8_t)(((uint32_t)baseColor.blue * breathBrightness) / 255U);
+                        setRemapLED(row,col,pixelColor);
+                    }
+                }
 
-								for (uint8_t col = 0U; col < LED_MATRIX_COLS; col++) {
-										for (uint8_t row = 0U; row < LED_MATRIX_ROWS; row++) {
-												uint16_t localTimebase = frameTimebase;
+                chBSemSignal(&ledUpdateSem);
 
-												localTimebase +=
-														(uint16_t)col * phase_step_col;
+                /*
+                 * 10 ms frame rate:
+                 * move one unit every frame.
+                 */
+                mosArt.TimerBase = (uint16_t)(frameTimebase + 1U);
+                return true;
+            }
 
-												localTimebase +=
-														(uint16_t)row * phase_step_row;
-
-												uint8_t breathBrightness = 0U;
-
-												calculate_breath_volume(
-														effect_speed,
-														localTimebase,
-														&breathBrightness
-												);
-
-												led_config_t pixelColor;
-
-												/*
-												 * 使用整數運算套用 0～255 呼吸亮度，
-												 * 避免 MCU 執行 float 運算。
-												 */
-												pixelColor.red = (uint8_t)(
-														((uint32_t)baseColor.red *
-														 breathBrightness) / 255U
-												);
-
-												pixelColor.green = (uint8_t)(
-														((uint32_t)baseColor.green *
-														 breathBrightness) / 255U
-												);
-
-												pixelColor.blue = (uint8_t)(
-														((uint32_t)baseColor.blue *
-														 breathBrightness) / 255U
-												);
-
-												setRemapLED(row, col, pixelColor);
-										}
-								}
-
-								chBSemSignal(&ledUpdateSem);
-
-								mosArt.TimerBase =
-										(uint16_t)(frameTimebase + TIMEBASE_STEP);
-
-								return true;
-						}
+            default:
+                bright = 0U;
+                break;
         }
-        tempmBright = (float)bright / 255;
-        if (mosArt.Rainbow != 0)
+
+        tempmBright = (float)bright / 255.0f;
+
+        if (mosArt.Rainbow != 0U)
         {
-            Calculate_Colorful_Color(effect_speed, mosArt.TimerBase, &mosArt.LED);
+            Calculate_Colorful_Color(effect_speed,mosArt.TimerBase,&mosArt.LED);
         }
 
-        ledTemp.red = mosArt.LED.red * tempmBright;
-        ledTemp.green = mosArt.LED.green * tempmBright;
-        ledTemp.blue = mosArt.LED.blue * tempmBright;
-        led_updateFrameBufferSingle(0, LedNumbers, &ledTemp);
-        mosArt.TimerBase += (mosArt.Mode == mosArtBreath || mosArt.Mode == mosArtWave) ? 3 : 10;
+        ledTemp.red = (uint8_t)(mosArt.LED.red * tempmBright);
+        ledTemp.green = (uint8_t)(mosArt.LED.green * tempmBright);
+        ledTemp.blue = (uint8_t)(mosArt.LED.blue * tempmBright);
+        led_updateFrameBufferSingle(0U,LedNumbers,&ledTemp);
+
+        /*
+         * Breath: 1 unit / 10 ms.
+         * Flash/static: 3 units / 10 ms.
+         */
+        mosArt.TimerBase += (mosArt.Mode == mosArtBreath || mosArt.Mode == mosArtWave) ? 1U : 3U;
+
         return true;
     }
-    else
-    {
-        chVTReset(&randColor_vt);
-        mosArt.enable = false;
-        ledAllOff(false);
-        effectStatus.effect = EffectIdle;
-    }
+
+    chVTReset(&randColor_vt);
+    mosArt.enable = false;
+    ledAllOff(false);
+    effectStatus.effect = EffectIdle;
+
     return false;
 }
 
@@ -1654,6 +1675,61 @@ void Calculate_Colorful_Color(uint8_t speed, uint32_t timebase, led_config_t* LE
             LED->green = colorInv;
             LED->blue = color;
             break;
+    }
+}
+
+static void calculate_mosart_breath_volume(uint8_t speed,uint16_t timebase,uint8_t *bright)
+{
+    uint32_t scaled_timebase;
+    uint16_t scale_per_thousand;
+    uint16_t phase;
+    uint16_t wtemp;
+
+    /*
+     * New frame rate:
+     *   1 unit / 10 ms = 100 units/s
+     *
+     * Old breath rate:
+     *   3 units / 50 ms = 60 units/s
+     *
+     * Therefore apply 0.6x of the old speed scale,
+     * so the visible breathing speed remains unchanged.
+     */
+    speed = led_clamp_percent(speed);
+
+    scale_per_thousand =
+        (uint16_t)(600U + ((uint16_t)speed * 42U));
+
+    scaled_timebase =
+        ((uint32_t)timebase *
+         (uint32_t)scale_per_thousand) / 1000U;
+
+    phase = (uint16_t)scaled_timebase;
+
+    if ((((phase >> 8) & 0x01U) == 0U))
+    {
+        *bright = (uint8_t)(phase & 0xFFU);
+    }
+    else
+    {
+        *bright = (uint8_t)(
+            255U - (phase & 0xFFU)
+        );
+    }
+
+    if (*bright <= 15U)
+    {
+        *bright = 0U;
+    }
+    else if (*bright >= 240U)
+    {
+        *bright = 255U;
+    }
+    else
+    {
+        wtemp = (uint16_t)(*bright - 15U);
+        wtemp = (wtemp * 255U) / 225U;
+        *bright = (uint8_t)wtemp;
     }
 }
 
@@ -2175,14 +2251,16 @@ void LED_init(void)
 {
     uint8_t ee_mode;
     uint8_t ee_brightness;
+    uint8_t ee_speed;
 
     c.red   = eeprom_read_byte(KB_COLOR_RED_ADDR);
     c.green = eeprom_read_byte(KB_COLOR_GREEN_ADDR);
     c.blue  = eeprom_read_byte(KB_COLOR_BLUE_ADDR);
+
     ee_mode = eeprom_read_byte(KB_COLOR_MODE_ADDR);
     ee_brightness = eeprom_read_byte(KB_COLOR_BRIGHTNESS_ADDR);
+    ee_speed = eeprom_read_byte(KB_COLOR_SPEED_ADDR);
 
-    /* Firmware before this version has no saved-brightness marker. */
     if (ee_brightness <= 100U)
     {
         normalBrightness = ee_brightness;
@@ -2192,12 +2270,25 @@ void LED_init(void)
         normalBrightness = 30U;
     }
 
+    if (ee_speed <= 100U)
+    {
+        normalSpeed = ee_speed;
+    }
+    else
+    {
+        normalSpeed = 100U;
+    }
+
     uprintf("\r\n");
     uprintf("========== LED EEPROM ==========\r\n");
     uprintf("Mode  : %3u (0x%02X)\r\n", ee_mode, ee_mode);
     uprintf("Bright: %3u%%\r\n", normalBrightness);
+    uprintf("Speed : %3u%%\r\n", normalSpeed);
+
     uprintf(
-        "Color : R=%3u (0x%02X) G=%3u (0x%02X) B=%3u (0x%02X)\r\n",
+        "Color : R=%3u (0x%02X) "
+        "G=%3u (0x%02X) "
+        "B=%3u (0x%02X)\r\n",
         c.red,
         c.red,
         c.green,
@@ -2205,6 +2296,7 @@ void LED_init(void)
         c.blue,
         c.blue
     );
+
     uprintf("================================\r\n");
 
     led_creatTask();
@@ -2225,24 +2317,25 @@ void LED_init(void)
     );
 
     /*
-     * Mode 0 is currently an off/black preset.
-     * Use mode 3 as the default when EEPROM is blank or stores mode 0.
+     * EEPROM blank: use preset 3.
      */
-    if (ee_mode == 0xFFU) {
+    if (ee_mode == 0xFFU)
+    {
         ee_mode = 3U;
     }
 
-    currentLED_RunMode.mode       = ee_mode;
+    currentLED_RunMode.mode = ee_mode;
     currentLED_RunMode.brightness = normalBrightness;
-    currentLED_RunMode.speed      = normalSpeed;
-    currentLED_RunMode.type       = normalMode;
+    currentLED_RunMode.speed = normalSpeed;
+    currentLED_RunMode.type = normalMode;
 
     uprintf(
-        "[LED INIT] RunMode mode=%u brightness=%u speed=%u type=%u\r\n",
-        currentLED_RunMode.mode,
-        currentLED_RunMode.brightness,
-        currentLED_RunMode.speed,
-        currentLED_RunMode.type
+        "[LED INIT] RunMode mode=%u brightness=%u "
+        "speed=%u type=%u\r\n",
+        (unsigned int)currentLED_RunMode.mode,
+        (unsigned int)currentLED_RunMode.brightness,
+        (unsigned int)currentLED_RunMode.speed,
+        (unsigned int)currentLED_RunMode.type
     );
 
     setRunMode(currentLED_RunMode);

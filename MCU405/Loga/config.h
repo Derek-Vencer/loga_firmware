@@ -86,6 +86,7 @@
 /* RGB brightness is stored separately from the effect/color settings. */
 #define KB_COLOR_BRIGHTNESS_ADDR       ((uint8_t *)0x0077)
 #define KB_COLOR_BRIGHTNESS_MAGIC_ADDR ((uint8_t *)0x0078)
+#define KB_COLOR_SPEED_ADDR 					 ((uint8_t *)0x0079)
 #define KB_COLOR_BRIGHTNESS_MAGIC      0xB7
 #define KB_COLOR_RED_ADDR \
     ((uint8_t *)0x007B)
@@ -412,6 +413,7 @@
 #endif
 
 uint16_t matrix_get_filtered_adc(uint8_t channel,uint8_t group);
+uint16_t matrix_get_linearized_adc(uint8_t channel, uint8_t group);
 void adc_gain_load_from_eeprom(void);
 bool adc_gain_set(uint8_t port, uint8_t gain);
 uint8_t adc_gain_get(uint8_t port);

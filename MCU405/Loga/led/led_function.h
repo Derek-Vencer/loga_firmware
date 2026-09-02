@@ -99,6 +99,7 @@ typedef struct {
 	uint8_t bbreathvolume;
 	uint8_t bFlashingVolume;
 	uint16_t TimerBase;
+	uint8_t TimerFraction;
 } EffectMosArt_t;
 
 

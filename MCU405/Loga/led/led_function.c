@@ -543,43 +543,80 @@ void led_ChannelSet(uint8_t channel){
 
 void ledDriver_PatternConvert(uint8_t* data)
 {
-uint8_t postion = 0;
-uint16_t dataPostion = 0;
-//uint8_t brightness_limit = 120;
+    uint8_t postion = 0;
+    uint16_t dataPostion = 0;
+    uint8_t brightness = normalBrightness;
 
-	for (uint8_t i=0; i< sizeof(ledRows); i++){
-		for (uint8_t j=0; j<ledRows[i]; j++){
-			#if 0 // lyon try to change the brightness
-			uint8_t r = data[dataPostion++];
+    /*
+     * RGB PWM white-balance ratio:
+     * Red   = 45%
+     * Green = 100%
+     * Blue  = 45%
+     *
+     * 再依目前 Brightness 0~100 縮放 PWM。
+     * 這可讓 Bright=1 時不再維持接近全 PWM 輸出。
+     */
+    if (brightness > 100U)
+    {
+        brightness = 100U;
+    }
+
+    for (uint8_t i = 0; i < sizeof(ledRows); i++)
+    {
+        for (uint8_t j = 0; j < ledRows[i]; j++)
+        {
+            uint8_t r = data[dataPostion++];
             uint8_t g = data[dataPostion++];
             uint8_t b = data[dataPostion++];
 
-			// ��鈭桀漲
-            if (r > brightness_limit) r = brightness_limit;
-            if (g > brightness_limit) g = brightness_limit;
-            if (b > brightness_limit) b = brightness_limit;
-			
-			ledDriverData[ledDriver_Remap[postion].chipNo][tabLED_PWMCTLRed[ledDriver_Remap[postion].postion]] = r;
-			ledDriverData[ledDriver_Remap[postion].chipNo][tabLED_PWMCTLGreen[ledDriver_Remap[postion].postion]] = g;
-			ledDriverData[ledDriver_Remap[postion].chipNo][tabLED_PWMCTLBlue[ledDriver_Remap[postion].postion]] = b;
-			
-			#endif
-			//ledDriverData[ledDriver_Remap[postion].chipNo][tabLED_PWMCTLRed[ledDriver_Remap[postion].postion]] = (float)data[dataPostion++] *.7;		//white balance adj
-			// ledDriverData[ledDriver_Remap[postion].chipNo][tabLED_PWMCTLRed[ledDriver_Remap[postion].postion]] = data[dataPostion++] * 0.45 ;//*1.1;
-			// ledDriverData[ledDriver_Remap[postion].chipNo][tabLED_PWMCTLGreen[ledDriver_Remap[postion].postion]] = data[dataPostion++] ;//*2;
-			// ledDriverData[ledDriver_Remap[postion].chipNo][tabLED_PWMCTLBlue[ledDriver_Remap[postion].postion]] = data[dataPostion++] * 0.45 ;//*1.1;
+            uint8_t chip =
+                ledDriver_Remap[postion].chipNo;
 
-			ledDriverData[ledDriver_Remap[postion].chipNo][tabLED_PWMCTLRed[ledDriver_Remap[postion].postion]] = data[dataPostion++] * 0.45;
-			ledDriverData[ledDriver_Remap[postion].chipNo][tabLED_PWMCTLGreen[ledDriver_Remap[postion].postion]] = data[dataPostion++];
-			ledDriverData[ledDriver_Remap[postion].chipNo][tabLED_PWMCTLBlue[ledDriver_Remap[postion].postion]] = data[dataPostion++] * 0.45;
-			
-			    
-			postion++;
-		}
-	}
-	for (uint8_t i=0 ;i < LED_DriverCount; i++){
-		SPI_UPDATE_NBYTE(i,&ledDriverData[i][0]);
-	}
+            uint8_t led =
+                ledDriver_Remap[postion].postion;
+
+            /*
+             * + divisor - 1: non-zero color at non-zero brightness
+             * still keeps Bright=1 extremely dim.
+             */
+            uint8_t scaled_r = (uint8_t)(
+                (((uint32_t)r * brightness * 45U) +
+                 25499U) / 25500U
+            );
+
+            uint8_t scaled_g = (uint8_t)(
+                (((uint32_t)g * brightness) +
+                 99U) / 100U
+            );
+
+            uint8_t scaled_b = (uint8_t)(
+                (((uint32_t)b * brightness * 45U) +
+                 25499U) / 25500U
+            );
+
+            ledDriverData[chip]
+                         [tabLED_PWMCTLRed[led]] =
+                scaled_r;
+
+            ledDriverData[chip]
+                         [tabLED_PWMCTLGreen[led]] =
+                scaled_g;
+
+            ledDriverData[chip]
+                         [tabLED_PWMCTLBlue[led]] =
+                scaled_b;
+
+            postion++;
+        }
+    }
+
+    for (uint8_t i = 0; i < LED_DriverCount; i++)
+    {
+        SPI_UPDATE_NBYTE(
+            i,
+            &ledDriverData[i][0]
+        );
+    }
 }
 
 
@@ -1426,7 +1463,7 @@ static THD_FUNCTION(LED_DynamaticLighting, arg)
 																{
 																		uint16_t filtered_adc;
 
-																		filtered_adc = matrix_get_filtered_adc(keyLocation.colA,keyLocation.rowA);
+												filtered_adc = matrix_get_linearized_adc(keyLocation.colA,keyLocation.rowA);
 
 																		if (filtered_adc > initPostionLevel[keyLocation.colA][keyLocation.rowA])
 																		{
@@ -1440,7 +1477,7 @@ static THD_FUNCTION(LED_DynamaticLighting, arg)
 																}
 
 																case 1:
-																		keycode = matrix_get_filtered_adc(keyLocation.colA,keyLocation.rowA);
+												keycode = matrix_get_linearized_adc(keyLocation.colA,keyLocation.rowA);
 																		break;
                                 case 2:
 
@@ -1830,7 +1867,7 @@ bool raw_hid_receive_kb(uint8_t *data, uint8_t length){
 									{
 											uint16_t filtered_adc;
 
-											filtered_adc = matrix_get_filtered_adc(keyLocation.colA,keyLocation.rowA);
+											filtered_adc = matrix_get_linearized_adc(keyLocation.colA,keyLocation.rowA);
 
 											if (filtered_adc > initPostionLevel[keyLocation.colA][keyLocation.rowA])
 											{
@@ -1844,7 +1881,7 @@ bool raw_hid_receive_kb(uint8_t *data, uint8_t length){
 									}
 
 									case id_raw_levels:
-											keycode = matrix_get_filtered_adc(keyLocation.colA,keyLocation.rowA);
+											keycode = matrix_get_linearized_adc(keyLocation.colA,keyLocation.rowA);
 											break;
 									case id_init_levels:				//Init
 										keycode = initPostionLevel[keyLocation.colA][keyLocation.rowA];

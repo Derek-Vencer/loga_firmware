@@ -3370,18 +3370,24 @@ break;
                     }
                     break;
 
-                    case 3:
-                    {
-                        uprintf("API=>Speed:\r\n");
+										case 3:
+										{
+												uint8_t requested_speed = recive_payload[1];
+												currentLED_RunMode.speed = speed_percent_to_internal(requested_speed);
+												eeprom_update_byte(KB_COLOR_SPEED_ADDR,currentLED_RunMode.speed);
 
-                        currentLED_RunMode.speed =
-                            speed_percent_to_internal(
-                                recive_payload[1]
-                            );
+												uprintf(
+														"API=>Speed: request=%u internal=%u saved=%u\r\n",
+														(unsigned int)requested_speed,
+														(unsigned int)currentLED_RunMode.speed,
+														(unsigned int)eeprom_read_byte(
+																KB_COLOR_SPEED_ADDR
+														)
+												);
 
-                        setRunMode(currentLED_RunMode);
-                    }
-                    break;
+												setRunMode(currentLED_RunMode);
+										}
+										break;
 
                     case 4:
                     {
