@@ -52,7 +52,6 @@ virtual_timer_t randColor_vt;
 //analogKey_Config_t keyLocation;
 
 extern EffectStatus_t effectStatus;
-extern EffectMosArt_t mosArt;
 extern uint8_t LED_DemoCurrentMode;
 extern report_lamp_array_t lamp_array_data_report;
 extern led_runMode_t currentLED_RunMode,lastLED_RunMode;
@@ -542,39 +541,26 @@ void led_ChannelSet(uint8_t channel){
 
 #ifdef LED_Driver
 
-static uint8_t ledDriver_scalePwm(uint8_t value,uint8_t brightness_percent,uint8_t balance_percent)
-{
-    uint32_t scaled;
-
-    scaled = (uint32_t)value * brightness_percent * balance_percent;
-    scaled = (scaled + 9999U) / 10000U;
-
-    return (scaled > 255U) ? 255U : (uint8_t)scaled;
-}
-
-void ledDriver_PatternConvert(uint8_t* data)
+void ledDriver_PatternConvert(uint8_t *data)
 {
     uint8_t postion = 0U;
     uint16_t dataPostion = 0U;
     uint8_t brightness = normalBrightness;
-    bool preserve_pwm_resolution;
-
-    if (brightness > 100U)
-    {
-        brightness = 100U;
-    }
 
     /*
-     * 呼吸／波浪保留完整 0~255 PWM 段數。
-     * 總亮度由 LED_CurrentAdjuest() 的 driver current 控制，
-     * 避免低亮度時 PWM 段數不足而產生視覺抖動。
+     * RGB PWM white-balance ratio:
+     * Red   = 100%
+     * Green = 45%
+     * Blue  = 100%
+     *
+     * App RGB=255/255/255、Brightness=100 時：
+     * PWM = R255 / G114 / B255
      */
-    preserve_pwm_resolution =
-        mosArt.enable &&
-        ((mosArt.Mode == mosArtBreath) ||
-         (mosArt.Mode == mosArtWave));
+    const uint8_t white_balance_r = 30U;
+    const uint8_t white_balance_g = 100U;
+    const uint8_t white_balance_b = 80U;
 
-    if (preserve_pwm_resolution)
+    if (brightness > 100U)
     {
         brightness = 100U;
     }
@@ -587,18 +573,49 @@ void ledDriver_PatternConvert(uint8_t* data)
             uint8_t g = data[dataPostion++];
             uint8_t b = data[dataPostion++];
 
-            uint8_t chip = ledDriver_Remap[postion].chipNo;
-            uint8_t led = ledDriver_Remap[postion].postion;
+            uint8_t chip =
+                ledDriver_Remap[postion].chipNo;
 
-            /* 白平衡：R=45%、G=100%、B=45%。 */
-            ledDriverData[chip][tabLED_PWMCTLRed[led]] =
-                ledDriver_scalePwm(r, brightness, 45U);
+            uint8_t led =
+                ledDriver_Remap[postion].postion;
 
-            ledDriverData[chip][tabLED_PWMCTLGreen[led]] =
-                ledDriver_scalePwm(g, brightness, 100U);
+            /*
+             * PWM = RGB × Brightness% × WhiteBalance%
+             * +9999U 用於無條件進位：
+             * 非零 RGB 在非零亮度時至少維持 1 PWM。
+             */
+            uint8_t scaled_r = (uint8_t)(
+                (((uint32_t)r *
+                  brightness *
+                  white_balance_r) +
+                 9999U) / 10000U
+            );
 
-            ledDriverData[chip][tabLED_PWMCTLBlue[led]] =
-                ledDriver_scalePwm(b, brightness, 45U);
+            uint8_t scaled_g = (uint8_t)(
+                (((uint32_t)g *
+                  brightness *
+                  white_balance_g) +
+                 9999U) / 10000U
+            );
+
+            uint8_t scaled_b = (uint8_t)(
+                (((uint32_t)b *
+                  brightness *
+                  white_balance_b) +
+                 9999U) / 10000U
+            );
+
+            ledDriverData[chip]
+                         [tabLED_PWMCTLRed[led]] =
+                scaled_r;
+
+            ledDriverData[chip]
+                         [tabLED_PWMCTLGreen[led]] =
+                scaled_g;
+
+            ledDriverData[chip]
+                         [tabLED_PWMCTLBlue[led]] =
+                scaled_b;
 
             postion++;
         }
@@ -606,7 +623,10 @@ void ledDriver_PatternConvert(uint8_t* data)
 
     for (uint8_t i = 0U; i < LED_DriverCount; i++)
     {
-        SPI_UPDATE_NBYTE(i, &ledDriverData[i][0]);
+        SPI_UPDATE_NBYTE(
+            i,
+            &ledDriverData[i][0]
+        );
     }
 }
 

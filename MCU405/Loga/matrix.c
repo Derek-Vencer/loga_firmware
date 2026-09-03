@@ -63,6 +63,9 @@ extern binary_semaphore_t ledUpdateSem;
 extern led_config_t LED_Datas[LedNumbers];
 extern report_gamepad_report extra_game_report;
 extern EffectMosArt_t mosArt; //lyon for changing color keycode
+extern EffectStruct_t LED_PresetMode[LED_PresetModes];
+extern int8_t normalEffect;
+
 hsv_t hsv;
 bool isKEYLOCK = false; // for toggle lock key
 bool isCtrl = true;
@@ -4328,45 +4331,57 @@ static void save_mosart_color_to_eeprom(void)
     uprintf("[RGB SAVE] R=%u G=%u B=%u\r\n",(unsigned int)mosArt.LED.red,(unsigned int)mosArt.LED.green,(unsigned int)mosArt.LED.blue);
 }
 
-static void plusHue(led_config_t in)
+void plusHue(led_config_t in)
 {
     current_hsv = rgb_to_hsv(in);
     current_hsv.h = (current_hsv.h + 15U) % 360U;
     mosArt.LED = hsv_to_rgb(current_hsv);
 }
 
-static void minusHue(led_config_t in)
+void minusHue(led_config_t in)
 {
     current_hsv = rgb_to_hsv(in);
     current_hsv.h = (current_hsv.h + 345U) % 360U;
     mosArt.LED = hsv_to_rgb(current_hsv);
 }
 
-static void plusSat(led_config_t in)
+void plusSat(led_config_t in)
 {
     current_hsv = rgb_to_hsv(in);
-    current_hsv.s = (current_hsv.s > 239U) ? 255U : (uint8_t)(current_hsv.s + 16U);
+    current_hsv.s =
+        (current_hsv.s > 239U) ? 255U :
+        (uint8_t)(current_hsv.s + 16U);
+
     mosArt.LED = hsv_to_rgb(current_hsv);
 }
 
-static void minusSat(led_config_t in)
+void minusSat(led_config_t in)
 {
     current_hsv = rgb_to_hsv(in);
-    current_hsv.s = (current_hsv.s < 16U) ? 0U : (uint8_t)(current_hsv.s - 16U);
+    current_hsv.s =
+        (current_hsv.s < 16U) ? 0U :
+        (uint8_t)(current_hsv.s - 16U);
+
     mosArt.LED = hsv_to_rgb(current_hsv);
 }
 
-static void plusBri(led_config_t in)
+void plusBri(led_config_t in)
 {
     current_hsv = rgb_to_hsv(in);
-    current_hsv.v = (current_hsv.v > 239U) ? 255U : (uint8_t)(current_hsv.v + 16U);
+    current_hsv.v =
+        (current_hsv.v > 239U) ? 255U :
+        (uint8_t)(current_hsv.v + 16U);
+
     mosArt.LED = hsv_to_rgb(current_hsv);
 }
 
-static void minusBri(led_config_t in)
+void minusBri(led_config_t in)
 {
     current_hsv = rgb_to_hsv(in);
-    current_hsv.v = (current_hsv.v < 16U) ? 0U : (uint8_t)(current_hsv.v - 16U);
+    current_hsv.v =
+        (current_hsv.v < 16U) ? 0U :
+        (uint8_t)(current_hsv.v - 16U);
+
     mosArt.LED = hsv_to_rgb(current_hsv);
 }
 
@@ -4389,7 +4404,7 @@ bool hook_matrix_change(keyrecord_t record)
             if (record.event.pressed)
             {
 				rgb_hue_key_held = true;
-                plusHue(mosArt.LED);
+                plusHue(LED_PresetMode[normalEffect].color);
                 save_mosart_color_to_eeprom();
 
                 uprintf(
@@ -4410,7 +4425,7 @@ bool hook_matrix_change(keyrecord_t record)
             if (record.event.pressed)
             {
 				rgb_hue_key_held = true;
-                minusHue(mosArt.LED);
+                minusHue(LED_PresetMode[normalEffect].color);
                 save_mosart_color_to_eeprom();
 
                 uprintf(
@@ -4430,7 +4445,7 @@ bool hook_matrix_change(keyrecord_t record)
         case KC_PSAT:
             if (record.event.pressed)
             {
-                plusSat(mosArt.LED);
+                plusSat(LED_PresetMode[normalEffect].color);
                 save_mosart_color_to_eeprom();
 
                 uprintf(
@@ -4449,7 +4464,7 @@ bool hook_matrix_change(keyrecord_t record)
         case KC_MSAT:
             if (record.event.pressed)
             {
-                minusSat(mosArt.LED);
+                minusSat(LED_PresetMode[normalEffect].color);
                 save_mosart_color_to_eeprom();
 
                 uprintf(

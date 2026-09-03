@@ -31,8 +31,7 @@ extern uint8_t currentProfile;
 
 extern led_config_t LED_Datas[LedNumbers]; // lyon
 
-extern EffectStatus_t effectStatus;
-extern EffectMosArt_t mosArt;
+extern EffectStatus_t effectStatus; //set led by lyon
 extern binary_semaphore_t ledEffetSem;
 extern EffectMosArt_t mosArt;
 
@@ -305,7 +304,13 @@ static void factory_system_reset_execute(void)
         (uint8_t *)EEPROM_FACTORY_INIT_FLAG_ADDR,
         0xFAU
     );
-
+		
+		eeprom_update_byte((uint8_t *)KB_COLOR_RED_ADDR,   255U);
+		eeprom_update_byte((uint8_t *)KB_COLOR_GREEN_ADDR, 255U);
+		eeprom_update_byte((uint8_t *)KB_COLOR_BLUE_ADDR,  255U);
+		eeprom_update_byte((uint8_t *)KB_COLOR_MODE_ADDR,  3U);
+		eeprom_update_byte((uint8_t *)KB_COLOR_MAGIC_ADDR,KB_COLOR_MAGIC);
+		uprintf("[FACTORY SYS] LED default R=0 G=149 B=136 mode=3\r\n");
     uprintf("[FACTORY SYS] End, system reset\r\n");
 
     chThdSleepMilliseconds(100U);
@@ -3305,7 +3310,7 @@ break;
 						 */
 						*send_status = ione_api_status_success;
 						*payload_length = 1U;
-
+						
 						uprintf(
 								"Factory/System Reset ACK queued pending=%u\r\n",
 								(unsigned int)factory_system_reset_pending
