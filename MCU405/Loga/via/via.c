@@ -31,7 +31,8 @@ extern uint8_t currentProfile;
 
 extern led_config_t LED_Datas[LedNumbers]; // lyon
 
-extern EffectStatus_t effectStatus; //set led by lyon
+extern EffectStatus_t effectStatus;
+extern EffectMosArt_t mosArt;
 extern binary_semaphore_t ledEffetSem;
 extern EffectMosArt_t mosArt;
 

@@ -490,6 +490,7 @@ static led_runMode_t profilePreviusMode;
 // static EffectMosArt_t mosArt;
 EffectMosArt_t mosArt;
 static EffectRanbowFlow_t ranbowFlow;
+static uint16_t rainbowFlowPhaseFraction;
 static effect_wheel_t wheel_fx;
 led_runMode_t currentLED_RunMode,lastLED_RunMode;
 EffectStatus_t effectStatus;
@@ -854,10 +855,14 @@ void LED_SpeedChange(int8_t brightness, uint8_t speed)
                     break;
             }
 
-            effectStatus.speed =
-                led_speed_percent_to_interval(
-                    currentLED_RunMode.speed
-                );
+						if (LED_PresetMode[normalEffect].effect == EffectTypeRainbowFlow)
+						{
+								effectStatus.speed = 10U;
+						}
+						else
+						{
+								effectStatus.speed = led_speed_percent_to_interval(currentLED_RunMode.speed);
+						}
             break;
 
         case demoMode:
@@ -923,7 +928,6 @@ bool LED_Effect(uint8_t effect, bool enable, uint32_t interval, uint8_t colorMod
 //                mosArt.Brightness = brightness;
                 effectStatus.speed = mosart_update_interval(mode);
 								mosArt.TimerBase = 0U;
-								mosArt.TimerFraction = 0U;
 								mosArt.enable = true;
                 switch (colorMode)
                 {
@@ -941,25 +945,33 @@ bool LED_Effect(uint8_t effect, bool enable, uint32_t interval, uint8_t colorMod
             }
             break;
 
-        case EffectTypeRainbowFlow:
-            if (enable)
-            {
-                if (speed > 100 || brightness > 100)
-                {
-                    return false;
-                }
-                ranbowFlow.Brightness = brightness;
-                effectStatus.speed = led_speed_percent_to_interval(speed);
-                ranbowFlow.timebase = rainbowBase;
-                ranbowFlow.enable = true;
-                ranbowFlow.direction = direction;
-                chVTSet(&randColor_vt, TIME_MS2I(effectStatus.speed), (vtfunc_t)led_cb, NULL);
-            }
-            else
-            {
-                ranbowFlow.enable = false;
-            }
-            break;
+					case EffectTypeRainbowFlow:
+							if (enable)
+							{
+									if (speed > 100U || brightness > 100U)
+									{
+											return false;
+									}
+
+									ranbowFlow.Brightness = brightness;
+									effectStatus.speed = 10U;
+									ranbowFlow.timebase = rainbowBase;
+									rainbowFlowPhaseFraction = 0U;
+									ranbowFlow.enable = true;
+									ranbowFlow.direction = direction;
+
+									chVTSet(
+											&randColor_vt,
+											TIME_MS2I(effectStatus.speed),
+											(vtfunc_t)led_cb,
+											NULL
+									);
+							}
+							else
+							{
+									ranbowFlow.enable = false;
+							}
+							break;
         case EffectTypeKeytest:
         	chVTSet(&randColor_vt, TIME_MS2I(effectStatus.speed), (vtfunc_t)led_cb, NULL);
             break;
@@ -1305,6 +1317,70 @@ bool effectRandowColorProcess(void)
     return true;
 }
 
+#define MOSART_FRAME_DEBUG 1
+
+#if MOSART_FRAME_DEBUG
+static void mosart_debug_frame(uint8_t mode,
+                               uint16_t timer_base,
+                               uint8_t brightness)
+{
+    static uint32_t last_tick;
+    static uint32_t window_start;
+    static uint16_t frame_count;
+    static uint16_t min_delta = 0xFFFFU;
+    static uint16_t max_delta;
+    uint32_t now;
+    uint16_t delta;
+
+    now = get_system_time_ticks();
+
+    if (last_tick == 0U)
+    {
+        last_tick = now;
+        window_start = now;
+        frame_count = 0U;
+        min_delta = 0xFFFFU;
+        max_delta = 0U;
+        return;
+    }
+
+    delta = (uint16_t)(now - last_tick);
+    last_tick = now;
+
+    if (delta < min_delta)
+    {
+        min_delta = delta;
+    }
+
+    if (delta > max_delta)
+    {
+        max_delta = delta;
+    }
+
+    frame_count++;
+
+    if (frame_count >= 100U)
+    {
+        uprintf(
+            "[MOSART FRAME] mode=%u frames=100 elapsed=%lu "
+            "avg=%lu ms min=%u ms max=%u ms base=%u bright=%u\r\n",
+            (unsigned int)mode,
+            (unsigned long)(now - window_start),
+            (unsigned long)((now - window_start) / frame_count),
+            (unsigned int)min_delta,
+            (unsigned int)max_delta,
+            (unsigned int)timer_base,
+            (unsigned int)brightness
+        );
+
+        window_start = now;
+        frame_count = 0U;
+        min_delta = 0xFFFFU;
+        max_delta = 0U;
+    }
+}
+#endif
+
 bool effectMosArtProcess(void)
 {
     float tempmBright;
@@ -1339,9 +1415,13 @@ bool effectMosArtProcess(void)
                 bright = 255U;
                 break;
 
-            case mosArtBreath:
-                calculate_mosart_breath_volume(effect_speed,mosArt.TimerBase,&bright);
-                break;
+						case mosArtBreath:
+								calculate_mosart_breath_volume(effect_speed,mosArt.TimerBase,&bright);
+
+#if MOSART_FRAME_DEBUG
+								mosart_debug_frame(mosArt.Mode,mosArt.TimerBase,bright);
+#endif
+								break;
 
             case mosArtFlash:
                 Calculate_Flashing_Volume(mosArt.Speed,mosArt.TimerBase,&bright);
@@ -1404,6 +1484,10 @@ bool effectMosArtProcess(void)
         ledTemp.green = (uint8_t)(mosArt.LED.green * tempmBright);
         ledTemp.blue = (uint8_t)(mosArt.LED.blue * tempmBright);
         led_updateFrameBufferSingle(0U,LedNumbers,&ledTemp);
+				
+#if MOSART_FRAME_DEBUG
+        mosart_debug_frame(mosArt.Mode,mosArt.TimerBase,bright);
+#endif
 
         /*
          * Breath: 1 unit / 10 ms.
@@ -1422,120 +1506,272 @@ bool effectMosArtProcess(void)
     return false;
 }
 
-bool EffectTypeRainbowFlowProcess(void)
-{
-    uint8_t row, column;
-//    float tempmBright;
-    if (ranbowFlow.enable)
-    {
-    	if (effectStatus.interval!=0 && (get_system_time_ticks()-effectStatus.timeStamp>effectStatus.interval)){
-            chVTReset(&randColor_vt);
-            ranbowFlow.enable = false;
-            ledAllOff(false);
-            effectStatus.effect = EffectIdle;
-            if (effectStatus.runMode == demoMode){
-            	chBSemSignal(&ledRunmodeSem);
-            }
-            return false;
-        }
-//        tempmBright = (float)(ranbowFlow.Brightness) / 10;
-//        for (column = 0; column < 16; column++)
-//        {
-//            Calculate_Colorful_Color(0, ranbowFlow.timebase, &ranbowFlow.LED);
-//            if (ranbowFlow.direction)
-//            {
-//                ranbowFlow.timebase += 99;
-//            }
-//            else
-//            {
-//                ranbowFlow.timebase += 96;
-//            }
-//            ranbowFlow.LED.red *= tempmBright;
-//            ranbowFlow.LED.green *= tempmBright;
-//            ranbowFlow.LED.blue *= tempmBright;
-//            for (row = 0; row < 6; row++)
-//            {
-//                setRemapLED(row, column, ranbowFlow.LED);
-//            }
-//        }
+#define RAINBOW_FRAME_DEBUG 1
 
-        for (column = 0; column < LED_MATRIX_COLS; column++)
-        {
-            Calculate_Colorful_Color(0, ranbowFlow.timebase, &ranbowFlow.LED);
-            if (ranbowFlow.direction)
-            {
-                ranbowFlow.timebase += rainbowBase+4;
-            }
-            else
-            {
-                ranbowFlow.timebase += rainbowBase;
-            }
-//            ranbowFlow.LED.red *= tempmBright;
-//            ranbowFlow.LED.green *= tempmBright;
-//            ranbowFlow.LED.blue *= tempmBright;
-            for (row = 0; row < LED_MATRIX_ROWS; row++)
-            {
-                setRemapLED(row, column, ranbowFlow.LED);
-            }
-        }
-        chBSemSignal(&ledUpdateSem);
-        return true;
-    }
-    else
+#if RAINBOW_FRAME_DEBUG
+static void rainbow_debug_frame(uint16_t timebase)
+{
+    static uint32_t last_tick;
+    static uint32_t window_start;
+    static uint16_t frame_count;
+    static uint16_t min_delta = 0xFFFFU;
+    static uint16_t max_delta;
+    uint32_t now;
+    uint16_t delta;
+
+    now = get_system_time_ticks();
+
+    if (last_tick == 0U)
     {
-        chVTReset(&randColor_vt);
-        ranbowFlow.enable = false;
-        ledAllOff(false);
-        effectStatus.effect = EffectIdle;
+        last_tick = now;
+        window_start = now;
+        frame_count = 0U;
+        min_delta = 0xFFFFU;
+        max_delta = 0U;
+        return;
     }
-    return false;
+
+    delta = (uint16_t)(now - last_tick);
+    last_tick = now;
+
+    if (delta < min_delta)
+    {
+        min_delta = delta;
+    }
+
+    if (delta > max_delta)
+    {
+        max_delta = delta;
+    }
+
+    frame_count++;
+
+    /* 彩虹流動在 speed=20 約 147 ms/frame，10 frame 約 1.5 秒。 */
+    if (frame_count >= 10U)
+    {
+        uprintf(
+            "[RAINBOW FRAME] frames=10 elapsed=%lu "
+            "avg=%lu ms min=%u ms max=%u ms base=%u\r\n",
+            (unsigned long)(now - window_start),
+            (unsigned long)((now - window_start) / frame_count),
+            (unsigned int)min_delta,
+            (unsigned int)max_delta,
+            (unsigned int)timebase
+        );
+
+        window_start = now;
+        frame_count = 0U;
+        min_delta = 0xFFFFU;
+        max_delta = 0U;
+    }
 }
+#endif
 
 bool EffectTypeWheelProcess(void)
 {
-    uint8_t row, col;
+    uint8_t row;
+    uint8_t col;
 
-    if (!wheel_fx.enable) {
+    if (!wheel_fx.enable)
+    {
         chVTReset(&randColor_vt);
         ledAllOff(false);
         effectStatus.effect = EffectIdle;
         return false;
     }
 
-    if (!led_pos_inited) {
+    if (!led_pos_inited)
+    {
         led_pos_init_from_remap();
     }
 
-    if (effectStatus.interval != 0 &&
-        (get_system_time_ticks() - effectStatus.timeStamp > effectStatus.interval)) {
+    if ((effectStatus.interval != 0U) &&
+        ((get_system_time_ticks() -
+          effectStatus.timeStamp) >
+         effectStatus.interval))
+    {
         chVTReset(&randColor_vt);
         wheel_fx.enable = false;
         ledAllOff(false);
         effectStatus.effect = EffectIdle;
 
-        if (effectStatus.runMode == demoMode) {
+        if (effectStatus.runMode == demoMode)
+        {
             chBSemSignal(&ledRunmodeSem);
         }
+
         return false;
     }
 
-    for (row = 0; row < LED_MATRIX_ROWS; row++) {
-        for (col = 0; col < LED_MATRIX_COLS; col++) {
+    for (row = 0U;
+         row < LED_MATRIX_ROWS;
+         row++)
+    {
+        for (col = 0U;
+             col < LED_MATRIX_COLS;
+             col++)
+        {
             int8_t idx = ledRemap[row][col];
 
-            if (idx < 0 || idx >= LedNumbers) {
+            if ((idx < 0) ||
+                (idx >= LedNumbers))
+            {
                 continue;
             }
 
             {
-                uint8_t hue = wheel_base_hue[row][col] + wheel_fx.offset;
-                led_config_t color = wheel_hue_to_rgb(hue);
+                uint8_t hue =
+                    (uint8_t)(
+                        wheel_base_hue[row][col] +
+                        wheel_fx.offset
+                    );
+
+                led_config_t color =
+                    wheel_hue_to_rgb(hue);
+
                 LED_Datas[idx] = color;
             }
         }
     }
 
-    wheel_fx.offset += (uint8_t)(1u + (((uint16_t)led_clamp_percent(currentLED_RunMode.speed) * 7u) / 100u));
+    wheel_fx.offset +=
+        (uint8_t)(
+            1U +
+            (((uint16_t)
+              led_clamp_percent(
+                  currentLED_RunMode.speed
+              ) * 7U) / 100U)
+        );
+
+    chBSemSignal(&ledUpdateSem);
+    return true;
+}
+
+bool EffectTypeRainbowFlowProcess(void)
+{
+    uint8_t row;
+    uint8_t column;
+    uint8_t old_interval_ms;
+    uint16_t column_phase_step;
+    uint16_t frame_phase_step;
+    uint16_t frame_timebase;
+
+    if (!ranbowFlow.enable)
+    {
+        chVTReset(&randColor_vt);
+        ledAllOff(false);
+        effectStatus.effect = EffectIdle;
+        return false;
+    }
+
+    if ((effectStatus.interval != 0U) &&
+        ((get_system_time_ticks() -
+          effectStatus.timeStamp) >
+         effectStatus.interval))
+    {
+        chVTReset(&randColor_vt);
+        ranbowFlow.enable = false;
+        ledAllOff(false);
+        effectStatus.effect = EffectIdle;
+
+        if (effectStatus.runMode == demoMode)
+        {
+            chBSemSignal(&ledRunmodeSem);
+        }
+
+        return false;
+    }
+
+    /*
+     * RainbowFlow frame rate remains fixed at 10 ms.
+     * Use the old speed interval only to calculate phase movement.
+     */
+    old_interval_ms =
+        led_speed_percent_to_interval(
+            currentLED_RunMode.speed
+        );
+
+    column_phase_step =
+        (uint16_t)rainbowBase;
+
+    if (ranbowFlow.direction)
+    {
+        column_phase_step += 4U;
+    }
+
+    frame_phase_step =
+        (uint16_t)(
+            (
+                ((uint32_t)column_phase_step *
+                 LED_MATRIX_COLS *
+                 10U) +
+                ((uint32_t)old_interval_ms / 2U)
+            ) /
+            old_interval_ms
+        );
+
+    /*
+     * First reduce the 100 Hz equivalent step.
+     */
+    frame_phase_step /= 4U;
+
+    /*
+     * Reduce movement by another 60%.
+     * Keep 40% of the current RainbowFlow speed.
+     */
+    frame_phase_step =
+        (uint16_t)(
+            (((uint32_t)frame_phase_step * 10U) +
+             50U) / 100U
+        );
+
+    if (frame_phase_step == 0U)
+    {
+        frame_phase_step = 1U;
+    }
+
+    frame_timebase = ranbowFlow.timebase;
+
+    for (column = 0U;
+         column < LED_MATRIX_COLS;
+         column++)
+    {
+        uint16_t column_timebase;
+
+        column_timebase =
+            (uint16_t)(
+                frame_timebase +
+                ((uint16_t)column *
+                 column_phase_step)
+            );
+
+        Calculate_Colorful_Color(
+            0U,
+            column_timebase,
+            &ranbowFlow.LED
+        );
+
+        for (row = 0U;
+             row < LED_MATRIX_ROWS;
+             row++)
+        {
+            setRemapLED(
+                row,
+                column,
+                ranbowFlow.LED
+            );
+        }
+    }
+
+    ranbowFlow.timebase =
+        (uint16_t)(
+            frame_timebase +
+            frame_phase_step
+        );
+
+#if RAINBOW_FRAME_DEBUG
+    rainbow_debug_frame(ranbowFlow.timebase);
+#endif
 
     chBSemSignal(&ledUpdateSem);
     return true;
@@ -1848,6 +2084,10 @@ void Calculate_Waving_Volumn(uint8_t speed,uint16_t timebase,uint8_t *bright)
     if (bright != NULL) {
         *bright = lastBrightness;
     }
+		
+#if MOSART_FRAME_DEBUG
+		mosart_debug_frame(mosArt.Mode,mosArt.TimerBase,*bright);
+#endif
 
     chBSemSignal(&ledUpdateSem);
 
