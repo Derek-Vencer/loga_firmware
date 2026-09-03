@@ -1986,14 +1986,12 @@ void adcOffsetCalc(bool findMax, bool update, uint16_t samples)
                     }
                 }
 #else
-                if (adcFiltered[j][i] > initPostionLevel[j][i])
-                {
-#ifdef minTriggerCheck
-                    initPostionLevel[j][i] = adcFiltered[j][i] + 2U;
-#else
-                    initPostionLevel[j][i] = adcFiltered[j][i] + 5U;
-#endif
-                }
+								/*
+								 * 校正時所有按鍵皆為釋放狀態。
+								 * 使用目前濾波 ADC 作為基準，不取最大值、也不再額外 +5，
+								 * 避免線性化起始區間被錯誤箝位。
+								 */
+								initPostionLevel[j][i] = adcFiltered[j][i];
 #endif
             }
         }
