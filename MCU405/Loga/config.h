@@ -101,6 +101,19 @@
 #undef KB_COLOR_BRIGHTNESS_ADDR
 #define KB_COLOR_BRIGHTNESS_ADDR ((uint8_t *)KB_COLOR_MAGIC_ADDR)
 
+/*
+ * Per-effect RGB storage.  The legacy KB_COLOR_* bytes above hold only one
+ * shared colour, so they cannot retain independent colours for each effect.
+ * Keep this block below the ADC-gain page and below the usable EEPROM limit.
+ */
+#define KB_EFFECT_COLOR_SLOT_COUNT  16U
+#define KB_EFFECT_COLOR_SLOT_SIZE    3U
+#define KB_EFFECT_COLOR_BASE_ADDR \
+    ((uint8_t *)(uintptr_t)0xFF00U)
+#define KB_EFFECT_COLOR_MAGIC_ADDR \
+    ((uint8_t *)(uintptr_t)0xFF30U)
+#define KB_EFFECT_COLOR_MAGIC        0xC9U
+
 #define KEYMAP_SIZE (sizeof(uint16_t) * FN_ACTIONS_COUNT + sizeof(uint16_t) * KEYS_COUNT)
 
 #define EECONFIG_KEYMAP_OFFSET_CALIBRATION	(uint16_t *)(0x80)

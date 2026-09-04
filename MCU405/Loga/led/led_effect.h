@@ -29,6 +29,7 @@ void LED_SetReactiveColor(uint8_t red, uint8_t green, uint8_t blue);
 void ledAllOff(bool mode);
 void LED_SpeedChange(int8_t brightness, uint8_t speed);
 void led_set_effect_color(uint8_t red, uint8_t green, uint8_t blue);
+void led_reset_effect_colors(uint8_t red, uint8_t green, uint8_t blue);
 hsv_t rgb_to_hsv(led_config_t rgb);
 led_config_t hsv_to_rgb(hsv_t hsv);
 

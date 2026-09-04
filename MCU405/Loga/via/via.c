@@ -165,6 +165,7 @@ static void factory_reset_execute(void)
     eeprom_update_byte(KB_COLOR_BRIGHTNESS_ADDR, 30U);
     eeprom_update_byte(KB_COLOR_BRIGHTNESS_MAGIC_ADDR,
                        KB_COLOR_BRIGHTNESS_MAGIC);
+    led_reset_effect_colors(255U, 255U, 255U);
 
     eeprom_update_byte(
         (uint8_t *)EECONFIG_POLLING_RATE,
@@ -310,7 +311,8 @@ static void factory_system_reset_execute(void)
 		eeprom_update_byte((uint8_t *)KB_COLOR_BLUE_ADDR,  255U);
 		eeprom_update_byte((uint8_t *)KB_COLOR_MODE_ADDR,  3U);
 		eeprom_update_byte((uint8_t *)KB_COLOR_MAGIC_ADDR,KB_COLOR_MAGIC);
-		uprintf("[FACTORY SYS] LED default R=0 G=149 B=136 mode=3\r\n");
+		led_reset_effect_colors(255U, 255U, 255U);
+		uprintf("[FACTORY SYS] LED default R=255 G=255 B=255 mode=3\r\n");
     uprintf("[FACTORY SYS] End, system reset\r\n");
 
     chThdSleepMilliseconds(100U);

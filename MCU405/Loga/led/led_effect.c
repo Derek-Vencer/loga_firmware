@@ -2349,6 +2349,95 @@ void buildNormalModes(void){
 
 }
 
+static uint8_t *led_effect_color_slot_addr(uint8_t mode)
+{
+    return KB_EFFECT_COLOR_BASE_ADDR +
+           ((uint16_t)mode * KB_EFFECT_COLOR_SLOT_SIZE);
+}
+
+static void led_store_effect_color(uint8_t mode, led_config_t color)
+{
+    uint8_t *addr;
+
+    if (mode >= KB_EFFECT_COLOR_SLOT_COUNT)
+    {
+        return;
+    }
+
+    addr = led_effect_color_slot_addr(mode);
+    eeprom_update_byte(addr + 0U, color.red);
+    eeprom_update_byte(addr + 1U, color.green);
+    eeprom_update_byte(addr + 2U, color.blue);
+}
+
+void led_reset_effect_colors(uint8_t red, uint8_t green, uint8_t blue)
+{
+    uint8_t mode;
+    led_config_t color;
+
+    color.red   = red;
+    color.green = green;
+    color.blue  = blue;
+
+    for (mode = 0U; mode < KB_EFFECT_COLOR_SLOT_COUNT; mode++)
+    {
+        /* Mode 0 is the fixed Off effect and is never user-configurable. */
+        if (mode == 0U)
+        {
+            led_config_t off_color = LED_NULL;
+            led_store_effect_color(mode, off_color);
+        }
+        else
+        {
+            led_store_effect_color(mode, color);
+        }
+    }
+
+    eeprom_update_byte(KB_EFFECT_COLOR_MAGIC_ADDR,
+                       KB_EFFECT_COLOR_MAGIC);
+}
+
+static void led_load_effect_colors(led_config_t fallback)
+{
+    uint8_t mode;
+    uint8_t *addr;
+    led_config_t color;
+
+    if (eeprom_read_byte(KB_EFFECT_COLOR_MAGIC_ADDR) !=
+        KB_EFFECT_COLOR_MAGIC)
+    {
+        /* Migrate existing firmware: use its former shared colour once. */
+        led_reset_effect_colors(fallback.red, fallback.green, fallback.blue);
+    }
+
+    for (mode = 0U; mode <= LED_PresetModeIndex; mode++)
+    {
+        if (mode >= KB_EFFECT_COLOR_SLOT_COUNT)
+        {
+            break;
+        }
+
+        /* Mode 0 must remain black even when old EEPROM contains RGB data. */
+        if (mode == 0U)
+        {
+            LED_PresetMode[mode].color = LED_NULL;
+            continue;
+        }
+
+        if (LED_PresetMode[mode].colorMode != single)
+        {
+            continue;
+        }
+
+        addr = led_effect_color_slot_addr(mode);
+        color.red   = eeprom_read_byte(addr + 0U);
+        color.green = eeprom_read_byte(addr + 1U);
+        color.blue  = eeprom_read_byte(addr + 2U);
+
+        LED_PresetMode[mode].color = color;
+    }
+}
+
 static inline uint8_t u8_max3(uint8_t a, uint8_t b, uint8_t c) {
     uint8_t m = (a > b) ? a : b;
     return (m > c) ? m : c;
@@ -2589,6 +2678,7 @@ void LED_init(void)
 
     buildDemoModes();
     buildNormalModes();
+    led_load_effect_colors(c);
 
     led_pos_init_from_remap();
     wheel_init_table();
@@ -2629,12 +2719,23 @@ void LED_init(void)
 
 void led_set_effect_color(uint8_t red, uint8_t green, uint8_t blue)
 {
-    uint8_t index;
     led_config_t new_color;
 
     new_color.red   = red;
     new_color.green = green;
     new_color.blue  = blue;
+
+    /* Mode 0 is a fixed lighting-Off mode, not a configurable colour mode. */
+    if ((currentLED_RunMode.type == normalMode) &&
+        (normalEffect == 0))
+    {
+        c = LED_NULL;
+        mosArt.LED = LED_NULL;
+        LED_PresetMode[0].color = LED_NULL;
+
+        uprintf("[LED] Ignore colour change in Off mode\r\n");
+        return;
+    }
 
     /*
      * 更新共用燈效顏色。
@@ -2658,6 +2759,7 @@ void led_set_effect_color(uint8_t red, uint8_t green, uint8_t blue)
         (LED_PresetMode[(uint8_t)normalEffect].colorMode == single))
     {
         LED_PresetMode[(uint8_t)normalEffect].color = new_color;
+        led_store_effect_color((uint8_t)normalEffect, new_color);
 
         uprintf(
             "[LED] Active preset index=%u color=%u/%u/%u\r\n",
@@ -2666,25 +2768,6 @@ void led_set_effect_color(uint8_t red, uint8_t green, uint8_t blue)
             new_color.green,
             new_color.blue
         );
-    }
-
-    /*
-     * 更新所有 Reactive preset 的顏色。
-     */
-    for (index = 0U; index <= LED_PresetModeIndex; index++)
-    {
-        if (LED_PresetMode[index].effect == EffectTypeReactive)
-        {
-            LED_PresetMode[index].color = new_color;
-
-            uprintf(
-                "[LED] Reactive preset index=%u color=%u/%u/%u\r\n",
-                index,
-                new_color.red,
-                new_color.green,
-                new_color.blue
-            );
-        }
     }
 
     uprintf(
