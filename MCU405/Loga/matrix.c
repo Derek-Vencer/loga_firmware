@@ -1542,12 +1542,15 @@ static void adcerrorcallback(ADCDriver* adcp, adcerror_t err);
 static adcsample_t adcFiltered[ADC_BUF_DEPTH][ADC_NUM_CHANNELS];
 static bool adcFilterReady[ADC_BUF_DEPTH];
 
+static adcsample_t adcDisplayOrigin[ADC_BUF_DEPTH][ADC_NUM_CHANNELS];
+static bool adcDisplayOriginValid[ADC_BUF_DEPTH][ADC_NUM_CHANNELS];
+
 #define HIGH_MODE_1
 
 #ifdef HIGH_MODE_1
-#define ADC_FILTER_DEADBAND       12  /* 原本 7 */
-#define ADC_FILTER_MEDIUM_DELTA   32  /* 原本 16 */
-#define ADC_FILTER_FAST_DELTA     96  /* 原本 80 */
+#define ADC_FILTER_DEADBAND       0
+#define ADC_FILTER_MEDIUM_DELTA  48
+#define ADC_FILTER_FAST_DELTA   128
 #endif
 
 #ifdef  HIGH_MODE
@@ -1702,53 +1705,65 @@ uint16_t matrix_get_filtered_adc(uint8_t channel,uint8_t group)
  */
 uint16_t matrix_get_linearized_adc(uint8_t channel, uint8_t group)
 {
-    uint32_t raw;
-    uint32_t initial;
-    uint32_t bottom;
-    uint32_t range;
-    uint32_t delta;
-    uint32_t corrected_delta;
+    int32_t raw;
+    int32_t origin;
+    int32_t travel;
+    int32_t range;
+    int32_t delta;
+    int32_t corrected_delta;
 
     if (channel >= ADC_BUF_DEPTH || group >= ADC_NUM_CHANNELS)
     {
         return 0U;
     }
 
-    raw = (uint32_t)adcFiltered[channel][group];
-    initial = (uint32_t)initPostionLevel[channel][group];
-    bottom = (uint32_t)travelPostionLevel[channel][group];
+    raw = (int32_t)adcFiltered[channel][group];
+    travel = (int32_t)travelPostionLevel[channel][group];
 
-    if (bottom <= initial)
+    /*
+     * 顯示原點使用該按鍵釋放時的實際 ADC，
+     * 不使用 initPostionLevel（它只是觸發校正值）。
+     */
+    if (!adcDisplayOriginValid[channel][group] ||
+        raw < (int32_t)adcDisplayOrigin[channel][group])
+    {
+        adcDisplayOrigin[channel][group] = (adcsample_t)raw;
+        adcDisplayOriginValid[channel][group] = true;
+    }
+
+    origin = (int32_t)adcDisplayOrigin[channel][group];
+    range = travel - origin;
+
+    if (range < (int32_t)ADC_LINEARIZATION_MIN_RANGE)
     {
         return (uint16_t)raw;
     }
 
-    range = bottom - initial;
-    if (range < ADC_LINEARIZATION_MIN_RANGE)
+    if (raw <= origin)
     {
-        return (uint16_t)raw;
+        return (uint16_t)origin;
     }
 
-    if (raw <= initial)
+    if (raw >= travel)
     {
-        return (uint16_t)initial;
+        return (uint16_t)travel;
     }
 
-    if (raw >= bottom)
-    {
-        return (uint16_t)bottom;
-    }
+    delta = raw - origin;
 
-    delta = raw - initial;
-    corrected_delta = (uint32_t)((sqrtf((float)delta / (float)range) *
-                                  (float)range) + 0.5f);
+    corrected_delta =
+        (int32_t)(
+            sqrtf((float)delta / (float)range) *
+            (float)range +
+            0.5f
+        );
 
     if (corrected_delta > range)
     {
         corrected_delta = range;
     }
 
-    return (uint16_t)(initial + corrected_delta);
+    return (uint16_t)(origin + corrected_delta);
 }
 
 /*
@@ -1986,12 +2001,14 @@ void adcOffsetCalc(bool findMax, bool update, uint16_t samples)
                     }
                 }
 #else
-								/*
-								 * 校正時所有按鍵皆為釋放狀態。
-								 * 使用目前濾波 ADC 作為基準，不取最大值、也不再額外 +5，
-								 * 避免線性化起始區間被錯誤箝位。
-								 */
-								initPostionLevel[j][i] = adcFiltered[j][i];
+                if (adcFiltered[j][i] > initPostionLevel[j][i])
+                {
+#ifdef minTriggerCheck
+                    initPostionLevel[j][i] = adcFiltered[j][i] + 2U;
+#else
+                    initPostionLevel[j][i] = adcFiltered[j][i] + 1U;
+#endif
+                }
 #endif
             }
         }
@@ -4558,7 +4575,7 @@ bool hook_matrix_change(keyrecord_t record)
 		// ripple_color.green = 220;
 		// ripple_color.blue = 255;
 		// ripple_add_event(record.event.key.row, record.event.key.col, ripple_color);
-		ripple_add_event(record.event.key.row, record.event.key.col, c);
+		ripple_add_event(record.event.key.row,record.event.key.col,LED_PresetMode[currentLED_RunMode.mode].color);
 	}
 	#ifdef socd
 	if(isSOCD){

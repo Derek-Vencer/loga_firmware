@@ -2576,6 +2576,9 @@ bool setRunMode(led_runMode_t runMode)
             normalEffect = runMode.mode;
             normalBrightness = runMode.brightness;
             normalSpeed = runMode.speed;
+						
+						/* 切換模式時，載入該 mode 自己保存的顏色。 */
+						mosArt.LED = LED_PresetMode[normalEffect].color;
 
             chBSemSignal(&ledRunmodeSem);
             break;
