@@ -426,7 +426,6 @@
 #endif
 
 uint16_t matrix_get_filtered_adc(uint8_t channel,uint8_t group);
-uint16_t matrix_get_linearized_adc(uint8_t channel, uint8_t group);
 void adc_gain_load_from_eeprom(void);
 bool adc_gain_set(uint8_t port, uint8_t gain);
 uint8_t adc_gain_get(uint8_t port);

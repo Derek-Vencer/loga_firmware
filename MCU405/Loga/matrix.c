@@ -48,12 +48,6 @@ extern socd_policy_t g_policy;
 #define TRAVEL_STEPS 350
 
 /*
- * A calibration span smaller than this is not reliable enough to correct.
- * In that case the unmodified filtered ADC value is reported instead.
- */
-#define ADC_LINEARIZATION_MIN_RANGE 32U
-
-/*
  * Missing declarations used by matrix.c.
  */
 //uint8_t get_highest_layer(layer_state_t state);
@@ -1542,15 +1536,12 @@ static void adcerrorcallback(ADCDriver* adcp, adcerror_t err);
 static adcsample_t adcFiltered[ADC_BUF_DEPTH][ADC_NUM_CHANNELS];
 static bool adcFilterReady[ADC_BUF_DEPTH];
 
-static adcsample_t adcDisplayOrigin[ADC_BUF_DEPTH][ADC_NUM_CHANNELS];
-static bool adcDisplayOriginValid[ADC_BUF_DEPTH][ADC_NUM_CHANNELS];
-
 #define HIGH_MODE_1
 
 #ifdef HIGH_MODE_1
-#define ADC_FILTER_DEADBAND       0
-#define ADC_FILTER_MEDIUM_DELTA  48
-#define ADC_FILTER_FAST_DELTA   128
+#define ADC_FILTER_DEADBAND       12  /* 原本 7 */
+#define ADC_FILTER_MEDIUM_DELTA   32  /* 原本 16 */
+#define ADC_FILTER_FAST_DELTA     96  /* 原本 80 */
 #endif
 
 #ifdef  HIGH_MODE
@@ -1691,79 +1682,6 @@ uint16_t matrix_get_filtered_adc(uint8_t channel,uint8_t group)
     }
 
     return (uint16_t)adcFiltered[channel][group];
-}
-
-/*
- * Return a display-only, per-key linearized ADC value.
- *
- * The Hall sensor curve is approximately quadratic: raw_delta is
- * proportional to travel^2.  The inverse square-root transformation below
- * makes the reported ADC value proportional to travel while retaining each
- * key's own calibrated rest level and full-travel level.  No trigger or
- * release decision uses this value, so changing the displayed curve cannot
- * cause keys to actuate unexpectedly.
- */
-uint16_t matrix_get_linearized_adc(uint8_t channel, uint8_t group)
-{
-    int32_t raw;
-    int32_t origin;
-    int32_t travel;
-    int32_t range;
-    int32_t delta;
-    int32_t corrected_delta;
-
-    if (channel >= ADC_BUF_DEPTH || group >= ADC_NUM_CHANNELS)
-    {
-        return 0U;
-    }
-
-    raw = (int32_t)adcFiltered[channel][group];
-    travel = (int32_t)travelPostionLevel[channel][group];
-
-    /*
-     * 顯示原點使用該按鍵釋放時的實際 ADC，
-     * 不使用 initPostionLevel（它只是觸發校正值）。
-     */
-    if (!adcDisplayOriginValid[channel][group] ||
-        raw < (int32_t)adcDisplayOrigin[channel][group])
-    {
-        adcDisplayOrigin[channel][group] = (adcsample_t)raw;
-        adcDisplayOriginValid[channel][group] = true;
-    }
-
-    origin = (int32_t)adcDisplayOrigin[channel][group];
-    range = travel - origin;
-
-    if (range < (int32_t)ADC_LINEARIZATION_MIN_RANGE)
-    {
-        return (uint16_t)raw;
-    }
-
-    if (raw <= origin)
-    {
-        return (uint16_t)origin;
-    }
-
-    if (raw >= travel)
-    {
-        return (uint16_t)travel;
-    }
-
-    delta = raw - origin;
-
-    corrected_delta =
-        (int32_t)(
-            sqrtf((float)delta / (float)range) *
-            (float)range +
-            0.5f
-        );
-
-    if (corrected_delta > range)
-    {
-        corrected_delta = range;
-    }
-
-    return (uint16_t)(origin + corrected_delta);
 }
 
 /*
@@ -2006,7 +1924,7 @@ void adcOffsetCalc(bool findMax, bool update, uint16_t samples)
 #ifdef minTriggerCheck
                     initPostionLevel[j][i] = adcFiltered[j][i] + 2U;
 #else
-                    initPostionLevel[j][i] = adcFiltered[j][i] + 1U;
+                    initPostionLevel[j][i] = adcFiltered[j][i] + 5U;
 #endif
                 }
 #endif
