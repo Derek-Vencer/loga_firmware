@@ -837,6 +837,7 @@ void LED_SpeedChange(int8_t brightness, uint8_t speed)
     );
 }
 
+
 bool LED_Effect(uint8_t effect, bool enable, uint32_t interval, uint8_t colorMode, uint8_t mode, led_config_t color, uint8_t brightness, uint8_t speed, bool direction)
 {
     switch (effect)

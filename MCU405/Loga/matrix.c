@@ -1541,7 +1541,7 @@ static bool adcFilterReady[ADC_BUF_DEPTH];
 #ifdef HIGH_MODE_1
 #define ADC_FILTER_DEADBAND       12  /* 原本 7 */
 #define ADC_FILTER_MEDIUM_DELTA   32  /* 原本 16 */
-#define ADC_FILTER_FAST_DELTA     96  /* 原本 80 */
+#define ADC_FILTER_FAST_DELTA     95  /* 原本 80 */
 #endif
 
 #ifdef  HIGH_MODE
