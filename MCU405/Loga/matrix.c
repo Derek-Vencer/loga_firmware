@@ -47,6 +47,78 @@ extern socd_policy_t g_policy;
 #include "../../keyboard_core/protocol/chibios/usb_main.h"
 #define TRAVEL_STEPS 350
 
+/* =========================================================
+ * LOGA Latency Debug GPIO
+ *
+ * TP47 PA5 : ADC Conversion
+ * TP48 PA6 : Matrix Processing
+ * TP49 PA7 : Press / Release
+ * TP50 PC4 : HID Report Update
+ * TP51 PC5 : USB Report Submit
+ * ========================================================= */
+
+#define LOGA_LATENCY_GPIO_DEBUG 1
+
+#if LOGA_LATENCY_GPIO_DEBUG
+
+#define LAT_ADC_START()       palSetPad(GPIOA, 5)
+#define LAT_ADC_END()         palClearPad(GPIOA, 5)
+
+#define LAT_MATRIX_START()    palSetPad(GPIOA, 6)
+#define LAT_MATRIX_END()      palClearPad(GPIOA, 6)
+
+#define LAT_KEY_PRESS()       palSetPad(GPIOA, 7)
+#define LAT_KEY_RELEASE()     palClearPad(GPIOA, 7)
+
+#define LAT_HID_START()       palSetPad(GPIOC, 4)
+#define LAT_HID_END()         palClearPad(GPIOC, 4)
+
+#define LAT_USB_START()       palSetPad(GPIOC, 5)
+#define LAT_USB_END()         palClearPad(GPIOC, 5)
+
+#else
+
+#define LAT_ADC_START()       ((void)0)
+#define LAT_ADC_END()         ((void)0)
+
+#define LAT_MATRIX_START()    ((void)0)
+#define LAT_MATRIX_END()      ((void)0)
+
+#define LAT_KEY_PRESS()       ((void)0)
+#define LAT_KEY_RELEASE()     ((void)0)
+
+#define LAT_HID_START()       ((void)0)
+#define LAT_HID_END()         ((void)0)
+
+#define LAT_USB_START()       ((void)0)
+#define LAT_USB_END()         ((void)0)
+
+#endif
+
+/* =====================================================
+ * LOGA Latency Debug GPIO - Group 2
+ * ===================================================== */
+
+/* TP52 / PB0 : ADC Filter execution */
+#define LAT_FILTER_START()      palSetPad(GPIOB, 0)
+#define LAT_FILTER_END()        palClearPad(GPIOB, 0)
+
+/* TP53 / PB1 : Target ADC data update */
+#define LAT_ADC_KEY_START()     palSetPad(GPIOB, 1)
+#define LAT_ADC_KEY_END()       palClearPad(GPIOB, 1)
+
+/* TP54 / PB2 : Threshold crossing state */
+#define LAT_THRESHOLD_PRESS()   palSetPad(GPIOB, 2)
+#define LAT_THRESHOLD_RELEASE() palClearPad(GPIOB, 2)
+
+/* TP55 / PB10 : Matrix commit */
+#define LAT_COMMIT_START()      palSetPad(GPIOB, 10)
+#define LAT_COMMIT_END()        palClearPad(GPIOB, 10)
+
+/* TP56 / PB12 : USB transfer complete */
+#define LAT_USB_DONE_START()    palSetPad(GPIOB, 12)
+#define LAT_USB_DONE_END()      palClearPad(GPIOB, 12)
+
 /*
  * Missing declarations used by matrix.c.
  */
@@ -1598,6 +1670,15 @@ static inline adcsample_t adc_apply_digital_gain(
 
     return (adcsample_t)amplified;
 }
+
+#if LOGA_LATENCY_GPIO_DEBUG
+static int32_t esc_raw_baseline = 0;
+static bool esc_raw_baseline_ready = false;
+static bool esc_raw_detected = false;
+
+#define ESC_RAW_CHANGE_THRESHOLD 5
+#endif
+
 static void adc_filter_update_channel(uint8_t channel)
 {
     if (channel >= ADC_BUF_DEPTH) {
@@ -1635,6 +1716,45 @@ static void adc_filter_update_channel(uint8_t channel)
             group,
             samples2[channel][group]
         );
+			
+#if LOGA_LATENCY_GPIO_DEBUG
+
+				if (channel == 0U && group == 0U)
+				{
+						if (!esc_raw_baseline_ready)
+						{
+								esc_raw_baseline = raw;
+								esc_raw_baseline_ready = true;
+						}
+
+						int32_t delta = raw - esc_raw_baseline;
+
+						/*
+						 * TP53 HIGH:
+						 * ESC ADC RAW exceeds baseline by 20 counts.
+						 *
+						 * TP53 LOW:
+						 * ESC ADC RAW returns within 10 counts.
+						 */
+						if (delta > ESC_RAW_CHANGE_THRESHOLD)
+						{
+								if (!esc_raw_detected)
+								{
+										palSetPad(GPIOB, 1);
+										esc_raw_detected = true;
+								}
+						}
+						else if (delta < 10)
+						{
+								if (esc_raw_detected)
+								{
+										palClearPad(GPIOB, 1);
+										esc_raw_detected = false;
+								}
+						}
+				}
+
+#endif
 
         filtered = (int32_t)adcFiltered[channel][group];
         difference = raw - filtered;
@@ -1825,6 +1945,10 @@ void irq_storm_gpt9_cb(GPTDriver *gptp)
 			if (!ledUpdatingLock){
 				if (adcsampleIndex<16){	 
 					AdcPortChange(false);
+					
+					/* TP47 HIGH：ADC Conversion Start */
+					LAT_ADC_START();
+					
 					adcStartConversion(&ADCD1, &adcgrpcfg2, &samples2[adcsampleIndex][0], 1);
 				return;
 				} else {
@@ -2124,15 +2248,33 @@ static void adccallback(ADCDriver *adcp)
     uint8_t completed_channel;
 
     (void)adcp;
+	
+    /*
+     * TP47 LOW:
+     * ADC conversion callback entered.
+     *
+     * Exclude ADC filtering execution time.
+     */
+    LAT_ADC_END();
 
     completed_channel =
         (uint8_t)adcsampleIndex;
 
     if (completed_channel < ADC_BUF_DEPTH)
     {
+#if LOGA_LATENCY_GPIO_DEBUG
+        /* TP52 HIGH : Filter Start */
+        LAT_FILTER_START();
+#endif
+			
         adc_filter_update_channel(completed_channel);
+			
+#if LOGA_LATENCY_GPIO_DEBUG
+        /* TP52 LOW : Filter End */
+        LAT_FILTER_END();
+#endif
     }
-
+		
     chBSemSignalI(&adcCompleteSem);
 
     sensorPowerCtrl(false);
@@ -2406,6 +2548,22 @@ if (!reset_checked)
             if (!matrix_key_location_valid(keyLocation)) {
                 continue;
             }
+						/*
+						 * TP53 : PB1
+						 * Selected key ADC processing marker.
+						 *
+						 * Example:
+						 * row = 2
+						 * col = 14
+						 */
+//#if LOGA_LATENCY_GPIO_DEBUG
+//						if (keyLocation.rowA == 0 &&
+//								keyLocation.colA == 0)
+//						{
+//								palSetPad(GPIOB, 1);
+//								palClearPad(GPIOB, 1);
+//						}
+//#endif
 
             switch (currentKeyMatrixMode)
             {
@@ -3144,6 +3302,12 @@ if (!reset_checked)
                     if (adcPre >
                         trigger_level)
                     {
+#if LOGA_LATENCY_GPIO_DEBUG
+												if (row == 0U && col == 0U)
+												{
+														palSetPad(GPIOB, 2);
+												}
+#endif
                         matrix_temp[row] |=
                             key_mask;
                     }
@@ -3151,9 +3315,48 @@ if (!reset_checked)
                 else if (
                     adcPre <= release_level)
                 {
+#if LOGA_LATENCY_GPIO_DEBUG
+										if (row == 0U && col == 0U)
+										{
+												palClearPad(GPIOB, 2);
+
+												//palClearPad(GPIOB, 1);
+												//esc_raw_detected = false;
+										}
+#endif
                     matrix_temp[row] &=
                         ~key_mask;
                 }
+								
+                /* ============================================
+                 * TP49 / PA7 - Analog Key Press / Release
+                 *
+                 * Target: Matrix Row 2, Column 14
+                 * HIGH = Press
+                 * LOW  = Release
+                 * ============================================ */
+#if LOGA_LATENCY_GPIO_DEBUG
+
+							if (row == 0U && col == 0U)
+							{
+									const bool debug_now_pressed =
+											(matrix_temp[row] & key_mask) != 0U;
+
+									if (was_pressed != debug_now_pressed)
+									{
+											if (debug_now_pressed)
+											{
+													LAT_KEY_PRESS();
+											}
+											else
+											{
+													LAT_KEY_RELEASE();
+											}
+									}
+							}
+
+#endif
+
 #ifndef NO_PRINT
                 {
                     const bool now_pressed =
@@ -3308,13 +3511,17 @@ if (!reset_checked)
 
         last_layer_state =
             current_layer_state;
-
+#if LOGA_LATENCY_GPIO_DEBUG
+				palSetPad(GPIOB, 10);
+#endif
         memcpy(
             matrix,
             matrix_temp,
             sizeof(matrix)
         );
-
+#if LOGA_LATENCY_GPIO_DEBUG
+				palClearPad(GPIOB, 10);
+#endif		
         keyboard_taskTMR();
     }
 
@@ -3380,8 +3587,12 @@ static THD_FUNCTION(ADC_ProcessThread, arg)
 
 
     //Mux Enable IO
+#if !LOGA_LATENCY_GPIO_DEBUG
+
+    /* Original MUX Enable GPIO initialization */
     palSetGroupMode(GPIOC, PAL_PORT_BIT(4) | PAL_PORT_BIT(5), 0, PAL_MODE_OUTPUT_PUSHPULL);
     palWriteGroup(GPIOC, PAL_PORT_BIT(4) | PAL_PORT_BIT(5), 0, 0x0000);
+#endif
 
     palSetGroupMode(GPIOB, PAL_PORT_BIT(0) | PAL_PORT_BIT(1) | PAL_PORT_BIT(2) | PAL_PORT_BIT(10) | PAL_PORT_BIT(12), 0, PAL_MODE_OUTPUT_PUSHPULL);
     palWriteGroup(GPIOB, PAL_PORT_BIT(0) | PAL_PORT_BIT(1) | PAL_PORT_BIT(2) | PAL_PORT_BIT(10) | PAL_PORT_BIT(12), 0, 0x0000);
@@ -3513,7 +3724,14 @@ static THD_FUNCTION(ADC_ProcessThread, arg)
     while (1)
     {
 				chBSemWait(&adcCompleteSem); 
+			
+				/* TP48 HIGH：Matrix Scan Start */
+				LAT_MATRIX_START();
+			
 				matrixAnalogScan();
+			
+				/* TP48 LOW：Matrix Scan Complete */
+				LAT_MATRIX_END();
     }
 }
 
@@ -3796,6 +4014,50 @@ if (!eepromInitCheck) {
 		reset_all_key_init();
 		factory_system_reset_init();
 		knobState = eeprom_read_byte(KB_ENCODER_MODE_ADDR);
+
+#if LOGA_LATENCY_GPIO_DEBUG
+
+    /* GPIOA */
+    palSetPadMode(GPIOA, 5, PAL_MODE_OUTPUT_PUSHPULL);
+    palSetPadMode(GPIOA, 6, PAL_MODE_OUTPUT_PUSHPULL);
+    palSetPadMode(GPIOA, 7, PAL_MODE_OUTPUT_PUSHPULL);
+
+    /* GPIOC */
+    palSetPadMode(GPIOC, 4, PAL_MODE_OUTPUT_PUSHPULL);
+    palSetPadMode(GPIOC, 5, PAL_MODE_OUTPUT_PUSHPULL);
+
+    /* Initial LOW */
+    palClearPad(GPIOA, 5);
+    palClearPad(GPIOA, 6);
+    palClearPad(GPIOA, 7);
+
+    palClearPad(GPIOC, 4);
+    palClearPad(GPIOC, 5);
+		
+
+		/* TP52 : PB0 */
+		palSetPadMode(GPIOB, 0, PAL_MODE_OUTPUT_PUSHPULL);
+
+		/* TP53 : PB1 */
+		palSetPadMode(GPIOB, 1, PAL_MODE_OUTPUT_PUSHPULL);
+
+		/* TP54 : PB2 */
+		palSetPadMode(GPIOB, 2, PAL_MODE_OUTPUT_PUSHPULL);
+
+		/* TP55 : PB10 */
+		palSetPadMode(GPIOB, 10, PAL_MODE_OUTPUT_PUSHPULL);
+
+		/* TP56 : PB12 */
+		palSetPadMode(GPIOB, 12, PAL_MODE_OUTPUT_PUSHPULL);
+
+		palClearPad(GPIOB, 0);
+		palClearPad(GPIOB, 1);
+		palClearPad(GPIOB, 2);
+		palClearPad(GPIOB, 10);
+		palClearPad(GPIOB, 12);
+
+
+#endif
 }
 
 

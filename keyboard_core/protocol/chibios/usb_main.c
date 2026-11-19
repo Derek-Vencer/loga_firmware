@@ -4612,21 +4612,45 @@ void send_remote_wakeup(USBDriver *usbp)
  */
 
 /* keyboard IN callback hander (a kbd report has made it IN) */
+/* =====================================================
+ * LOGA USB HID Latency Debug
+ *
+ * TP56 = PB12
+ *
+ * HIGH : USB IN Transfer Complete Callback
+ * LOW  : Callback Debug Pulse End
+ * ===================================================== */
+
+#define LOGA_LATENCY_GPIO_DEBUG 1
+
+/* Keyboard IN callback */
 void kbd_in_cb(USBDriver *usbp, usbep_t ep)
 {
-    /* STUB */
+#if LOGA_LATENCY_GPIO_DEBUG
+    /* TP56 : USB Keyboard Transfer Complete */
+    palSetPad(GPIOB, 12);
+    palClearPad(GPIOB, 12);
+#endif
+
     (void)usbp;
     (void)ep;
 }
 
 #ifdef NKRO_ENABLE
-/* nkro IN callback hander (a nkro report has made it IN) */
+
+/* NKRO Keyboard IN callback */
 void nkro_in_cb(USBDriver *usbp, usbep_t ep)
 {
-    /* STUB */
+#if LOGA_LATENCY_GPIO_DEBUG
+    /* TP56 : USB NKRO Transfer Complete */
+    palSetPad(GPIOB, 12);
+    palClearPad(GPIOB, 12);
+#endif
+
     (void)usbp;
     (void)ep;
 }
+
 #endif /* NKRO_ENABLE */
 
 /* start-of-frame handler
@@ -4711,7 +4735,14 @@ void send_keyboard(report_keyboard_t *report)
              * Note: for suspend, need USB_USE_WAIT == TRUE in halconf.h */
             osalThreadSuspendS(&(&USB_DRIVER)->epc[NKRO_ENDPOINT]->in_state->thread);
         }
+				/* TP51 HIGH: USB HID transmission requested */
+				palSetPad(GPIOC, 5);
+				
         usbStartTransmitI(&USB_DRIVER, NKRO_ENDPOINT, (uint8_t *)report, sizeof(report_keyboard_t));
+				
+				/* TP51 LOW: USB transmit API returned */
+				palClearPad(GPIOC, 5);
+				
         osalSysUnlock();
     }
     else
@@ -4728,7 +4759,14 @@ void send_keyboard(report_keyboard_t *report)
              * Note: for suspend, need USB_USE_WAIT == TRUE in halconf.h */
             osalThreadSuspendS(&(&USB_DRIVER)->epc[KBD_ENDPOINT]->in_state->thread);
         }
+				/* TP51 HIGH: USB HID transmission requested */
+				palSetPad(GPIOC, 5);
+				
         usbStartTransmitI(&USB_DRIVER, KBD_ENDPOINT, (uint8_t *)report, KBD_EPSIZE);
+				
+				/* TP51 LOW: USB transmit API returned */
+				palClearPad(GPIOC, 5);
+				
         osalSysUnlock();
     }
     keyboard_report_sent = *report;

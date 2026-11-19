@@ -179,7 +179,13 @@ void keyboard_taskTMR(void)
                     };
                     keyrecord_t record = { .event = e };
                     if (hook_matrix_change(record)){
-                    action_exec(e);
+                        /* TP50 HIGH: Start processing keyboard event */
+												palSetPad(GPIOC, 4);
+
+												action_exec(e);
+
+												/* TP50 LOW: Keyboard event processing returned */
+												palClearPad(GPIOC, 4);
                     }
 //                    action_exec(e);
 //                    hook_matrix_change(e);
