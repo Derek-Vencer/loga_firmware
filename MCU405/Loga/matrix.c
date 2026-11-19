@@ -103,7 +103,7 @@ extern socd_policy_t g_policy;
 #define LAT_FILTER_START()      palSetPad(GPIOB, 0)
 #define LAT_FILTER_END()        palClearPad(GPIOB, 0)
 
-/* TP53 / PB1 : Target ADC data update */
+/* TP53 / PB1 : ESC raw ADC delta state (not an ADC update pulse) */
 #define LAT_ADC_KEY_START()     palSetPad(GPIOB, 1)
 #define LAT_ADC_KEY_END()       palClearPad(GPIOB, 1)
 
@@ -1676,7 +1676,8 @@ static int32_t esc_raw_baseline = 0;
 static bool esc_raw_baseline_ready = false;
 static bool esc_raw_detected = false;
 
-#define ESC_RAW_CHANGE_THRESHOLD 5
+#define ESC_RAW_CHANGE_THRESHOLD 20
+#define ESC_RAW_RELEASE_THRESHOLD 10
 #endif
 
 static void adc_filter_update_channel(uint8_t channel)
@@ -1744,7 +1745,7 @@ static void adc_filter_update_channel(uint8_t channel)
 										esc_raw_detected = true;
 								}
 						}
-						else if (delta < 10)
+						else if (delta < ESC_RAW_RELEASE_THRESHOLD)
 						{
 								if (esc_raw_detected)
 								{
@@ -3331,7 +3332,7 @@ if (!reset_checked)
                 /* ============================================
                  * TP49 / PA7 - Analog Key Press / Release
                  *
-                 * Target: Matrix Row 2, Column 14
+                 * Target: Matrix Row 0, Column 0 (ESC)
                  * HIGH = Press
                  * LOW  = Release
                  * ============================================ */
