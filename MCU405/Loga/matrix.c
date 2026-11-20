@@ -3530,7 +3530,10 @@ if (!reset_checked)
                     else
                     {
                         pgdn_raw_press_count = 0U;
-                        if (raw_travel <= release_level)
+                        /* Test20: PgDn-only RAW fast release at travel 20.
+                         * Keep configured release_level and all other
+                         * keys unchanged; retain two-sample confirmation. */
+                        if (raw_travel <= 20)
                         {
                             if (pgdn_raw_release_count < 2U)
                                 pgdn_raw_release_count++;
