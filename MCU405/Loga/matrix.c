@@ -1784,14 +1784,14 @@ static THD_FUNCTION(PgdnDiagThread, arg)
         if (press_count != 0U)
         {
             pgdn_diag_press_pending = 0U;
-            uprintf("[PGDN_KEY] PRESS count=%lu\\r\\n",
+            uprintf("[PGDN_KEY] PRESS count=%lu\r\n",
                     (unsigned long)pgdn_diag_press_events);
         }
         uint32_t release_count = pgdn_diag_release_pending;
         if (release_count != 0U)
         {
             pgdn_diag_release_pending = 0U;
-            uprintf("[PGDN_KEY] RELEASE count=%lu\\r\\n",
+            uprintf("[PGDN_KEY] RELEASE count=%lu\r\n",
                     (unsigned long)pgdn_diag_release_events);
         }
         pgdn_diag_dump_deferred();
