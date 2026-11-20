@@ -1767,8 +1767,9 @@ static void pgdn_diag_dump_deferred(void)
 }
 #endif
 
-/* Test8: independent low-priority diagnostic UART worker. */
-#if LOGA_LATENCY_GPIO_DEBUG
+/* Test12: disable the experimental UART worker while restoring
+ * baseline analog-key logging. Retain its source for later analysis. */
+#if 0
 static THD_WORKING_AREA(waPgdnDiagThread, 512);
 static THD_FUNCTION(PgdnDiagThread, arg)
 {
@@ -3527,9 +3528,8 @@ if (!reset_checked)
                      * PgdnDiagThread, without blocking on a mutex.
                      * All other key debug output remains unchanged.
                      */
-                    /* Test11: all ANALOG KEY UART prints disabled during
-                     * PGDN diagnostics. Event detection remains active. */
-                    if (false && was_pressed != now_pressed)
+                    /* Test12: restore original analog key transition logging. */
+                    if (was_pressed != now_pressed)
                     {
                         uint8_t active_layer =
                             biton32(
@@ -4175,8 +4175,7 @@ if (!eepromInitCheck) {
 }
 		chThdCreateStatic(waADC_ProcessThread, sizeof(waADC_ProcessThread), NORMALPRIO - 4, ADC_ProcessThread, NULL);
 #if LOGA_LATENCY_GPIO_DEBUG
-        chThdCreateStatic(waPgdnDiagThread, sizeof(waPgdnDiagThread),
-                          NORMALPRIO - 8, PgdnDiagThread, NULL);
+        /* Test12: PgdnDiagThread intentionally not created. */
 #endif
 		LED_init();
 		factory_reset_init();
