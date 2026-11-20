@@ -1672,10 +1672,75 @@ static inline adcsample_t adc_apply_digital_gain(
 }
 
 /*
- * Latency Test5: TP53 marks when the PGDN release fast-filter
- * branch is active. This replaces the Test3/4 RAW threshold marker.
- * TP54 remains the actual filtered key decision.
+ * Latency Test6: PGDN-only diagnostic samples buffered in RAM.
+ * Freeze a 48-sample history at RELEASE, then print >=300ms later
+ * from matrix_scan(), outside the time-critical ADC processing path.
+ * TP53 continues to show the Test5 fast-release condition.
  */
+#if LOGA_LATENCY_GPIO_DEBUG
+#define PGDN_DIAG_COUNT 48U
+typedef struct {
+    uint32_t ms;
+    int32_t raw;
+    int32_t filtered;
+    int32_t travel;
+    int32_t trigger;
+    int32_t release;
+    uint8_t pressed;
+    uint8_t fast;
+} pgdn_diag_sample_t;
+static pgdn_diag_sample_t pgdn_diag_ring[PGDN_DIAG_COUNT];
+static uint8_t pgdn_diag_head;
+static uint8_t pgdn_diag_size;
+static bool pgdn_diag_frozen;
+static uint32_t pgdn_diag_release_ms;
+static bool pgdn_diag_fast_active;
+
+static void pgdn_diag_capture(uint8_t channel, uint8_t group,
+                              int32_t travel, int32_t trig,
+                              int32_t rel, bool pressed)
+{
+    if (pgdn_diag_frozen)
+        return;
+    pgdn_diag_sample_t *p = &pgdn_diag_ring[pgdn_diag_head];
+    p->ms = timer_read32();
+    p->raw = (int32_t)adc_apply_digital_gain(group, samples2[channel][group]);
+    p->filtered = (int32_t)adcFiltered[channel][group];
+    p->travel = travel;
+    p->trigger = trig;
+    p->release = rel;
+    p->pressed = pressed ? 1U : 0U;
+    p->fast = pgdn_diag_fast_active ? 1U : 0U;
+    pgdn_diag_head = (uint8_t)((pgdn_diag_head + 1U) % PGDN_DIAG_COUNT);
+    if (pgdn_diag_size < PGDN_DIAG_COUNT)
+        pgdn_diag_size++;
+}
+
+static void pgdn_diag_dump_deferred(void)
+{
+#ifndef NO_PRINT
+    if (!pgdn_diag_frozen ||
+        timer_elapsed32(pgdn_diag_release_ms) < 300U)
+        return;
+    uint8_t start = (uint8_t)((pgdn_diag_head + PGDN_DIAG_COUNT -
+                               pgdn_diag_size) % PGDN_DIAG_COUNT);
+    uprintf("[PGDN_DIAG] samples=%u (ms,raw,filtered,travel,trig,rel,pressed,fast)\\r\\n",
+            (unsigned)pgdn_diag_size);
+    for (uint8_t i = 0; i < pgdn_diag_size; i++)
+    {
+        const pgdn_diag_sample_t *p =
+            &pgdn_diag_ring[(start + i) % PGDN_DIAG_COUNT];
+        uprintf("[PGDN_DIAG] %lu,%ld,%ld,%ld,%ld,%ld,%u,%u\\r\\n",
+                (unsigned long)p->ms, (long)p->raw, (long)p->filtered,
+                (long)p->travel, (long)p->trigger, (long)p->release,
+                (unsigned)p->pressed, (unsigned)p->fast);
+    }
+    pgdn_diag_frozen = false;
+    pgdn_diag_size = 0U;
+    pgdn_diag_head = 0U;
+#endif
+}
+#endif
 
 static void adc_filter_update_channel(uint8_t channel)
 {
@@ -1760,6 +1825,11 @@ static void adc_filter_update_channel(uint8_t channel)
             else
                 palClearPad(GPIOB, 1);
         }
+#endif
+#if LOGA_LATENCY_GPIO_DEBUG
+        if (analogKeyRelocate[group][channel].rowA == 3 &&
+            analogKeyRelocate[group][channel].colA == 13)
+            pgdn_diag_fast_active = pgdn_release_fast;
 #endif
         if (pgdn_release_fast &&
             absolute_difference > ADC_FILTER_DEADBAND)
@@ -3302,6 +3372,12 @@ if (!reset_checked)
                 }
 
 
+#if LOGA_LATENCY_GPIO_DEBUG
+                if (row == 3U && col == 13U)
+                    pgdn_diag_capture(channel, group, adcPre,
+                                      trigger_level, release_level,
+                                      was_pressed);
+#endif
                 if (!was_pressed)
                 {
                     if (adcPre >
@@ -3331,6 +3407,13 @@ if (!reset_checked)
 #endif
                     matrix_temp[row] &=
                         ~key_mask;
+#if LOGA_LATENCY_GPIO_DEBUG
+                    if (row == 3U && col == 13U && !pgdn_diag_frozen)
+                    {
+                        pgdn_diag_release_ms = timer_read32();
+                        pgdn_diag_frozen = true;
+                    }
+#endif
                 }
 								
                 /* ============================================
@@ -4069,6 +4152,9 @@ if (!eepromInitCheck) {
 
 uint8_t matrix_scan(void)
 {
+#if LOGA_LATENCY_GPIO_DEBUG
+    pgdn_diag_dump_deferred();
+#endif
 	//chThdSleepMilliseconds(1);
 //	chBSemWait(&matrixScanSem);
 	keyboard_taskTMR();
