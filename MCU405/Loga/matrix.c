@@ -3478,10 +3478,63 @@ if (!reset_checked)
                         LAT_THRESHOLD_RELEASE();
                 }
 #endif
+                /*
+                 * Test16: PgDn RAW ADC threshold fast path.
+                 * Require two consecutive samples beyond the relevant
+                 * threshold to reject isolated ADC spikes. Only active
+                 * in normal key-matrix mode; other keys remain unchanged.
+                 * TP54 is still the independent, unconfirmed RAW state.
+                 */
+                bool pgdn_fast_press = false;
+                bool pgdn_fast_release = false;
+#if LOGA_LATENCY_GPIO_DEBUG
+                if (row == 3U && col == 13U &&
+                    currentKeyMatrixMode == keyMatrixMode_Normal &&
+                    range > 0)
+                {
+                    static uint8_t pgdn_raw_press_count = 0U;
+                    static uint8_t pgdn_raw_release_count = 0U;
+                    const int32_t raw_adc = (int32_t)adc_apply_digital_gain(
+                        group, samples2[channel][group]);
+                    const int32_t raw_delta = raw_adc - (int32_t)init;
+                    int32_t raw_travel = 0;
+                    if (raw_delta > 0)
+                        raw_travel = raw_delta * TRAVEL_STEPS / range;
+                    if (raw_travel > TRAVEL_STEPS)
+                        raw_travel = TRAVEL_STEPS;
+
+                    if (!was_pressed)
+                    {
+                        pgdn_raw_release_count = 0U;
+                        if (raw_travel > trigger_level)
+                        {
+                            if (pgdn_raw_press_count < 2U)
+                                pgdn_raw_press_count++;
+                        }
+                        else
+                            pgdn_raw_press_count = 0U;
+                        pgdn_fast_press = pgdn_raw_press_count >= 2U;
+                    }
+                    else
+                    {
+                        pgdn_raw_press_count = 0U;
+                        if (raw_travel <= release_level)
+                        {
+                            if (pgdn_raw_release_count < 2U)
+                                pgdn_raw_release_count++;
+                        }
+                        else
+                            pgdn_raw_release_count = 0U;
+                        pgdn_fast_release = pgdn_raw_release_count >= 2U;
+                    }
+                }
+#endif
                 if (!was_pressed)
                 {
-                    if (adcPre >
-                        trigger_level)
+                    if (pgdn_fast_press ||
+                        (adcPre > trigger_level &&
+                         !(row == 3U && col == 13U &&
+                           currentKeyMatrixMode == keyMatrixMode_Normal)))
                     {
 
                         matrix_temp[row] |=
@@ -3495,8 +3548,10 @@ if (!reset_checked)
 #endif
                     }
                 }
-                else if (
-                    adcPre <= release_level)
+                else if (pgdn_fast_release ||
+                         (adcPre <= release_level &&
+                          !(row == 3U && col == 13U &&
+                            currentKeyMatrixMode == keyMatrixMode_Normal)))
                 {
 
                     matrix_temp[row] &=
