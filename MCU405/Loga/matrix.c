@@ -1718,31 +1718,42 @@ static void pgdn_diag_capture(uint8_t channel, uint8_t group,
 
 static void pgdn_diag_dump_deferred(void)
 {
-#ifndef NO_PRINT
-    if (!pgdn_diag_frozen ||
-        timer_elapsed32(pgdn_diag_release_ms) < 300U)
+    /*
+     * Test7: diagnostic output is intentionally independent of NO_PRINT.
+     * Emit at most one UART line per matrix_scan() invocation, to avoid
+     * a single burst of 48 blocking prints.
+     */
+    static bool dumping = false;
+    static uint8_t dump_index = 0U;
+    static uint8_t dump_start = 0U;
+    if (!dumping)
+    {
+        if (!pgdn_diag_frozen ||
+            timer_elapsed32(pgdn_diag_release_ms) < 300U)
+            return;
+        dump_start = (uint8_t)((pgdn_diag_head + PGDN_DIAG_COUNT -
+                                pgdn_diag_size) % PGDN_DIAG_COUNT);
+        dump_index = 0U;
+        dumping = true;
+        uprintf("[PGDN_DIAG] samples=%u (ms,raw,filtered,travel,trig,rel,pressed,fast)\r\n",
+                (unsigned)pgdn_diag_size);
         return;
-    uint8_t start = (uint8_t)((pgdn_diag_head + PGDN_DIAG_COUNT -
-                               pgdn_diag_size) % PGDN_DIAG_COUNT);
-    uprintf("[PGDN_DIAG] samples=%u (ms,raw,filtered,travel,trig,rel,pressed,fast)\r\n",
-            (unsigned)pgdn_diag_size);
-    for (uint8_t i = 0; i < pgdn_diag_size; i++)
+    }
+    if (dump_index < pgdn_diag_size)
     {
         const pgdn_diag_sample_t *p =
-            &pgdn_diag_ring[(start + i) % PGDN_DIAG_COUNT];
+            &pgdn_diag_ring[(dump_start + dump_index) % PGDN_DIAG_COUNT];
         uprintf("[PGDN_DIAG] %lu,%ld,%ld,%ld,%ld,%ld,%u,%u\r\n",
                 (unsigned long)p->ms, (long)p->raw, (long)p->filtered,
                 (long)p->travel, (long)p->trigger, (long)p->release,
                 (unsigned)p->pressed, (unsigned)p->fast);
+        dump_index++;
+        return;
     }
+    dumping = false;
     pgdn_diag_frozen = false;
     pgdn_diag_size = 0U;
     pgdn_diag_head = 0U;
-#else
-    pgdn_diag_frozen = false;
-    pgdn_diag_size = 0U;
-    pgdn_diag_head = 0U;
-#endif
 }
 #endif
 
