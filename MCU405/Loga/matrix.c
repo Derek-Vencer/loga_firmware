@@ -1724,17 +1724,21 @@ static void pgdn_diag_dump_deferred(void)
         return;
     uint8_t start = (uint8_t)((pgdn_diag_head + PGDN_DIAG_COUNT -
                                pgdn_diag_size) % PGDN_DIAG_COUNT);
-    uprintf("[PGDN_DIAG] samples=%u (ms,raw,filtered,travel,trig,rel,pressed,fast)\\r\\n",
+    uprintf("[PGDN_DIAG] samples=%u (ms,raw,filtered,travel,trig,rel,pressed,fast)\r\n",
             (unsigned)pgdn_diag_size);
     for (uint8_t i = 0; i < pgdn_diag_size; i++)
     {
         const pgdn_diag_sample_t *p =
             &pgdn_diag_ring[(start + i) % PGDN_DIAG_COUNT];
-        uprintf("[PGDN_DIAG] %lu,%ld,%ld,%ld,%ld,%ld,%u,%u\\r\\n",
+        uprintf("[PGDN_DIAG] %lu,%ld,%ld,%ld,%ld,%ld,%u,%u\r\n",
                 (unsigned long)p->ms, (long)p->raw, (long)p->filtered,
                 (long)p->travel, (long)p->trigger, (long)p->release,
                 (unsigned)p->pressed, (unsigned)p->fast);
     }
+    pgdn_diag_frozen = false;
+    pgdn_diag_size = 0U;
+    pgdn_diag_head = 0U;
+#else
     pgdn_diag_frozen = false;
     pgdn_diag_size = 0U;
     pgdn_diag_head = 0U;
