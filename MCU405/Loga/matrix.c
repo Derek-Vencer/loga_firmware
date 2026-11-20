@@ -3508,6 +3508,8 @@ if (!reset_checked)
                 {
                     static uint8_t pgdn_raw_press_count = 0U;
                     static uint8_t pgdn_raw_release_count = 0U;
+                    /* Test23: PgDn-only initial press stabilization. */
+                    static uint32_t pgdn_raw_press_time_ms = 0U;
                     const int32_t raw_adc = (int32_t)adc_apply_digital_gain(
                         group, samples2[channel][group]);
                     const int32_t raw_delta = raw_adc - (int32_t)init;
@@ -3528,6 +3530,8 @@ if (!reset_checked)
                         else
                             pgdn_raw_press_count = 0U;
                         pgdn_fast_press = pgdn_raw_press_count >= 2U;
+                        if (pgdn_fast_press)
+                            pgdn_raw_press_time_ms = timer_read32();
                     }
                     else
                     {
@@ -3542,7 +3546,19 @@ if (!reset_checked)
                         }
                         else
                             pgdn_raw_release_count = 0U;
-                        pgdn_fast_release = pgdn_raw_release_count >= 2U;
+                        /* Test23: reject an early false release while the
+                         * actuator is still pressing. Preserve the two-sample
+                         * RAW release threshold and normal release behavior
+                         * after the 8 ms stabilization interval. */
+                        if (timer_elapsed32(pgdn_raw_press_time_ms) < 8U)
+                        {
+                            pgdn_raw_release_count = 0U;
+                            pgdn_fast_release = false;
+                        }
+                        else
+                        {
+                            pgdn_fast_release = pgdn_raw_release_count >= 2U;
+                        }
                     }
                 }
 #endif
