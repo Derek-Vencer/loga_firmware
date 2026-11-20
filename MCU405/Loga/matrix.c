@@ -1723,7 +1723,8 @@ static void pgdn_diag_capture(uint8_t channel, uint8_t group,
         pgdn_diag_size++;
 }
 
-static void pgdn_diag_dump_deferred(void)
+/* Test12 cleanup: retained for future diagnostics, worker currently disabled. */
+static void __attribute__((unused)) pgdn_diag_dump_deferred(void)
 {
     /*
      * Test9: diagnostic output is independent of NO_PRINT.
