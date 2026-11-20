@@ -3304,7 +3304,7 @@ if (!reset_checked)
                         trigger_level)
                     {
 #if LOGA_LATENCY_GPIO_DEBUG
-												if (row == 0U && col == 0U)
+												if (row == 3U && col == 13U)
 												{
 														palSetPad(GPIOB, 2);
 												}
@@ -3317,7 +3317,7 @@ if (!reset_checked)
                     adcPre <= release_level)
                 {
 #if LOGA_LATENCY_GPIO_DEBUG
-										if (row == 0U && col == 0U)
+										if (row == 3U && col == 13U)
 										{
 												palClearPad(GPIOB, 2);
 
@@ -3332,13 +3332,13 @@ if (!reset_checked)
                 /* ============================================
                  * TP49 / PA7 - Analog Key Press / Release
                  *
-                 * Target: Matrix Row 0, Column 0 (ESC)
+                 * Target: Matrix Row 3, Column 13 (PGDN)
                  * HIGH = Press
                  * LOW  = Release
                  * ============================================ */
 #if LOGA_LATENCY_GPIO_DEBUG
 
-							if (row == 0U && col == 0U)
+							if (row == 3U && col == 13U)
 							{
 									const bool debug_now_pressed =
 											(matrix_temp[row] & key_mask) != 0U;
