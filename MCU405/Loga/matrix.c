@@ -1699,6 +1699,8 @@ static bool pgdn_diag_fast_active;
 static volatile uint32_t pgdn_diag_press_events;
 static volatile uint32_t pgdn_diag_release_events;
 static volatile uint32_t pgdn_diag_capture_events;
+static volatile uint32_t pgdn_diag_press_pending;
+static volatile uint32_t pgdn_diag_release_pending;
 
 static void pgdn_diag_capture(uint8_t channel, uint8_t group,
                               int32_t travel, int32_t trig,
@@ -1772,29 +1774,27 @@ static THD_FUNCTION(PgdnDiagThread, arg)
 {
     (void)arg;
     chRegSetThreadName("pgdn_diag");
-    uprintf("[PGDN_THREAD] START Test10\r\n");
-    uint32_t last_status_ms = timer_read32();
-    uint32_t last_release_count = 0U;
     while (true)
     {
-        uint32_t release_count = pgdn_diag_release_events;
-        if (release_count != last_release_count)
+        /*
+         * Test11: single UART owner for PGDN events and ADC dump.
+         * Matrix/ADC processing only updates RAM counters.
+         */
+        uint32_t press_count = pgdn_diag_press_pending;
+        if (press_count != 0U)
         {
-            last_release_count = release_count;
-            uprintf("[PGDN_CAPTURE] RELEASE count=%lu samples=%u\r\n",
-                    (unsigned long)release_count, (unsigned)pgdn_diag_size);
+            pgdn_diag_press_pending = 0U;
+            uprintf("[PGDN_KEY] PRESS count=%lu\\r\\n",
+                    (unsigned long)pgdn_diag_press_events);
+        }
+        uint32_t release_count = pgdn_diag_release_pending;
+        if (release_count != 0U)
+        {
+            pgdn_diag_release_pending = 0U;
+            uprintf("[PGDN_KEY] RELEASE count=%lu\\r\\n",
+                    (unsigned long)pgdn_diag_release_events);
         }
         pgdn_diag_dump_deferred();
-        if (timer_elapsed32(last_status_ms) >= 2000U)
-        {
-            last_status_ms = timer_read32();
-            uprintf("[PGDN_THREAD] ALIVE press=%lu release=%lu capture=%lu frozen=%u samples=%u\r\n",
-                    (unsigned long)pgdn_diag_press_events,
-                    (unsigned long)pgdn_diag_release_events,
-                    (unsigned long)pgdn_diag_capture_events,
-                    pgdn_diag_frozen ? 1U : 0U,
-                    (unsigned)pgdn_diag_size);
-        }
         chThdSleepMilliseconds(10);
     }
 }
@@ -3451,7 +3451,10 @@ if (!reset_checked)
                             key_mask;
 #if LOGA_LATENCY_GPIO_DEBUG
                         if (row == 3U && col == 13U)
+                        {
                             pgdn_diag_press_events++;
+                            pgdn_diag_press_pending++;
+                        }
 #endif
                     }
                 }
@@ -3474,6 +3477,7 @@ if (!reset_checked)
                     {
                         pgdn_diag_release_ms = timer_read32();
                         pgdn_diag_release_events++;
+                        pgdn_diag_release_pending++;
                         pgdn_diag_frozen = true;
                     }
 #endif
@@ -3523,8 +3527,9 @@ if (!reset_checked)
                      * PgdnDiagThread, without blocking on a mutex.
                      * All other key debug output remains unchanged.
                      */
-                    if (was_pressed != now_pressed &&
-                        !(row == 3U && col == 13U))
+                    /* Test11: all ANALOG KEY UART prints disabled during
+                     * PGDN diagnostics. Event detection remains active. */
+                    if (false && was_pressed != now_pressed)
                     {
                         uint8_t active_layer =
                             biton32(
