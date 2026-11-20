@@ -3486,14 +3486,14 @@ if (!reset_checked)
                  * TP54 is still the independent, unconfirmed RAW state.
                  */
                 /*
-                 * Test17: PgDn-only earlier press actuation experiment.
+                 * Test18: PgDn-only press threshold 50 experiment.
                  * Preserve the stored trigger threshold and all release
                  * thresholds. This affects the RAW fast path only.
                  */
                 const int32_t pgdn_fast_press_threshold =
                     (row == 3U && col == 13U &&
                      currentKeyMatrixMode == keyMatrixMode_Normal)
-                    ? 100 : trigger_level;
+                    ? 50 : trigger_level;
                 bool pgdn_fast_press = false;
                 bool pgdn_fast_release = false;
 #if LOGA_LATENCY_GPIO_DEBUG
