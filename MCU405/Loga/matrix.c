@@ -103,7 +103,7 @@ extern socd_policy_t g_policy;
 #define LAT_FILTER_START()      palSetPad(GPIOB, 0)
 #define LAT_FILTER_END()        palClearPad(GPIOB, 0)
 
-/* TP53 / PB1 : PGDN RAW threshold state (same thresholds as TP54) */
+/* TP53 / PB1 : PGDN fast-release filter active (Test5) */
 #define LAT_ADC_KEY_START()     palSetPad(GPIOB, 1)
 #define LAT_ADC_KEY_END()       palClearPad(GPIOB, 1)
 
@@ -1671,14 +1671,11 @@ static inline adcsample_t adc_apply_digital_gain(
     return (adcsample_t)amplified;
 }
 
-#if LOGA_LATENCY_GPIO_DEBUG
 /*
- * TP53: PGDN RAW ADC crosses the SAME configured trigger/release
- * thresholds as the filtered key decision (TP54).
- * Diagnostic state is independent of the actual key state.
+ * Latency Test5: TP53 marks when the PGDN release fast-filter
+ * branch is active. This replaces the Test3/4 RAW threshold marker.
+ * TP54 remains the actual filtered key decision.
  */
-static bool pgdn_raw_threshold_pressed = false;
-#endif
 
 static void adc_filter_update_channel(uint8_t channel)
 {
@@ -1725,6 +1722,11 @@ static void adc_filter_update_channel(uint8_t channel)
             difference >= 0 ? difference : -difference;
 
         if (absolute_difference <= ADC_FILTER_DEADBAND) {
+#if LOGA_LATENCY_GPIO_DEBUG
+            if (analogKeyRelocate[group][channel].rowA == 3 &&
+                analogKeyRelocate[group][channel].colA == 13)
+                palClearPad(GPIOB, 1);
+#endif
             continue;
         }
 
@@ -1746,6 +1748,17 @@ static void adc_filter_update_channel(uint8_t channel)
             pgdn_release_fast = (matrix_temp[3] &
                 ((matrix_row_t)1U << 13)) != 0U &&
                 raw_dist < filtered_dist;
+        }
+#endif
+#if LOGA_LATENCY_GPIO_DEBUG
+        /* TP53 HIGH only while PGDN fast release filter is applied. */
+        if (analogKeyRelocate[group][channel].rowA == 3 &&
+            analogKeyRelocate[group][channel].colA == 13)
+        {
+            if (pgdn_release_fast)
+                palSetPad(GPIOB, 1);
+            else
+                palClearPad(GPIOB, 1);
         }
 #endif
         if (pgdn_release_fast &&
@@ -3288,49 +3301,6 @@ if (!reset_checked)
                             );
                 }
 
-#if LOGA_LATENCY_GPIO_DEBUG
-                /*
-                 * PGDN TP53 (PB1): RAW ADC threshold crossing.
-                 * PGDN TP54 (PB2): existing FILTERED ADC decision.
-                 * Both use the same calibrated travel scale and
-                 * trigger/release thresholds. RAW debug state is
-                 * independent and never changes matrix_temp.
-                 * Valid for normal/initial-position scan modes.
-                 */
-                if (row == 3U && col == 13U &&
-                    (currentKeyMatrixMode == keyMatrixMode_Normal ||
-                     currentKeyMatrixMode == keyMatrixMode_InitialPostionCalc))
-                {
-                    int32_t raw_adc = (int32_t)adc_apply_digital_gain(
-                        group, samples2[channel][group]);
-                    int32_t raw_range =
-                        (int32_t)travelPostionLevel[channel][group] -
-                        (int32_t)initPostionLevel[channel][group];
-                    int32_t raw_delta =
-                        raw_adc - (int32_t)initPostionLevel[channel][group];
-                    int32_t raw_travel = 0;
-
-                    if (raw_range > 0 && raw_delta > 0)
-                    {
-                        raw_travel = raw_delta * TRAVEL_STEPS / raw_range;
-                        if (raw_travel > TRAVEL_STEPS)
-                            raw_travel = TRAVEL_STEPS;
-                    }
-
-                    if (!pgdn_raw_threshold_pressed &&
-                        raw_travel > trigger_level)
-                    {
-                        pgdn_raw_threshold_pressed = true;
-                        palSetPad(GPIOB, 1);
-                    }
-                    else if (pgdn_raw_threshold_pressed &&
-                             raw_travel <= release_level)
-                    {
-                        pgdn_raw_threshold_pressed = false;
-                        palClearPad(GPIOB, 1);
-                    }
-                }
-#endif
 
                 if (!was_pressed)
                 {
