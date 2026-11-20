@@ -107,7 +107,7 @@ extern socd_policy_t g_policy;
 #define LAT_ADC_KEY_START()     palSetPad(GPIOB, 1)
 #define LAT_ADC_KEY_END()       palClearPad(GPIOB, 1)
 
-/* TP54 / PB2 : Threshold crossing state */
+/* TP54 / PB2 : Test15 independent RAW ADC threshold state */
 #define LAT_THRESHOLD_PRESS()   palSetPad(GPIOB, 2)
 #define LAT_THRESHOLD_RELEASE() palClearPad(GPIOB, 2)
 
@@ -3453,20 +3453,37 @@ if (!reset_checked)
 
 
 #if LOGA_LATENCY_GPIO_DEBUG
-                /* Test13: skip per-sample RAM capture to minimize ADC-path overhead.
-                 * TP49/TP53/TP54 and key event counters remain enabled. */
+                /* Test15: TP54 uses the gained, unfiltered ADC value and
+                 * exactly the same calibration range and thresholds as
+                 * the matrix path. This is diagnostic only: HID unchanged. */
+                if (row == 3U && col == 13U &&
+                    currentKeyMatrixMode == keyMatrixMode_Normal)
+                {
+                    static bool pgdn_raw_pressed = false;
+                    const int32_t raw_adc = (int32_t)adc_apply_digital_gain(
+                        group, samples2[channel][group]);
+                    const int32_t raw_delta = raw_adc - (int32_t)init;
+                    int32_t raw_travel = 0;
+                    if (raw_delta > 0 && range > 0)
+                        raw_travel = raw_delta * TRAVEL_STEPS / range;
+                    if (raw_travel > TRAVEL_STEPS)
+                        raw_travel = TRAVEL_STEPS;
+                    if (!pgdn_raw_pressed && raw_travel > trigger_level)
+                        pgdn_raw_pressed = true;
+                    else if (pgdn_raw_pressed && raw_travel <= release_level)
+                        pgdn_raw_pressed = false;
+                    if (pgdn_raw_pressed)
+                        LAT_THRESHOLD_PRESS();
+                    else
+                        LAT_THRESHOLD_RELEASE();
+                }
 #endif
                 if (!was_pressed)
                 {
                     if (adcPre >
                         trigger_level)
                     {
-#if LOGA_LATENCY_GPIO_DEBUG
-												if (row == 3U && col == 13U)
-												{
-														palSetPad(GPIOB, 2);
-												}
-#endif
+
                         matrix_temp[row] |=
                             key_mask;
 #if LOGA_LATENCY_GPIO_DEBUG
@@ -3481,15 +3498,7 @@ if (!reset_checked)
                 else if (
                     adcPre <= release_level)
                 {
-#if LOGA_LATENCY_GPIO_DEBUG
-										if (row == 3U && col == 13U)
-										{
-												palClearPad(GPIOB, 2);
 
-												//palClearPad(GPIOB, 1);
-												//esc_raw_detected = false;
-										}
-#endif
                     matrix_temp[row] &=
                         ~key_mask;
 #if LOGA_LATENCY_GPIO_DEBUG
