@@ -107,7 +107,7 @@ extern socd_policy_t g_policy;
 #define LAT_ADC_KEY_START()     palSetPad(GPIOB, 1)
 #define LAT_ADC_KEY_END()       palClearPad(GPIOB, 1)
 
-/* TP54 / PB2 : Test21 RAW travel 100 threshold marker */
+/* TP54 / PB2 : Test22 RAW travel 150 threshold marker */
 #define LAT_THRESHOLD_PRESS()   palSetPad(GPIOB, 2)
 #define LAT_THRESHOLD_RELEASE() palClearPad(GPIOB, 2)
 
@@ -3453,8 +3453,8 @@ if (!reset_checked)
 
 
 #if LOGA_LATENCY_GPIO_DEBUG
-                /* Test21: diagnostic-only RAW threshold marker at travel 100.
-                 * TP54 HIGH for RAW travel > 100, LOW for <= 100.
+                /* Test22: diagnostic-only RAW threshold marker at travel 150.
+                 * TP54 HIGH for RAW travel > 150, LOW for <= 150.
                  * No hysteresis: may toggle if RAW noise crosses 100.
                  * Matrix/HID behavior remains unchanged from Test20. */
                 if (row == 3U && col == 13U &&
@@ -3469,13 +3469,13 @@ if (!reset_checked)
                         raw_travel = raw_delta * TRAVEL_STEPS / range;
                     if (raw_travel > TRAVEL_STEPS)
                         raw_travel = TRAVEL_STEPS;
-                    /* Test21: diagnostic RAW travel crossing 100.
+                    /* Test22: diagnostic RAW travel crossing 150.
                      * This marker is independent of the actual PgDn
                      * press (50) / release (20) fast-path thresholds.
                      * Hysteresis-free by design for timing comparison. */
-                    if (!pgdn_raw_pressed && raw_travel > 100)
+                    if (!pgdn_raw_pressed && raw_travel > 150)
                         pgdn_raw_pressed = true;
-                    else if (pgdn_raw_pressed && raw_travel <= 100)
+                    else if (pgdn_raw_pressed && raw_travel <= 150)
                         pgdn_raw_pressed = false;
                     if (pgdn_raw_pressed)
                         LAT_THRESHOLD_PRESS();
