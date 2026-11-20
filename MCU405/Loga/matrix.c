@@ -3453,14 +3453,17 @@ if (!reset_checked)
 
 
 #if LOGA_LATENCY_GPIO_DEBUG
-                /* Test22: diagnostic-only RAW threshold marker at travel 150.
-                 * TP54 HIGH for RAW travel > 150, LOW for <= 150.
-                 * No hysteresis: may toggle if RAW noise crosses 100.
-                 * Matrix/HID behavior remains unchanged from Test20. */
+                /* Test24: diagnostic-only RAW PgDn threshold state.
+                 * TP54 HIGH when RAW travel > 50, LOW when <= 20.
+                 * This uses hysteresis but NO two-sample confirmation
+                 * and NO 8 ms release guard. TP49 remains the actual
+                 * debounced matrix state. Compare TP54 to TP49 to
+                 * identify RAW excursions rejected by Test23.
+                 * No changes to Matrix/HID or other keys. */
                 if (row == 3U && col == 13U &&
                     currentKeyMatrixMode == keyMatrixMode_Normal)
                 {
-                    static bool pgdn_raw_pressed = false;
+                    static bool pgdn_raw_diag_pressed = false;
                     const int32_t raw_adc = (int32_t)adc_apply_digital_gain(
                         group, samples2[channel][group]);
                     const int32_t raw_delta = raw_adc - (int32_t)init;
@@ -3469,15 +3472,11 @@ if (!reset_checked)
                         raw_travel = raw_delta * TRAVEL_STEPS / range;
                     if (raw_travel > TRAVEL_STEPS)
                         raw_travel = TRAVEL_STEPS;
-                    /* Test22: diagnostic RAW travel crossing 150.
-                     * This marker is independent of the actual PgDn
-                     * press (50) / release (20) fast-path thresholds.
-                     * Hysteresis-free by design for timing comparison. */
-                    if (!pgdn_raw_pressed && raw_travel > 150)
-                        pgdn_raw_pressed = true;
-                    else if (pgdn_raw_pressed && raw_travel <= 150)
-                        pgdn_raw_pressed = false;
-                    if (pgdn_raw_pressed)
+                    if (!pgdn_raw_diag_pressed && raw_travel > 50)
+                        pgdn_raw_diag_pressed = true;
+                    else if (pgdn_raw_diag_pressed && raw_travel <= 20)
+                        pgdn_raw_diag_pressed = false;
+                    if (pgdn_raw_diag_pressed)
                         LAT_THRESHOLD_PRESS();
                     else
                         LAT_THRESHOLD_RELEASE();
