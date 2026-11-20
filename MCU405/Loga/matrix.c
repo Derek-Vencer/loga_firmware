@@ -1672,7 +1672,7 @@ static inline adcsample_t adc_apply_digital_gain(
 }
 
 /*
- * Latency Test6: PGDN-only diagnostic samples buffered in RAM.
+ * Latency Test9: PGDN-only diagnostic samples buffered in RAM.
  * Freeze a 48-sample history at RELEASE, then print >=300ms later
  * from a dedicated low-priority task, outside the ADC processing path.
  * TP53 continues to show the Test5 fast-release condition.
@@ -1719,7 +1719,7 @@ static void pgdn_diag_capture(uint8_t channel, uint8_t group,
 static void pgdn_diag_dump_deferred(void)
 {
     /*
-     * Test7: diagnostic output is intentionally independent of NO_PRINT.
+     * Test9: diagnostic output is independent of NO_PRINT.
      * Emit at most one UART line per low-priority task iteration, to avoid
      * a single burst of 48 blocking prints.
      */
@@ -3481,8 +3481,17 @@ if (!reset_checked)
                         (matrix_temp[row] &
                          key_mask) != 0U;
 
-                    if (was_pressed !=
-                        now_pressed)
+                    /*
+                     * Test9: PGDN transitions are recorded in the RAM
+                     * diagnostic ring instead of printing from the
+                     * time-critical matrix processing thread.
+                     *
+                     * Prevent character-level UART interleaving with
+                     * PgdnDiagThread, without blocking on a mutex.
+                     * All other key debug output remains unchanged.
+                     */
+                    if (was_pressed != now_pressed &&
+                        !(row == 3U && col == 13U))
                     {
                         uint8_t active_layer =
                             biton32(
