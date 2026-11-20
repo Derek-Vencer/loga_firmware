@@ -103,7 +103,7 @@ extern socd_policy_t g_policy;
 #define LAT_FILTER_START()      palSetPad(GPIOB, 0)
 #define LAT_FILTER_END()        palClearPad(GPIOB, 0)
 
-/* TP53 / PB1 : PGDN raw ADC delta state (not an ADC update pulse) */
+/* TP53 / PB1 : PGDN RAW threshold state (same thresholds as TP54) */
 #define LAT_ADC_KEY_START()     palSetPad(GPIOB, 1)
 #define LAT_ADC_KEY_END()       palClearPad(GPIOB, 1)
 
@@ -1672,12 +1672,12 @@ static inline adcsample_t adc_apply_digital_gain(
 }
 
 #if LOGA_LATENCY_GPIO_DEBUG
-/* PGDN RAW ADC diagnostic only. No impact on filtering or key detection. */
-#define PGDN_RAW_CHANGE_THRESHOLD 20
-#define PGDN_RAW_RELEASE_THRESHOLD 10
-static int32_t pgdn_raw_baseline = 0;
-static bool pgdn_raw_baseline_ready = false;
-static bool pgdn_raw_detected = false;
+/*
+ * TP53: PGDN RAW ADC crosses the SAME configured trigger/release
+ * thresholds as the filtered key decision (TP54).
+ * Diagnostic state is independent of the actual key state.
+ */
+static bool pgdn_raw_threshold_pressed = false;
 #endif
 
 static void adc_filter_update_channel(uint8_t channel)
@@ -2508,39 +2508,6 @@ if (!reset_checked)
 
             keyLocation = analogKeyRelocate[group][channel];
 
-#if LOGA_LATENCY_GPIO_DEBUG
-            /*
-             * TP53 / PB1: PGDN (matrix row 3, col 13) RAW ADC delta.
-             * Use the real ADC group/channel mapping through analogKeyRelocate.
-             * HIGH when abs(raw - startup_baseline) > 20 counts.
-             * LOW when abs(raw - startup_baseline) < 10 counts.
-             * Diagnostic only; no changes to ADC filter or key thresholds.
-             */
-            if (keyLocation.rowA == 3 && keyLocation.colA == 13)
-            {
-                int32_t raw = (int32_t)adc_apply_digital_gain(
-                    group, samples2[channel][group]);
-                if (!pgdn_raw_baseline_ready)
-                {
-                    pgdn_raw_baseline = raw;
-                    pgdn_raw_baseline_ready = true;
-                }
-                int32_t delta = raw - pgdn_raw_baseline;
-                if (delta < 0) delta = -delta;
-                if (!pgdn_raw_detected &&
-                    delta > PGDN_RAW_CHANGE_THRESHOLD)
-                {
-                    palSetPad(GPIOB, 1);
-                    pgdn_raw_detected = true;
-                }
-                else if (pgdn_raw_detected &&
-                         delta < PGDN_RAW_RELEASE_THRESHOLD)
-                {
-                    palClearPad(GPIOB, 1);
-                    pgdn_raw_detected = false;
-                }
-            }
-#endif
 
             if (!matrix_key_location_valid(keyLocation)) {
                 continue;
@@ -3293,6 +3260,50 @@ if (!reset_checked)
                                 col
                             );
                 }
+
+#if LOGA_LATENCY_GPIO_DEBUG
+                /*
+                 * PGDN TP53 (PB1): RAW ADC threshold crossing.
+                 * PGDN TP54 (PB2): existing FILTERED ADC decision.
+                 * Both use the same calibrated travel scale and
+                 * trigger/release thresholds. RAW debug state is
+                 * independent and never changes matrix_temp.
+                 * Valid for normal/initial-position scan modes.
+                 */
+                if (row == 3U && col == 13U &&
+                    (currentKeyMatrixMode == keyMatrixMode_Normal ||
+                     currentKeyMatrixMode == keyMatrixMode_InitialPostionCalc))
+                {
+                    int32_t raw_adc = (int32_t)adc_apply_digital_gain(
+                        group, samples2[channel][group]);
+                    int32_t raw_range =
+                        (int32_t)travelPostionLevel[channel][group] -
+                        (int32_t)initPostionLevel[channel][group];
+                    int32_t raw_delta =
+                        raw_adc - (int32_t)initPostionLevel[channel][group];
+                    int32_t raw_travel = 0;
+
+                    if (raw_range > 0 && raw_delta > 0)
+                    {
+                        raw_travel = raw_delta * TRAVEL_STEPS / raw_range;
+                        if (raw_travel > TRAVEL_STEPS)
+                            raw_travel = TRAVEL_STEPS;
+                    }
+
+                    if (!pgdn_raw_threshold_pressed &&
+                        raw_travel > trigger_level)
+                    {
+                        pgdn_raw_threshold_pressed = true;
+                        palSetPad(GPIOB, 1);
+                    }
+                    else if (pgdn_raw_threshold_pressed &&
+                             raw_travel <= release_level)
+                    {
+                        pgdn_raw_threshold_pressed = false;
+                        palClearPad(GPIOB, 1);
+                    }
+                }
+#endif
 
                 if (!was_pressed)
                 {
