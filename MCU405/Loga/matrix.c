@@ -1728,7 +1728,34 @@ static void adc_filter_update_channel(uint8_t channel)
             continue;
         }
 
-        if (absolute_difference >= ADC_FILTER_FAST_DELTA) {
+        /*
+         * Latency Test4: accelerate only PGDN release tracking.
+         * Compare distance to calibrated rest position, rather than
+         * assuming ADC polarity. Other keys and PGDN press unchanged.
+         * Minimum correction remains bounded by the existing filter.
+         */
+        bool pgdn_release_fast = false;
+#if defined(LOGA_LATENCY_GPIO_DEBUG) && LOGA_LATENCY_GPIO_DEBUG
+        if (analogKeyRelocate[group][channel].rowA == 3 &&
+            analogKeyRelocate[group][channel].colA == 13)
+        {
+            int32_t rest = (int32_t)initPostionLevel[channel][group];
+            int32_t raw_dist = raw >= rest ? raw - rest : rest - raw;
+            int32_t filtered_dist =
+                filtered >= rest ? filtered - rest : rest - filtered;
+            pgdn_release_fast = (matrix_temp[3] &
+                ((matrix_row_t)1U << 13)) != 0U &&
+                raw_dist < filtered_dist;
+        }
+#endif
+        if (pgdn_release_fast &&
+            absolute_difference > ADC_FILTER_DEADBAND)
+        {
+            correction = difference / 2;
+            if (correction == 0)
+                correction = difference > 0 ? 1 : -1;
+        }
+        else if (absolute_difference >= ADC_FILTER_FAST_DELTA) {
             correction = difference / 2;
         }
         else if (absolute_difference >= ADC_FILTER_MEDIUM_DELTA) {
