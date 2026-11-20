@@ -107,7 +107,7 @@ extern socd_policy_t g_policy;
 #define LAT_ADC_KEY_START()     palSetPad(GPIOB, 1)
 #define LAT_ADC_KEY_END()       palClearPad(GPIOB, 1)
 
-/* TP54 / PB2 : Test15 independent RAW ADC threshold state */
+/* TP54 / PB2 : Test19 RAW travel onset marker (12 / 6 hysteresis) */
 #define LAT_THRESHOLD_PRESS()   palSetPad(GPIOB, 2)
 #define LAT_THRESHOLD_RELEASE() palClearPad(GPIOB, 2)
 
@@ -3453,9 +3453,12 @@ if (!reset_checked)
 
 
 #if LOGA_LATENCY_GPIO_DEBUG
-                /* Test15: TP54 uses the gained, unfiltered ADC value and
-                 * exactly the same calibration range and thresholds as
-                 * the matrix path. This is diagnostic only: HID unchanged. */
+                /* Test19: diagnostic-only RAW movement marker.
+                 * TP54 HIGH once RAW travel >= 12, LOW at <= 6.
+                 * This is an early-motion proxy, NOT the first physical
+                 * movement or the actual trigger threshold. Hysteresis
+                 * avoids excessive toggling near rest. Matrix/HID
+                 * behavior remains exactly as in Test18. */
                 if (row == 3U && col == 13U &&
                     currentKeyMatrixMode == keyMatrixMode_Normal)
                 {
@@ -3468,9 +3471,9 @@ if (!reset_checked)
                         raw_travel = raw_delta * TRAVEL_STEPS / range;
                     if (raw_travel > TRAVEL_STEPS)
                         raw_travel = TRAVEL_STEPS;
-                    if (!pgdn_raw_pressed && raw_travel > trigger_level)
+                    if (!pgdn_raw_pressed && raw_travel >= 12)
                         pgdn_raw_pressed = true;
-                    else if (pgdn_raw_pressed && raw_travel <= release_level)
+                    else if (pgdn_raw_pressed && raw_travel <= 6)
                         pgdn_raw_pressed = false;
                     if (pgdn_raw_pressed)
                         LAT_THRESHOLD_PRESS();
