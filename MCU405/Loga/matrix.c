@@ -1674,7 +1674,7 @@ static inline adcsample_t adc_apply_digital_gain(
 /*
  * Latency Test6: PGDN-only diagnostic samples buffered in RAM.
  * Freeze a 48-sample history at RELEASE, then print >=300ms later
- * from matrix_scan(), outside the time-critical ADC processing path.
+ * from a dedicated low-priority task, outside the ADC processing path.
  * TP53 continues to show the Test5 fast-release condition.
  */
 #if LOGA_LATENCY_GPIO_DEBUG
@@ -1720,7 +1720,7 @@ static void pgdn_diag_dump_deferred(void)
 {
     /*
      * Test7: diagnostic output is intentionally independent of NO_PRINT.
-     * Emit at most one UART line per matrix_scan() invocation, to avoid
+     * Emit at most one UART line per low-priority task iteration, to avoid
      * a single burst of 48 blocking prints.
      */
     static bool dumping = false;
@@ -1754,6 +1754,21 @@ static void pgdn_diag_dump_deferred(void)
     pgdn_diag_frozen = false;
     pgdn_diag_size = 0U;
     pgdn_diag_head = 0U;
+}
+#endif
+
+/* Test8: independent low-priority diagnostic UART worker. */
+#if LOGA_LATENCY_GPIO_DEBUG
+static THD_WORKING_AREA(waPgdnDiagThread, 512);
+static THD_FUNCTION(PgdnDiagThread, arg)
+{
+    (void)arg;
+    chRegSetThreadName("pgdn_diag");
+    while (true)
+    {
+        pgdn_diag_dump_deferred();
+        chThdSleepMilliseconds(10);
+    }
 }
 #endif
 
@@ -4112,6 +4127,10 @@ if (!eepromInitCheck) {
     }
 }
 		chThdCreateStatic(waADC_ProcessThread, sizeof(waADC_ProcessThread), NORMALPRIO - 4, ADC_ProcessThread, NULL);
+#if LOGA_LATENCY_GPIO_DEBUG
+        chThdCreateStatic(waPgdnDiagThread, sizeof(waPgdnDiagThread),
+                          NORMALPRIO - 8, PgdnDiagThread, NULL);
+#endif
 		LED_init();
 		factory_reset_init();
 		reset_all_key_init();
@@ -4167,9 +4186,6 @@ if (!eepromInitCheck) {
 
 uint8_t matrix_scan(void)
 {
-#if LOGA_LATENCY_GPIO_DEBUG
-    pgdn_diag_dump_deferred();
-#endif
 	//chThdSleepMilliseconds(1);
 //	chBSemWait(&matrixScanSem);
 	keyboard_taskTMR();
