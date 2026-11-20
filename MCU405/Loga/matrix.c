@@ -1702,7 +1702,7 @@ static volatile uint32_t pgdn_diag_capture_events;
 static volatile uint32_t pgdn_diag_press_pending;
 static volatile uint32_t pgdn_diag_release_pending;
 
-static void pgdn_diag_capture(uint8_t channel, uint8_t group,
+static void __attribute__((unused)) pgdn_diag_capture(uint8_t channel, uint8_t group,
                               int32_t travel, int32_t trig,
                               int32_t rel, bool pressed)
 {
@@ -3433,10 +3433,8 @@ if (!reset_checked)
 
 
 #if LOGA_LATENCY_GPIO_DEBUG
-                if (row == 3U && col == 13U)
-                    pgdn_diag_capture(channel, group, adcPre,
-                                      trigger_level, release_level,
-                                      was_pressed);
+                /* Test13: skip per-sample RAM capture to minimize ADC-path overhead.
+                 * TP49/TP53/TP54 and key event counters remain enabled. */
 #endif
                 if (!was_pressed)
                 {
@@ -3529,8 +3527,10 @@ if (!reset_checked)
                      * PgdnDiagThread, without blocking on a mutex.
                      * All other key debug output remains unchanged.
                      */
-                    /* Test12: restore original analog key transition logging. */
-                    if (was_pressed != now_pressed)
+                    /* Test13: no blocking UART output for PgDn (row 3, col 13).
+                     * Keep other keys' analog transition logs for verification. */
+                    if (was_pressed != now_pressed &&
+                        !(row == 3U && col == 13U))
                     {
                         uint8_t active_layer =
                             biton32(
