@@ -1695,6 +1695,10 @@ static uint8_t pgdn_diag_size;
 static bool pgdn_diag_frozen;
 static uint32_t pgdn_diag_release_ms;
 static bool pgdn_diag_fast_active;
+/* Test10: RAM-only counters; no UART calls in the ADC/matrix path. */
+static volatile uint32_t pgdn_diag_press_events;
+static volatile uint32_t pgdn_diag_release_events;
+static volatile uint32_t pgdn_diag_capture_events;
 
 static void pgdn_diag_capture(uint8_t channel, uint8_t group,
                               int32_t travel, int32_t trig,
@@ -1702,6 +1706,7 @@ static void pgdn_diag_capture(uint8_t channel, uint8_t group,
 {
     if (pgdn_diag_frozen)
         return;
+    pgdn_diag_capture_events++;
     pgdn_diag_sample_t *p = &pgdn_diag_ring[pgdn_diag_head];
     p->ms = timer_read32();
     p->raw = (int32_t)adc_apply_digital_gain(group, samples2[channel][group]);
@@ -1735,6 +1740,9 @@ static void pgdn_diag_dump_deferred(void)
                                 pgdn_diag_size) % PGDN_DIAG_COUNT);
         dump_index = 0U;
         dumping = true;
+        uprintf("[PGDN_DUMP] START releases=%lu captures=%lu\r\n",
+                (unsigned long)pgdn_diag_release_events,
+                (unsigned long)pgdn_diag_capture_events);
         uprintf("[PGDN_DIAG] samples=%u (ms,raw,filtered,travel,trig,rel,pressed,fast)\r\n",
                 (unsigned)pgdn_diag_size);
         return;
@@ -1764,9 +1772,29 @@ static THD_FUNCTION(PgdnDiagThread, arg)
 {
     (void)arg;
     chRegSetThreadName("pgdn_diag");
+    uprintf("[PGDN_THREAD] START Test10\r\n");
+    uint32_t last_status_ms = timer_read32();
+    uint32_t last_release_count = 0U;
     while (true)
     {
+        uint32_t release_count = pgdn_diag_release_events;
+        if (release_count != last_release_count)
+        {
+            last_release_count = release_count;
+            uprintf("[PGDN_CAPTURE] RELEASE count=%lu samples=%u\r\n",
+                    (unsigned long)release_count, (unsigned)pgdn_diag_size);
+        }
         pgdn_diag_dump_deferred();
+        if (timer_elapsed32(last_status_ms) >= 2000U)
+        {
+            last_status_ms = timer_read32();
+            uprintf("[PGDN_THREAD] ALIVE press=%lu release=%lu capture=%lu frozen=%u samples=%u\r\n",
+                    (unsigned long)pgdn_diag_press_events,
+                    (unsigned long)pgdn_diag_release_events,
+                    (unsigned long)pgdn_diag_capture_events,
+                    pgdn_diag_frozen ? 1U : 0U,
+                    (unsigned)pgdn_diag_size);
+        }
         chThdSleepMilliseconds(10);
     }
 }
@@ -3421,6 +3449,10 @@ if (!reset_checked)
 #endif
                         matrix_temp[row] |=
                             key_mask;
+#if LOGA_LATENCY_GPIO_DEBUG
+                        if (row == 3U && col == 13U)
+                            pgdn_diag_press_events++;
+#endif
                     }
                 }
                 else if (
@@ -3441,6 +3473,7 @@ if (!reset_checked)
                     if (row == 3U && col == 13U && !pgdn_diag_frozen)
                     {
                         pgdn_diag_release_ms = timer_read32();
+                        pgdn_diag_release_events++;
                         pgdn_diag_frozen = true;
                     }
 #endif
