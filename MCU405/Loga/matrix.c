@@ -1891,8 +1891,28 @@ static void adc_filter_update_channel(uint8_t channel)
             analogKeyRelocate[group][channel].colA == 13)
             pgdn_diag_fast_active = pgdn_release_fast;
 #endif
-        if (pgdn_release_fast &&
-            absolute_difference > ADC_FILTER_DEADBAND)
+        /*
+         * Latency Test14: PgDn-only threshold tracking acceleration.
+         * Track BOTH press and release more quickly while preserving
+         * the calibrated travel/trigger/release thresholds and the
+         * existing filter for every other key. 3/4 step leaves 1/4
+         * residual per ADC update; deadband still suppresses noise.
+         * TP49/TP54 retain the actual matrix/threshold state markers.
+         */
+        bool pgdn_threshold_fast = false;
+#if LOGA_LATENCY_GPIO_DEBUG
+        pgdn_threshold_fast =
+            analogKeyRelocate[group][channel].rowA == 3U &&
+            analogKeyRelocate[group][channel].colA == 13U;
+#endif
+        if (pgdn_threshold_fast)
+        {
+            correction = (difference * 3) / 4;
+            if (correction == 0)
+                correction = difference > 0 ? 1 : -1;
+        }
+        else if (pgdn_release_fast &&
+                 absolute_difference > ADC_FILTER_DEADBAND)
         {
             correction = difference / 2;
             if (correction == 0)
