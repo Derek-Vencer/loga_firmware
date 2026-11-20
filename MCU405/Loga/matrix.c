@@ -103,7 +103,7 @@ extern socd_policy_t g_policy;
 #define LAT_FILTER_START()      palSetPad(GPIOB, 0)
 #define LAT_FILTER_END()        palClearPad(GPIOB, 0)
 
-/* TP53 / PB1 : ESC raw ADC delta state (not an ADC update pulse) */
+/* TP53 / PB1 : PGDN raw ADC delta state (not an ADC update pulse) */
 #define LAT_ADC_KEY_START()     palSetPad(GPIOB, 1)
 #define LAT_ADC_KEY_END()       palClearPad(GPIOB, 1)
 
@@ -1672,12 +1672,12 @@ static inline adcsample_t adc_apply_digital_gain(
 }
 
 #if LOGA_LATENCY_GPIO_DEBUG
-static int32_t esc_raw_baseline = 0;
-static bool esc_raw_baseline_ready = false;
-static bool esc_raw_detected = false;
-
-#define ESC_RAW_CHANGE_THRESHOLD 20
-#define ESC_RAW_RELEASE_THRESHOLD 10
+/* PGDN RAW ADC diagnostic only. No impact on filtering or key detection. */
+#define PGDN_RAW_CHANGE_THRESHOLD 20
+#define PGDN_RAW_RELEASE_THRESHOLD 10
+static int32_t pgdn_raw_baseline = 0;
+static bool pgdn_raw_baseline_ready = false;
+static bool pgdn_raw_detected = false;
 #endif
 
 static void adc_filter_update_channel(uint8_t channel)
@@ -1718,44 +1718,6 @@ static void adc_filter_update_channel(uint8_t channel)
             samples2[channel][group]
         );
 			
-#if LOGA_LATENCY_GPIO_DEBUG
-
-				if (channel == 0U && group == 0U)
-				{
-						if (!esc_raw_baseline_ready)
-						{
-								esc_raw_baseline = raw;
-								esc_raw_baseline_ready = true;
-						}
-
-						int32_t delta = raw - esc_raw_baseline;
-
-						/*
-						 * TP53 HIGH:
-						 * ESC ADC RAW exceeds baseline by 20 counts.
-						 *
-						 * TP53 LOW:
-						 * ESC ADC RAW returns within 10 counts.
-						 */
-						if (delta > ESC_RAW_CHANGE_THRESHOLD)
-						{
-								if (!esc_raw_detected)
-								{
-										palSetPad(GPIOB, 1);
-										esc_raw_detected = true;
-								}
-						}
-						else if (delta < ESC_RAW_RELEASE_THRESHOLD)
-						{
-								if (esc_raw_detected)
-								{
-										palClearPad(GPIOB, 1);
-										esc_raw_detected = false;
-								}
-						}
-				}
-
-#endif
 
         filtered = (int32_t)adcFiltered[channel][group];
         difference = raw - filtered;
@@ -2545,6 +2507,40 @@ if (!reset_checked)
             bool dksKeyMatched = false;
 
             keyLocation = analogKeyRelocate[group][channel];
+
+#if LOGA_LATENCY_GPIO_DEBUG
+            /*
+             * TP53 / PB1: PGDN (matrix row 3, col 13) RAW ADC delta.
+             * Use the real ADC group/channel mapping through analogKeyRelocate.
+             * HIGH when abs(raw - startup_baseline) > 20 counts.
+             * LOW when abs(raw - startup_baseline) < 10 counts.
+             * Diagnostic only; no changes to ADC filter or key thresholds.
+             */
+            if (keyLocation.rowA == 3 && keyLocation.colA == 13)
+            {
+                int32_t raw = (int32_t)adc_apply_digital_gain(
+                    group, samples2[channel][group]);
+                if (!pgdn_raw_baseline_ready)
+                {
+                    pgdn_raw_baseline = raw;
+                    pgdn_raw_baseline_ready = true;
+                }
+                int32_t delta = raw - pgdn_raw_baseline;
+                if (delta < 0) delta = -delta;
+                if (!pgdn_raw_detected &&
+                    delta > PGDN_RAW_CHANGE_THRESHOLD)
+                {
+                    palSetPad(GPIOB, 1);
+                    pgdn_raw_detected = true;
+                }
+                else if (pgdn_raw_detected &&
+                         delta < PGDN_RAW_RELEASE_THRESHOLD)
+                {
+                    palClearPad(GPIOB, 1);
+                    pgdn_raw_detected = false;
+                }
+            }
+#endif
 
             if (!matrix_key_location_valid(keyLocation)) {
                 continue;
