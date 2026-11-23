@@ -4658,6 +4658,14 @@ void nkro_in_cb(USBDriver *usbp, usbep_t ep)
  *  so that this is not going to have to be checked every 1ms */
 void kbd_sof_cb(USBDriver *usbp)
 {
+#if LOGA_LATENCY_GPIO_DEBUG
+    /* Test36 TP55/PB10: pulse on each USB Start Of Frame (SOF).
+     * Compare SOF with TP51 submit and TP56 IN-complete callback.
+     * SOF cadence is nominally 1 ms for full-speed USB.
+     */
+    palSetPad(GPIOB, 10);
+    palClearPad(GPIOB, 10);
+#endif
     (void)usbp;
 }
 
