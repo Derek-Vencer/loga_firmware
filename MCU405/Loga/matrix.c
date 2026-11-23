@@ -112,9 +112,10 @@ extern socd_policy_t g_policy;
 #define LAT_THRESHOLD_PRESS()   palSetPad(GPIOB, 2)
 #define LAT_THRESHOLD_RELEASE() palClearPad(GPIOB, 2)
 
-/* Test35 TP55 / PB10: pulse at each PgDn matrix RAW evaluation. */
-#define LAT_ADC_FRAME_START()   palSetPad(GPIOB, 10)
-#define LAT_ADC_FRAME_END()     palClearPad(GPIOB, 10)
+/* Test36: TP55 / PB10 is reserved for USB SOF (usb_main.c). */
+/* Disable Test35 matrix cadence pulses to avoid GPIO contention. */
+#define LAT_ADC_FRAME_START()   ((void)0)
+#define LAT_ADC_FRAME_END()     ((void)0)
 
 /* TP56 / PB12 : USB transfer complete */
 #define LAT_USB_DONE_START()    palSetPad(GPIOB, 12)
