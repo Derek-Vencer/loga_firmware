@@ -99,6 +99,10 @@ extern socd_policy_t g_policy;
  * LOGA Latency Debug GPIO - Group 2
  * ===================================================== */
 
+/* Test43: PgDn ADC MUX slot, discovered from analogKeyRelocate.
+ * 0xFF means not yet discovered. Diagnostic only. */
+static volatile uint8_t loga_test43_pgdn_mux_slot = 0xFFU;
+
 /* TP52 / PB0 : ADC Filter execution */
 #define LAT_FILTER_START()      palSetPad(GPIOB, 0)
 #define LAT_FILTER_END()        palClearPad(GPIOB, 0)
@@ -2425,6 +2429,16 @@ static void adccallback(ADCDriver *adcp)
 #if LOGA_LATENCY_GPIO_DEBUG
         /* TP52 LOW : Filter End */
         LAT_FILTER_END();
+        /* Test43: second TP52 pulse uniquely marks the PgDn MUX
+         * conversion callback. The first pulse is ADC filtering.
+         * Compare consecutive second pulses for sample cadence,
+         * and the second pulse to TP54 for processing delay.
+         * No ADC timing or key thresholds are changed. */
+        if (completed_channel == loga_test43_pgdn_mux_slot)
+        {
+            LAT_FILTER_START();
+            LAT_FILTER_END();
+        }
 #endif
     }
 		
@@ -2705,6 +2719,10 @@ if (!reset_checked)
             if (!matrix_key_location_valid(keyLocation)) {
                 continue;
             }
+#if LOGA_LATENCY_GPIO_DEBUG
+            if (keyLocation.rowA == 3U && keyLocation.colA == 13U)
+                loga_test43_pgdn_mux_slot = channel;
+#endif
 						/*
 						 * TP53 : PB1
 						 * Selected key ADC processing marker.
