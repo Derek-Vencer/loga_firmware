@@ -103,7 +103,7 @@ extern socd_policy_t g_policy;
 #define LAT_FILTER_START()      palSetPad(GPIOB, 0)
 #define LAT_FILTER_END()        palClearPad(GPIOB, 0)
 
-/* TP53 / PB1 : PGDN fast-release filter active (Test5) */
+/* TP53 / PB1 : Test28 PgDn RAW travel >50 diagnostic (hysteresis <=20) */
 #define LAT_ADC_KEY_START()     palSetPad(GPIOB, 1)
 #define LAT_ADC_KEY_END()       palClearPad(GPIOB, 1)
 
@@ -1875,17 +1875,8 @@ static void adc_filter_update_channel(uint8_t channel)
                 raw_dist < filtered_dist;
         }
 #endif
-#if LOGA_LATENCY_GPIO_DEBUG
-        /* TP53 HIGH only while PGDN fast release filter is applied. */
-        if (analogKeyRelocate[group][channel].rowA == 3 &&
-            analogKeyRelocate[group][channel].colA == 13)
-        {
-            if (pgdn_release_fast)
-                palSetPad(GPIOB, 1);
-            else
-                palClearPad(GPIOB, 1);
-        }
-#endif
+/* Test28: TP53 is reassigned to RAW >50 diagnostic in matrix scan.
+         * Keep pgdn_release_fast computation and filter behavior unchanged. */
 #if LOGA_LATENCY_GPIO_DEBUG
         if (analogKeyRelocate[group][channel].rowA == 3 &&
             analogKeyRelocate[group][channel].colA == 13)
@@ -3464,6 +3455,7 @@ if (!reset_checked)
                     currentKeyMatrixMode == keyMatrixMode_Normal)
                 {
                     static bool pgdn_raw_diag_pressed = false;
+                    static bool pgdn_raw_50_diag_pressed = false;
                     const int32_t raw_adc = (int32_t)adc_apply_digital_gain(
                         group, samples2[channel][group]);
                     const int32_t raw_delta = raw_adc - (int32_t)init;
@@ -3472,6 +3464,14 @@ if (!reset_checked)
                         raw_travel = raw_delta * TRAVEL_STEPS / range;
                     if (raw_travel > TRAVEL_STEPS)
                         raw_travel = TRAVEL_STEPS;
+                    if (!pgdn_raw_50_diag_pressed && raw_travel > 50)
+                        pgdn_raw_50_diag_pressed = true;
+                    else if (pgdn_raw_50_diag_pressed && raw_travel <= 20)
+                        pgdn_raw_50_diag_pressed = false;
+                    if (pgdn_raw_50_diag_pressed)
+                        LAT_ADC_KEY_START();
+                    else
+                        LAT_ADC_KEY_END();
                     if (!pgdn_raw_diag_pressed && raw_travel > 150)
                         pgdn_raw_diag_pressed = true;
                     else if (pgdn_raw_diag_pressed && raw_travel <= 20)
