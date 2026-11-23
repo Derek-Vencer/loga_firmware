@@ -107,7 +107,7 @@ extern socd_policy_t g_policy;
 #define LAT_ADC_KEY_START()     palSetPad(GPIOB, 1)
 #define LAT_ADC_KEY_END()       palClearPad(GPIOB, 1)
 
-/* TP54 / PB2 : Test22 RAW travel 150 threshold marker */
+/* TP54 / PB2 : Test27 PgDn RAW press threshold 150 diagnostic */
 #define LAT_THRESHOLD_PRESS()   palSetPad(GPIOB, 2)
 #define LAT_THRESHOLD_RELEASE() palClearPad(GPIOB, 2)
 
@@ -3453,12 +3453,12 @@ if (!reset_checked)
 
 
 #if LOGA_LATENCY_GPIO_DEBUG
-                /* Test24: diagnostic-only RAW PgDn threshold state.
-                 * TP54 HIGH when RAW travel > 50, LOW when <= 20.
+                /* Test27: diagnostic-only RAW PgDn threshold state.
+                 * TP54 HIGH when RAW travel > 150, LOW when <= 20.
                  * This uses hysteresis but NO two-sample confirmation
                  * and NO 8 ms release guard. TP49 remains the actual
                  * debounced matrix state. Compare TP54 to TP49 to
-                 * identify RAW excursions rejected by Test23.
+                 * measure threshold-to-matrix confirmation latency.
                  * No changes to Matrix/HID or other keys. */
                 if (row == 3U && col == 13U &&
                     currentKeyMatrixMode == keyMatrixMode_Normal)
@@ -3472,7 +3472,7 @@ if (!reset_checked)
                         raw_travel = raw_delta * TRAVEL_STEPS / range;
                     if (raw_travel > TRAVEL_STEPS)
                         raw_travel = TRAVEL_STEPS;
-                    if (!pgdn_raw_diag_pressed && raw_travel > 50)
+                    if (!pgdn_raw_diag_pressed && raw_travel > 150)
                         pgdn_raw_diag_pressed = true;
                     else if (pgdn_raw_diag_pressed && raw_travel <= 20)
                         pgdn_raw_diag_pressed = false;
