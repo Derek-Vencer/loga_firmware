@@ -64,10 +64,11 @@ extern socd_policy_t g_policy;
 #define LAT_ADC_START()       palSetPad(GPIOA, 5)
 #define LAT_ADC_END()         palClearPad(GPIOA, 5)
 
-/* Test46: TP48 reassigned from matrix duration to PgDn ADC MUX callback cadence. */
+/* Test47: TP48 is PgDn RAW >1 early diagnostic (reset at RAW <=0). */
 #define LAT_MATRIX_START()    ((void)0)
 #define LAT_MATRIX_END()      ((void)0)
-#define LAT_PGDN_MUX_PULSE()  do { palSetPad(GPIOA, 6); palClearPad(GPIOA, 6); } while (0)
+#define LAT_RAW1_START()      palSetPad(GPIOA, 6)
+#define LAT_RAW1_END()        palClearPad(GPIOA, 6)
 
 #define LAT_KEY_PRESS()       palSetPad(GPIOA, 7)
 #define LAT_KEY_RELEASE()     palClearPad(GPIOA, 7)
@@ -85,6 +86,8 @@ extern socd_policy_t g_policy;
 
 #define LAT_MATRIX_START()    ((void)0)
 #define LAT_MATRIX_END()      ((void)0)
+#define LAT_RAW1_START()      ((void)0)
+#define LAT_RAW1_END()        ((void)0)
 
 #define LAT_KEY_PRESS()       ((void)0)
 #define LAT_KEY_RELEASE()     ((void)0)
@@ -2431,13 +2434,6 @@ static void adccallback(ADCDriver *adcp)
 #endif
 			
         adc_filter_update_channel(completed_channel);
-        /* Test46: one TP48 pulse per completed PgDn MUX sample.
-         * Measure consecutive rising edges to obtain the real per-key
-         * ADC sampling period; no scan, filter or threshold changes. */
-        if (completed_channel == loga_test43_pgdn_mux_slot)
-        {
-            LAT_PGDN_MUX_PULSE();
-        }
 			
 #if LOGA_LATENCY_GPIO_DEBUG
         /* TP52 LOW : Filter End */
@@ -3503,6 +3499,7 @@ if (!reset_checked)
                     static bool pgdn_raw_diag_pressed = false;
                     static bool pgdn_raw_50_diag_pressed = false;
                     static bool pgdn_raw_3_diag_pressed = false;
+                    static bool pgdn_raw_1_diag_pressed = false;
                     const int32_t raw_adc = (int32_t)adc_apply_digital_gain(
                         group, samples2[channel][group]);
                     const int32_t raw_delta = raw_adc - (int32_t)init;
@@ -3511,6 +3508,17 @@ if (!reset_checked)
                         raw_travel = raw_delta * TRAVEL_STEPS / range;
                     if (raw_travel > TRAVEL_STEPS)
                         raw_travel = TRAVEL_STEPS;
+                    /* Test47: TP48 HIGH for PgDn RAW travel >1, LOW <=0.
+                     * This is a noise-sensitive diagnostic, not proof of
+                     * mechanical motion. No effect on key decisions. */
+                    if (!pgdn_raw_1_diag_pressed && raw_travel > 1)
+                        pgdn_raw_1_diag_pressed = true;
+                    else if (pgdn_raw_1_diag_pressed && raw_travel <= 0)
+                        pgdn_raw_1_diag_pressed = false;
+                    if (pgdn_raw_1_diag_pressed)
+                        LAT_RAW1_START();
+                    else
+                        LAT_RAW1_END();
                     /* Test45 diagnostic only: RAW >3, reset <=1.
                      * Observe whether low-level ADC movement precedes
                      * Test44 RAW10. This is NOT a reliable mechanical
