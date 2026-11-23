@@ -103,9 +103,12 @@ extern socd_policy_t g_policy;
 #define LAT_FILTER_START()      palSetPad(GPIOB, 0)
 #define LAT_FILTER_END()        palClearPad(GPIOB, 0)
 
-/* TP53 / PB1 : Test28 PgDn RAW travel >50 diagnostic (hysteresis <=20) */
-#define LAT_ADC_KEY_START()     palSetPad(GPIOB, 1)
-#define LAT_ADC_KEY_END()       palClearPad(GPIOB, 1)
+/* Test32 TP53 / PB1: ADC callback semaphore signal -> matrix task wake. */
+/* RAW >50 diagnostic disabled for this experiment; TP54 RAW >150 remains. */
+#define LAT_ADC_KEY_START()     ((void)0)
+#define LAT_ADC_KEY_END()       ((void)0)
+#define LAT_ADC_SEM_SIGNAL()    palSetPad(GPIOB, 1)
+#define LAT_ADC_SEM_WAKE()      palClearPad(GPIOB, 1)
 
 /* TP54 / PB2 : Test27 PgDn RAW press threshold 150 diagnostic */
 #define LAT_THRESHOLD_PRESS()   palSetPad(GPIOB, 2)
@@ -2432,6 +2435,8 @@ static void adccallback(ADCDriver *adcp)
     if (completed_channel == 15U)
         LAT_ADC_FRAME_END();
 
+    /* TP53 HIGH: ADC callback signals matrix task (per channel). */
+    LAT_ADC_SEM_SIGNAL();
     chBSemSignalI(&adcCompleteSem);
 
     sensorPowerCtrl(false);
@@ -4080,7 +4085,9 @@ static THD_FUNCTION(ADC_ProcessThread, arg)
 	uprintf("ADC Task compli...\r\n");
     while (1)
     {
-				chBSemWait(&adcCompleteSem); 
+				chBSemWait(&adcCompleteSem);
+                /* TP53 LOW: matrix task resumed after semaphore wait. */
+                LAT_ADC_SEM_WAKE();
 			
 				/* TP48 HIGH：Matrix Scan Start */
 				LAT_MATRIX_START();
