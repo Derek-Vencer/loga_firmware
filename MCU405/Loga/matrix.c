@@ -3636,6 +3636,54 @@ if (!reset_checked)
                         allkey_fast_release = release_count[row][col] >= 2U;
                     }
                 }
+                /*
+                 * Test40: PgUp RELEASE-only RAW A/B experiment.
+                 * PgUp PRESS remains on its original filtered path to
+                 * preserve the Test38/39 PgUp-PgDn isolation.
+                 * Two consecutive RAW release samples and an 8 ms
+                 * post-press guard prevent one-sample false releases.
+                 * All other keys and PgDn behavior remain unchanged.
+                 */
+                bool pgup_raw_release = false;
+                if (row == 2U && col == 14U &&
+                    currentKeyMatrixMode == keyMatrixMode_Normal &&
+                    range > 0)
+                {
+                    static uint8_t pgup_release_count = 0U;
+                    static uint32_t pgup_press_ms = 0U;
+                    if (!was_pressed)
+                    {
+                        pgup_release_count = 0U;
+                    }
+                    else
+                    {
+                        const int32_t pgup_raw_adc =
+                            (int32_t)adc_apply_digital_gain(
+                                group, samples2[channel][group]);
+                        const int32_t pgup_raw_delta =
+                            pgup_raw_adc - (int32_t)init;
+                        int32_t pgup_raw_travel = 0;
+                        if (pgup_raw_delta > 0)
+                            pgup_raw_travel =
+                                pgup_raw_delta * TRAVEL_STEPS / range;
+                        if (pgup_raw_travel > TRAVEL_STEPS)
+                            pgup_raw_travel = TRAVEL_STEPS;
+                        if (timer_elapsed32(pgup_press_ms) < 8U)
+                            pgup_release_count = 0U;
+                        else if (pgup_raw_travel <= release_level)
+                        {
+                            if (pgup_release_count < 2U)
+                                pgup_release_count++;
+                        }
+                        else
+                            pgup_release_count = 0U;
+                        pgup_raw_release = pgup_release_count >= 2U;
+                    }
+                    /* Timestamp the first matrix-pressed scan, not
+                     * the raw threshold crossing. */
+                    if (!was_pressed && adcPre > trigger_level)
+                        pgup_press_ms = timer_read32();
+                }
                 if (!was_pressed)
                 {
                     if (pgdn_fast_press || allkey_fast_press ||
@@ -3657,6 +3705,7 @@ if (!reset_checked)
                     }
                 }
                 else if (pgdn_fast_release || allkey_fast_release ||
+                         pgup_raw_release ||
                          (adcPre <= release_level &&
                           !allkey_fast_enabled &&
                           !(row == 3U && col == 13U &&
