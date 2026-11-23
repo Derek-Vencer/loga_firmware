@@ -111,9 +111,9 @@ extern socd_policy_t g_policy;
 #define LAT_THRESHOLD_PRESS()   palSetPad(GPIOB, 2)
 #define LAT_THRESHOLD_RELEASE() palClearPad(GPIOB, 2)
 
-/* TP55 / PB10 : Matrix commit */
-#define LAT_COMMIT_START()      palSetPad(GPIOB, 10)
-#define LAT_COMMIT_END()        palClearPad(GPIOB, 10)
+/* Test31 TP55 / PB10: ADC frame active, channel 0 start to channel 15 callback. */
+#define LAT_ADC_FRAME_START()   palSetPad(GPIOB, 10)
+#define LAT_ADC_FRAME_END()     palClearPad(GPIOB, 10)
 
 /* TP56 / PB12 : USB transfer complete */
 #define LAT_USB_DONE_START()    palSetPad(GPIOB, 12)
@@ -2096,6 +2096,9 @@ void irq_storm_gpt9_cb(GPTDriver *gptp)
 				if (adcsampleIndex<16){	 
 					AdcPortChange(false);
 					
+                    /* Test31: mark start of a full 16-MUX ADC frame. */
+                    if (adcsampleIndex == 0)
+                        LAT_ADC_FRAME_START();
 					/* TP47 HIGH：ADC Conversion Start */
 					LAT_ADC_START();
 					
@@ -2425,6 +2428,10 @@ static void adccallback(ADCDriver *adcp)
 #endif
     }
 		
+    /* Test31: channel 15 conversion/filter finished; frame is complete. */
+    if (completed_channel == 15U)
+        LAT_ADC_FRAME_END();
+
     chBSemSignalI(&adcCompleteSem);
 
     sensorPowerCtrl(false);
