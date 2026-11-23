@@ -2069,6 +2069,12 @@ void irq_storm_gpt9_cb(GPTDriver *gptp)
 }
 #endif
 
+/* Test30 A/B: reduce ADC_v5 MUX settling one-shot from 14 to 10
+ * GPT ticks. PgDn RAW press threshold remains 150.
+ * Experimental: verify neighboring-key crosstalk before latency testing.
+ */
+#define LOGA_TEST30_ADC_MUX_SETTLE_TICKS 10U
+
 #ifdef ADC_v5
 void irq_storm_gpt9_cb(GPTDriver *gptp)
 {
@@ -2080,7 +2086,7 @@ void irq_storm_gpt9_cb(GPTDriver *gptp)
 			muxSelect(adcsampleIndex);
 			adcStauts = adcConvertStart;
 #ifndef ADC_Oversample
-			gptStartOneShot(&GPTD9, 14);  // 2
+            gptStartOneShot(&GPTD9, LOGA_TEST30_ADC_MUX_SETTLE_TICKS);
 #else
 			gptStartOneShot(&GPTD9, 3);
 #endif
@@ -2425,7 +2431,7 @@ static void adccallback(ADCDriver *adcp)
     muxSelect(++adcsampleIndex);
 
 #ifndef ADC_Oversample
-    gptStartOneShot(&GPTD9, 14);
+    gptStartOneShot(&GPTD9, LOGA_TEST30_ADC_MUX_SETTLE_TICKS);
 #else
     gptStartOneShot(&GPTD9, 3);
 #endif
