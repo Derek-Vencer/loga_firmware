@@ -3561,10 +3561,66 @@ if (!reset_checked)
                     }
                 }
 #endif
+                /*
+                 * Test25: all-key RAW fast path in normal analog mode.
+                 * PgDn (3,13) keeps the exact Test24/Test23 path above.
+                 * Other keys use their own configured trigger/release
+                 * levels, per-key counters, and 8 ms release guard.
+                 * No shared state across keys; non-normal modes retain
+                 * their existing behavior. This is an experimental build.
+                 */
+                bool allkey_fast_press = false;
+                bool allkey_fast_release = false;
+                const bool allkey_fast_enabled =
+                    currentKeyMatrixMode == keyMatrixMode_Normal &&
+                    !(row == 3U && col == 13U) && range > 0;
+                if (allkey_fast_enabled)
+                {
+                    static uint8_t press_count[MATRIX_ROWS][MATRIX_COLS];
+                    static uint8_t release_count[MATRIX_ROWS][MATRIX_COLS];
+                    static uint32_t press_ms[MATRIX_ROWS][MATRIX_COLS];
+                    const int32_t raw_adc = (int32_t)adc_apply_digital_gain(
+                        group, samples2[channel][group]);
+                    const int32_t raw_delta = raw_adc - (int32_t)init;
+                    int32_t raw_travel = 0;
+                    if (raw_delta > 0)
+                        raw_travel = raw_delta * TRAVEL_STEPS / range;
+                    if (raw_travel > TRAVEL_STEPS)
+                        raw_travel = TRAVEL_STEPS;
+                    if (!was_pressed)
+                    {
+                        release_count[row][col] = 0U;
+                        if (raw_travel > trigger_level)
+                        {
+                            if (press_count[row][col] < 2U)
+                                press_count[row][col]++;
+                        }
+                        else
+                            press_count[row][col] = 0U;
+                        allkey_fast_press = press_count[row][col] >= 2U;
+                        if (allkey_fast_press)
+                            press_ms[row][col] = timer_read32();
+                    }
+                    else
+                    {
+                        press_count[row][col] = 0U;
+                        if (timer_elapsed32(press_ms[row][col]) < 8U)
+                            release_count[row][col] = 0U;
+                        else if (raw_travel <= release_level)
+                        {
+                            if (release_count[row][col] < 2U)
+                                release_count[row][col]++;
+                        }
+                        else
+                            release_count[row][col] = 0U;
+                        allkey_fast_release = release_count[row][col] >= 2U;
+                    }
+                }
                 if (!was_pressed)
                 {
-                    if (pgdn_fast_press ||
+                    if (pgdn_fast_press || allkey_fast_press ||
                         (adcPre > trigger_level &&
+                         !allkey_fast_enabled &&
                          !(row == 3U && col == 13U &&
                            currentKeyMatrixMode == keyMatrixMode_Normal)))
                     {
@@ -3580,8 +3636,9 @@ if (!reset_checked)
 #endif
                     }
                 }
-                else if (pgdn_fast_release ||
+                else if (pgdn_fast_release || allkey_fast_release ||
                          (adcPre <= release_level &&
+                          !allkey_fast_enabled &&
                           !(row == 3U && col == 13U &&
                             currentKeyMatrixMode == keyMatrixMode_Normal)))
                 {
