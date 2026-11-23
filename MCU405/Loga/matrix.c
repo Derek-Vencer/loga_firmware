@@ -103,7 +103,7 @@ extern socd_policy_t g_policy;
 #define LAT_FILTER_START()      palSetPad(GPIOB, 0)
 #define LAT_FILTER_END()        palClearPad(GPIOB, 0)
 
-/* Test34 TP53 / PB1: PgDn RAW travel >50 diagnostic (release <=20). */
+/* Test38 TP53 / PB1: PgDn RAW travel >150 diagnostic (release <=20). */
 /* Diagnostic only: does not change key press or release decisions. */
 #define LAT_ADC_KEY_START()     palSetPad(GPIOB, 1)
 #define LAT_ADC_KEY_END()       palClearPad(GPIOB, 1)
@@ -1877,7 +1877,7 @@ static void adc_filter_update_channel(uint8_t channel)
                 raw_dist < filtered_dist;
         }
 #endif
-/* Test28: TP53 is reassigned to RAW >50 diagnostic in matrix scan.
+/* Test38: TP53 is reassigned to RAW >150 diagnostic in matrix scan.
          * Keep pgdn_release_fast computation and filter behavior unchanged. */
 #if LOGA_LATENCY_GPIO_DEBUG
         if (analogKeyRelocate[group][channel].rowA == 3 &&
@@ -2430,7 +2430,7 @@ static void adccallback(ADCDriver *adcp)
 		
 
 
-    /* Test34: TP53 reserved for PgDn RAW >50 diagnostic. */
+    /* Test38: TP53 reserved for PgDn RAW >150 diagnostic. */
     chBSemSignalI(&adcCompleteSem);
 
     sensorPowerCtrl(false);
@@ -3479,7 +3479,7 @@ if (!reset_checked)
                         raw_travel = raw_delta * TRAVEL_STEPS / range;
                     if (raw_travel > TRAVEL_STEPS)
                         raw_travel = TRAVEL_STEPS;
-                    if (!pgdn_raw_50_diag_pressed && raw_travel > 50)
+                    if (!pgdn_raw_50_diag_pressed && raw_travel > 150)
                         pgdn_raw_50_diag_pressed = true;
                     else if (pgdn_raw_50_diag_pressed && raw_travel <= 20)
                         pgdn_raw_50_diag_pressed = false;
@@ -3505,14 +3505,14 @@ if (!reset_checked)
                  * TP54 is still the independent, unconfirmed RAW state.
                  */
                 /*
-                 * Test18: PgDn-only press threshold 50 experiment.
+                 * Test38: PgDn RAW press minimum threshold 150.
                  * Preserve the stored trigger threshold and all release
                  * thresholds. This affects the RAW fast path only.
                  */
                 const int32_t pgdn_fast_press_threshold =
                     (row == 3U && col == 13U &&
                      currentKeyMatrixMode == keyMatrixMode_Normal)
-                    ? 50 : trigger_level;
+                    ? 150 : (trigger_level < 150 ? 150 : trigger_level);
                 bool pgdn_fast_press = false;
                 bool pgdn_fast_release = false;
 #if LOGA_LATENCY_GPIO_DEBUG
@@ -3610,7 +3610,7 @@ if (!reset_checked)
                     if (!was_pressed)
                     {
                         release_count[row][col] = 0U;
-                        if (raw_travel > trigger_level)
+                        if (raw_travel > (trigger_level < 150 ? 150 : trigger_level))
                         {
                             if (press_count[row][col] < 2U)
                                 press_count[row][col]++;
