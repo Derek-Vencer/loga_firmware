@@ -103,13 +103,10 @@ extern socd_policy_t g_policy;
 #define LAT_FILTER_START()      palSetPad(GPIOB, 0)
 #define LAT_FILTER_END()        palClearPad(GPIOB, 0)
 
-/* Test33 TP53 / PB1: short pulse at each ADC callback semaphore signal. */
-/* Unlike Test32, no cross-task HIGH/LOW state: avoids GPIO races. */
-/* RAW >50 diagnostic disabled; TP54 RAW >150 unchanged. */
-#define LAT_ADC_KEY_START()     ((void)0)
-#define LAT_ADC_KEY_END()       ((void)0)
-#define LAT_ADC_SEM_PULSE_START() palSetPad(GPIOB, 1)
-#define LAT_ADC_SEM_PULSE_END()   palClearPad(GPIOB, 1)
+/* Test34 TP53 / PB1: PgDn RAW travel >50 diagnostic (release <=20). */
+/* Diagnostic only: does not change key press or release decisions. */
+#define LAT_ADC_KEY_START()     palSetPad(GPIOB, 1)
+#define LAT_ADC_KEY_END()       palClearPad(GPIOB, 1)
 
 /* TP54 / PB2 : Test27 PgDn RAW press threshold 150 diagnostic */
 #define LAT_THRESHOLD_PRESS()   palSetPad(GPIOB, 2)
@@ -2436,10 +2433,8 @@ static void adccallback(ADCDriver *adcp)
     if (completed_channel == 15U)
         LAT_ADC_FRAME_END();
 
-    /* Test33: bounded TP53 pulse for each ADC callback notification. */
-    LAT_ADC_SEM_PULSE_START();
+    /* Test34: TP53 reserved for PgDn RAW >50 diagnostic. */
     chBSemSignalI(&adcCompleteSem);
-    LAT_ADC_SEM_PULSE_END();
 
     sensorPowerCtrl(false);
     muxSelect(++adcsampleIndex);
