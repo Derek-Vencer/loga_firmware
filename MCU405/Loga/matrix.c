@@ -64,8 +64,10 @@ extern socd_policy_t g_policy;
 #define LAT_ADC_START()       palSetPad(GPIOA, 5)
 #define LAT_ADC_END()         palClearPad(GPIOA, 5)
 
-#define LAT_MATRIX_START()    palSetPad(GPIOA, 6)
-#define LAT_MATRIX_END()      palClearPad(GPIOA, 6)
+/* Test46: TP48 reassigned from matrix duration to PgDn ADC MUX callback cadence. */
+#define LAT_MATRIX_START()    ((void)0)
+#define LAT_MATRIX_END()      ((void)0)
+#define LAT_PGDN_MUX_PULSE()  do { palSetPad(GPIOA, 6); palClearPad(GPIOA, 6); } while (0)
 
 #define LAT_KEY_PRESS()       palSetPad(GPIOA, 7)
 #define LAT_KEY_RELEASE()     palClearPad(GPIOA, 7)
@@ -2429,6 +2431,13 @@ static void adccallback(ADCDriver *adcp)
 #endif
 			
         adc_filter_update_channel(completed_channel);
+        /* Test46: one TP48 pulse per completed PgDn MUX sample.
+         * Measure consecutive rising edges to obtain the real per-key
+         * ADC sampling period; no scan, filter or threshold changes. */
+        if (completed_channel == loga_test43_pgdn_mux_slot)
+        {
+            LAT_PGDN_MUX_PULSE();
+        }
 			
 #if LOGA_LATENCY_GPIO_DEBUG
         /* TP52 LOW : Filter End */
