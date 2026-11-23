@@ -112,7 +112,7 @@ extern socd_policy_t g_policy;
 #define LAT_THRESHOLD_PRESS()   palSetPad(GPIOB, 2)
 #define LAT_THRESHOLD_RELEASE() palClearPad(GPIOB, 2)
 
-/* Test31 TP55 / PB10: ADC frame active, channel 0 start to channel 15 callback. */
+/* Test35 TP55 / PB10: pulse at each PgDn matrix RAW evaluation. */
 #define LAT_ADC_FRAME_START()   palSetPad(GPIOB, 10)
 #define LAT_ADC_FRAME_END()     palClearPad(GPIOB, 10)
 
@@ -2097,9 +2097,7 @@ void irq_storm_gpt9_cb(GPTDriver *gptp)
 				if (adcsampleIndex<16){	 
 					AdcPortChange(false);
 					
-                    /* Test31: mark start of a full 16-MUX ADC frame. */
-                    if (adcsampleIndex == 0)
-                        LAT_ADC_FRAME_START();
+
 					/* TP47 HIGH：ADC Conversion Start */
 					LAT_ADC_START();
 					
@@ -2429,9 +2427,7 @@ static void adccallback(ADCDriver *adcp)
 #endif
     }
 		
-    /* Test31: channel 15 conversion/filter finished; frame is complete. */
-    if (completed_channel == 15U)
-        LAT_ADC_FRAME_END();
+
 
     /* Test34: TP53 reserved for PgDn RAW >50 diagnostic. */
     chBSemSignalI(&adcCompleteSem);
@@ -3469,6 +3465,9 @@ if (!reset_checked)
                 if (row == 3U && col == 13U &&
                     currentKeyMatrixMode == keyMatrixMode_Normal)
                 {
+                    /* Test35: each pulse marks one PgDn RAW evaluation. */
+                    LAT_ADC_FRAME_START();
+                    LAT_ADC_FRAME_END();
                     static bool pgdn_raw_diag_pressed = false;
                     static bool pgdn_raw_50_diag_pressed = false;
                     const int32_t raw_adc = (int32_t)adc_apply_digital_gain(
