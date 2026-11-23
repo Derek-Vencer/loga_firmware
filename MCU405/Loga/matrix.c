@@ -3573,7 +3573,12 @@ if (!reset_checked)
                 bool allkey_fast_release = false;
                 const bool allkey_fast_enabled =
                     currentKeyMatrixMode == keyMatrixMode_Normal &&
-                    !(row == 3U && col == 13U) && range > 0;
+                    !(row == 3U && col == 13U) &&
+                    /* Test26 isolation: PgUp (2,14) uses the original
+                     * filtered ADC path. PgDn remains Test24 unchanged.
+                     * This A/B test checks whether PgUp's RAW path is
+                     * responsible for the observed dual-key event. */
+                    !(row == 2U && col == 14U) && range > 0;
                 if (allkey_fast_enabled)
                 {
                     static uint8_t press_count[MATRIX_ROWS][MATRIX_COLS];
