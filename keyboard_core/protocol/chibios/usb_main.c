@@ -4718,6 +4718,17 @@ uint8_t keyboard_leds(void)
  * not callable from ISR or locked state */
 void send_keyboard(report_keyboard_t *report)
 {
+#if LOGA_LATENCY_GPIO_DEBUG
+    /*
+     * Test41 TP50 / PC4: keyboard report reaches send_keyboard().
+     * One short pulse per call, BEFORE USB lock/endpoint wait.
+     * Compare TP49 matrix transition -> TP50 entry ->
+     * TP51 usbStartTransmitI -> TP56 IN completion.
+     * Diagnostic only; do not modify report content or USB timing.
+     */
+    palSetPad(GPIOC, 4);
+    palClearPad(GPIOC, 4);
+#endif
     osalSysLock();
     if (usbGetDriverStateI(&USB_DRIVER) != USB_ACTIVE)
     {
