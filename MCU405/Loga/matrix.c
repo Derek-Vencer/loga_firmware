@@ -3512,7 +3512,7 @@ if (!reset_checked)
                 const int32_t pgdn_fast_press_threshold =
                     (row == 3U && col == 13U &&
                      currentKeyMatrixMode == keyMatrixMode_Normal)
-                    ? 150 : trigger_level;
+                    ? 50 : trigger_level;
                 bool pgdn_fast_press = false;
                 bool pgdn_fast_release = false;
 #if LOGA_LATENCY_GPIO_DEBUG
