@@ -64,11 +64,11 @@ extern socd_policy_t g_policy;
 #define LAT_ADC_START()       palSetPad(GPIOA, 5)
 #define LAT_ADC_END()         palClearPad(GPIOA, 5)
 
-/* Test47: TP48 is PgDn RAW >1 early diagnostic (reset at RAW <=0). */
+/* Test48: TP48 is PgDn RAW >5 early diagnostic (reset at RAW <=2). */
 #define LAT_MATRIX_START()    ((void)0)
 #define LAT_MATRIX_END()      ((void)0)
-#define LAT_RAW1_START()      palSetPad(GPIOA, 6)
-#define LAT_RAW1_END()        palClearPad(GPIOA, 6)
+#define LAT_RAW5_START()      palSetPad(GPIOA, 6)
+#define LAT_RAW5_END()        palClearPad(GPIOA, 6)
 
 #define LAT_KEY_PRESS()       palSetPad(GPIOA, 7)
 #define LAT_KEY_RELEASE()     palClearPad(GPIOA, 7)
@@ -86,8 +86,8 @@ extern socd_policy_t g_policy;
 
 #define LAT_MATRIX_START()    ((void)0)
 #define LAT_MATRIX_END()      ((void)0)
-#define LAT_RAW1_START()      ((void)0)
-#define LAT_RAW1_END()        ((void)0)
+#define LAT_RAW5_START()      ((void)0)
+#define LAT_RAW5_END()        ((void)0)
 
 #define LAT_KEY_PRESS()       ((void)0)
 #define LAT_KEY_RELEASE()     ((void)0)
@@ -3499,7 +3499,7 @@ if (!reset_checked)
                     static bool pgdn_raw_diag_pressed = false;
                     static bool pgdn_raw_50_diag_pressed = false;
                     static bool pgdn_raw_3_diag_pressed = false;
-                    static bool pgdn_raw_1_diag_pressed = false;
+                    static bool pgdn_raw_5_diag_pressed = false;
                     const int32_t raw_adc = (int32_t)adc_apply_digital_gain(
                         group, samples2[channel][group]);
                     const int32_t raw_delta = raw_adc - (int32_t)init;
@@ -3508,17 +3508,17 @@ if (!reset_checked)
                         raw_travel = raw_delta * TRAVEL_STEPS / range;
                     if (raw_travel > TRAVEL_STEPS)
                         raw_travel = TRAVEL_STEPS;
-                    /* Test47: TP48 HIGH for PgDn RAW travel >1, LOW <=0.
+                    /* Test48: TP48 HIGH for PgDn RAW travel >5, LOW <=2.
                      * This is a noise-sensitive diagnostic, not proof of
                      * mechanical motion. No effect on key decisions. */
-                    if (!pgdn_raw_1_diag_pressed && raw_travel > 1)
-                        pgdn_raw_1_diag_pressed = true;
-                    else if (pgdn_raw_1_diag_pressed && raw_travel <= 0)
-                        pgdn_raw_1_diag_pressed = false;
-                    if (pgdn_raw_1_diag_pressed)
-                        LAT_RAW1_START();
+                    if (!pgdn_raw_5_diag_pressed && raw_travel > 5)
+                        pgdn_raw_5_diag_pressed = true;
+                    else if (pgdn_raw_5_diag_pressed && raw_travel <= 2)
+                        pgdn_raw_5_diag_pressed = false;
+                    if (pgdn_raw_5_diag_pressed)
+                        LAT_RAW5_START();
                     else
-                        LAT_RAW1_END();
+                        LAT_RAW5_END();
                     /* Test45 diagnostic only: RAW >3, reset <=1.
                      * Observe whether low-level ADC movement precedes
                      * Test44 RAW10. This is NOT a reliable mechanical
