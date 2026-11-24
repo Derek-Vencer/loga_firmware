@@ -108,8 +108,8 @@ extern socd_policy_t g_policy;
  * 0xFF means not yet discovered. Diagnostic only. */
 static volatile uint8_t loga_test43_pgdn_mux_slot = 0xFFU;
 
-/* Test45: TP52 / PB0 is PgDn RAW >3 early
- * detection (release <=1). It no longer displays ADC Filter pulses.
+/* Test49: TP52 / PB0 is PgDn RAW >30 curve marker
+ * (release <=20). It no longer displays ADC Filter pulses.
  * Keep TP47 ADC conversion and TP53/TP54 thresholds unchanged. */
 #define LAT_FILTER_START()      ((void)0)
 #define LAT_FILTER_END()        ((void)0)
@@ -3519,14 +3519,13 @@ if (!reset_checked)
                         LAT_RAW5_START();
                     else
                         LAT_RAW5_END();
-                    /* Test45 diagnostic only: RAW >3, reset <=1.
-                     * Observe whether low-level ADC movement precedes
-                     * Test44 RAW10. This is NOT a reliable mechanical
-                     * motion-start marker: idle noise may assert TP52.
+                    /* Test49 diagnostic only: TP52 marks RAW >30, reset <=20.
+                     * Together with TP48 >5, TP54 >75, TP53 >150,
+                     * this captures the PgDn RAW travel timing curve.
                      * Key press thresholds and HID remain unchanged. */
-                    if (!pgdn_raw_3_diag_pressed && raw_travel > 3)
+                    if (!pgdn_raw_3_diag_pressed && raw_travel > 30)
                         pgdn_raw_3_diag_pressed = true;
-                    else if (pgdn_raw_3_diag_pressed && raw_travel <= 1)
+                    else if (pgdn_raw_3_diag_pressed && raw_travel <= 20)
                         pgdn_raw_3_diag_pressed = false;
                     if (pgdn_raw_3_diag_pressed)
                         LAT_RAW3_START();
