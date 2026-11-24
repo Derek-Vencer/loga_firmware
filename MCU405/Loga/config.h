@@ -32,7 +32,7 @@
 #define USBSTR_SERIAL 		   '0', '\x00', '1', '\x00', '2', '\x00', '3', '\x00'
 
 //#define minTriggerCheck
-#define DEFAULT_TRIGGER_LEVEL	120
+#define DEFAULT_TRIGGER_LEVEL	150
 #define DEFAULT_RELEASE_LEVEL	10
 
 /* key matrix size */
