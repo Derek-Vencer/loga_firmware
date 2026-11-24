@@ -2735,7 +2735,7 @@ if (!reset_checked)
                 continue;
             }
 #if LOGA_LATENCY_GPIO_DEBUG
-            if (keyLocation.rowA == 3U && keyLocation.colA == 13U)
+            if (keyLocation.rowA == 2U && keyLocation.colA == 14U)
                 loga_test43_pgdn_mux_slot = channel;
 #endif
 						/*
@@ -3489,59 +3489,6 @@ if (!reset_checked)
 
 
 #if LOGA_LATENCY_GPIO_DEBUG
-                /* Test39: diagnostic-only early RAW PgDn threshold state.
-                 * TP54 HIGH when RAW travel > 75, LOW when <= 20.
-                 * This uses hysteresis but NO two-sample confirmation
-                 * and NO 8 ms release guard. TP49 remains the actual
-                 * debounced matrix state. Compare TP54 to TP49 to
-                 * measure threshold-to-matrix confirmation latency.
-                 * No changes to Matrix/HID or other keys. */
-                if (row == 3U && col == 13U &&
-                    currentKeyMatrixMode == keyMatrixMode_Normal)
-                {
-                    /* Test35: each pulse marks one PgDn RAW evaluation. */
-                    LAT_ADC_FRAME_START();
-                    LAT_ADC_FRAME_END();
-                    static bool pgdn_raw_diag_pressed = false;
-                    static bool pgdn_raw_50_diag_pressed = false;
-                    static bool pgdn_raw_3_diag_pressed = false;
-                    const int32_t raw_adc = (int32_t)adc_apply_digital_gain(
-                        group, samples2[channel][group]);
-                    const int32_t raw_delta = raw_adc - (int32_t)init;
-                    int32_t raw_travel = 0;
-                    if (raw_delta > 0 && range > 0)
-                        raw_travel = raw_delta * TRAVEL_STEPS / range;
-                    if (raw_travel > TRAVEL_STEPS)
-                        raw_travel = TRAVEL_STEPS;
-                    /* Test49 diagnostic only: TP52 marks RAW >30, reset <=20.
-                     * Together with TP48 sample cadence, TP54 >75, TP53 >150,
-                     * this captures the PgDn RAW travel timing curve.
-                     * Key press thresholds and HID remain unchanged. */
-                    if (!pgdn_raw_3_diag_pressed && raw_travel > 30)
-                        pgdn_raw_3_diag_pressed = true;
-                    else if (pgdn_raw_3_diag_pressed && raw_travel <= 20)
-                        pgdn_raw_3_diag_pressed = false;
-                    if (pgdn_raw_3_diag_pressed)
-                        LAT_RAW3_START();
-                    else
-                        LAT_RAW3_END();
-                    if (!pgdn_raw_50_diag_pressed && raw_travel > 150)
-                        pgdn_raw_50_diag_pressed = true;
-                    else if (pgdn_raw_50_diag_pressed && raw_travel <= 20)
-                        pgdn_raw_50_diag_pressed = false;
-                    if (pgdn_raw_50_diag_pressed)
-                        LAT_ADC_KEY_START();
-                    else
-                        LAT_ADC_KEY_END();
-                    if (!pgdn_raw_diag_pressed && raw_travel > 75)
-                        pgdn_raw_diag_pressed = true;
-                    else if (pgdn_raw_diag_pressed && raw_travel <= 20)
-                        pgdn_raw_diag_pressed = false;
-                    if (pgdn_raw_diag_pressed)
-                        LAT_THRESHOLD_PRESS();
-                    else
-                        LAT_THRESHOLD_RELEASE();
-                }
 #endif
                 /*
                  * Test16: PgDn RAW ADC threshold fast path.
@@ -3699,6 +3646,11 @@ if (!reset_checked)
                     static uint32_t pgup_press_ms = 0U;
                     if (!was_pressed)
                     {
+#if LOGA_LATENCY_GPIO_DEBUG
+                        LAT_RAW3_END();
+                        LAT_ADC_KEY_END();
+                        LAT_THRESHOLD_RELEASE();
+#endif
                         pgup_release_count = 0U;
                     }
                     else
@@ -3724,6 +3676,21 @@ if (!reset_checked)
                         else
                             pgup_release_count = 0U;
                         pgup_raw_release = pgup_release_count >= 2U;
+#if LOGA_LATENCY_GPIO_DEBUG
+                        /* Test53: independent PgUp release predicates. */
+                        if (pgup_raw_travel <= release_level)
+                            LAT_RAW3_START();
+                        else
+                            LAT_RAW3_END();
+                        if (pgup_raw_release)
+                            LAT_ADC_KEY_START();
+                        else
+                            LAT_ADC_KEY_END();
+                        if (adcPre <= release_level)
+                            LAT_THRESHOLD_PRESS();
+                        else
+                            LAT_THRESHOLD_RELEASE();
+#endif
                     }
                     /* Timestamp the first matrix-pressed scan, not
                      * the raw threshold crossing. */
@@ -3774,13 +3741,13 @@ if (!reset_checked)
                 /* ============================================
                  * TP49 / PA7 - Analog Key Press / Release
                  *
-                 * Target: Matrix Row 3, Column 13 (PGDN)
+                 * Target: Matrix Row 2, Column 14 (PGUP)
                  * HIGH = Press
                  * LOW  = Release
                  * ============================================ */
 #if LOGA_LATENCY_GPIO_DEBUG
 
-							if (row == 3U && col == 13U)
+							if (row == 2U && col == 14U)
 							{
 									const bool debug_now_pressed =
 											(matrix_temp[row] & key_mask) != 0U;
