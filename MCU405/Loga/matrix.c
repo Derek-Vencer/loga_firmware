@@ -125,7 +125,7 @@ static volatile uint8_t loga_test43_pgdn_mux_slot = 0xFFU;
 #define LAT_THRESHOLD_PRESS()   palSetPad(GPIOB, 2)
 #define LAT_THRESHOLD_RELEASE() palClearPad(GPIOB, 2)
 
-/* Test36: TP55 / PB10 is reserved for USB SOF (usb_main.c). */
+/* Test60: TP55 / PB10 is reserved for PgUp RAW >5. */
 /* Disable Test35 matrix cadence pulses to avoid GPIO contention. */
 #define LAT_ADC_FRAME_START()   ((void)0)
 #define LAT_ADC_FRAME_END()     ((void)0)
@@ -3664,16 +3664,21 @@ if (!reset_checked)
                     if (pgup_raw_travel > TRAVEL_STEPS)
                         pgup_raw_travel = TRAVEL_STEPS;
 #if LOGA_LATENCY_GPIO_DEBUG
-                    /* Test59: PgUp RAW vs filtered threshold, diagnostic only.
-                     * TP52: RAW travel >10 (early motion/noise marker).
+                    /* Test60: PgUp RAW vs filtered threshold, diagnostic only.
+                     * TP52: RAW travel >2 (early motion/noise marker).
+                     * TP55: RAW travel >5 (early motion/noise marker).
                      * TP53: RAW travel > effective trigger_level.
                      * TP54: filtered travel (adcPre) > effective trigger_level.
                      * TP49 remains the actual filtered matrix press.
                      * No change to press/release decisions. */
-                    if (pgup_raw_travel > 10)
+                    if (pgup_raw_travel > 2)
                         LAT_RAW3_START();
                     else
                         LAT_RAW3_END();
+                    if (pgup_raw_travel > 5)
+                        palSetPad(GPIOB, 10);
+                    else
+                        palClearPad(GPIOB, 10);
                     if (pgup_raw_travel > trigger_level)
                         LAT_ADC_KEY_START();
                     else
@@ -3940,17 +3945,13 @@ if (!reset_checked)
 
         last_layer_state =
             current_layer_state;
-#if LOGA_LATENCY_GPIO_DEBUG
-				palSetPad(GPIOB, 10);
-#endif
+
         memcpy(
             matrix,
             matrix_temp,
             sizeof(matrix)
         );
-#if LOGA_LATENCY_GPIO_DEBUG
-				palClearPad(GPIOB, 10);
-#endif		
+
         keyboard_taskTMR();
     }
 
