@@ -125,7 +125,7 @@ static volatile uint8_t loga_test43_pgdn_mux_slot = 0xFFU;
 #define LAT_THRESHOLD_PRESS()   palSetPad(GPIOB, 2)
 #define LAT_THRESHOLD_RELEASE() palClearPad(GPIOB, 2)
 
-/* Test60: TP55 / PB10 is reserved for PgUp RAW >5. */
+/* Test61: TP55 / PB10 is reserved for PgUp RAW >30. */
 /* Disable Test35 matrix cadence pulses to avoid GPIO contention. */
 #define LAT_ADC_FRAME_START()   ((void)0)
 #define LAT_ADC_FRAME_END()     ((void)0)
@@ -3664,18 +3664,18 @@ if (!reset_checked)
                     if (pgup_raw_travel > TRAVEL_STEPS)
                         pgup_raw_travel = TRAVEL_STEPS;
 #if LOGA_LATENCY_GPIO_DEBUG
-                    /* Test60: PgUp RAW vs filtered threshold, diagnostic only.
-                     * TP52: RAW travel >2 (early motion/noise marker).
-                     * TP55: RAW travel >5 (early motion/noise marker).
+                    /* Test61: PgUp RAW vs filtered threshold, diagnostic only.
+                     * TP52: RAW travel >15 (early motion/noise marker).
+                     * TP55: RAW travel >30 (early motion/noise marker).
                      * TP53: RAW travel > effective trigger_level.
                      * TP54: filtered travel (adcPre) > effective trigger_level.
                      * TP49 remains the actual filtered matrix press.
                      * No change to press/release decisions. */
-                    if (pgup_raw_travel > 2)
+                    if (pgup_raw_travel > 15)
                         LAT_RAW3_START();
                     else
                         LAT_RAW3_END();
-                    if (pgup_raw_travel > 5)
+                    if (pgup_raw_travel > 30)
                         palSetPad(GPIOB, 10);
                     else
                         palClearPad(GPIOB, 10);
