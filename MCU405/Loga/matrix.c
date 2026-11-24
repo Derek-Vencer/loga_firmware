@@ -3644,28 +3644,38 @@ if (!reset_checked)
                 {
                     static uint8_t pgup_release_count = 0U;
                     static uint32_t pgup_press_ms = 0U;
-                    if (!was_pressed)
-                    {
+                    const int32_t pgup_raw_adc =
+                        (int32_t)adc_apply_digital_gain(
+                            group, samples2[channel][group]);
+                    const int32_t pgup_raw_delta =
+                        pgup_raw_adc - (int32_t)init;
+                    int32_t pgup_raw_travel = 0;
+                    if (pgup_raw_delta > 0)
+                        pgup_raw_travel =
+                            pgup_raw_delta * TRAVEL_STEPS / range;
+                    if (pgup_raw_travel > TRAVEL_STEPS)
+                        pgup_raw_travel = TRAVEL_STEPS;
 #if LOGA_LATENCY_GPIO_DEBUG
+                    /* Test54: PgUp press predicates, diagnostic only. */
+                    if (pgup_raw_travel > 75)
+                        LAT_RAW3_START();
+                    else
                         LAT_RAW3_END();
+                    if (pgup_raw_travel > 150)
+                        LAT_ADC_KEY_START();
+                    else
                         LAT_ADC_KEY_END();
+                    if (adcPre > trigger_level)
+                        LAT_THRESHOLD_PRESS();
+                    else
                         LAT_THRESHOLD_RELEASE();
 #endif
+                    if (!was_pressed)
+                    {
                         pgup_release_count = 0U;
                     }
                     else
                     {
-                        const int32_t pgup_raw_adc =
-                            (int32_t)adc_apply_digital_gain(
-                                group, samples2[channel][group]);
-                        const int32_t pgup_raw_delta =
-                            pgup_raw_adc - (int32_t)init;
-                        int32_t pgup_raw_travel = 0;
-                        if (pgup_raw_delta > 0)
-                            pgup_raw_travel =
-                                pgup_raw_delta * TRAVEL_STEPS / range;
-                        if (pgup_raw_travel > TRAVEL_STEPS)
-                            pgup_raw_travel = TRAVEL_STEPS;
                         if (timer_elapsed32(pgup_press_ms) < 8U)
                             pgup_release_count = 0U;
                         else if (pgup_raw_travel <= release_level)
@@ -3676,21 +3686,6 @@ if (!reset_checked)
                         else
                             pgup_release_count = 0U;
                         pgup_raw_release = pgup_release_count >= 2U;
-#if LOGA_LATENCY_GPIO_DEBUG
-                        /* Test53: independent PgUp release predicates. */
-                        if (pgup_raw_travel <= release_level)
-                            LAT_RAW3_START();
-                        else
-                            LAT_RAW3_END();
-                        if (pgup_raw_release)
-                            LAT_ADC_KEY_START();
-                        else
-                            LAT_ADC_KEY_END();
-                        if (adcPre <= release_level)
-                            LAT_THRESHOLD_PRESS();
-                        else
-                            LAT_THRESHOLD_RELEASE();
-#endif
                     }
                     /* Timestamp the first matrix-pressed scan, not
                      * the raw threshold crossing. */
