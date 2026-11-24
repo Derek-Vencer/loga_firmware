@@ -3664,21 +3664,21 @@ if (!reset_checked)
                     if (pgup_raw_travel > TRAVEL_STEPS)
                         pgup_raw_travel = TRAVEL_STEPS;
 #if LOGA_LATENCY_GPIO_DEBUG
-                    /* Test56: PgUp RAW onset ladder, diagnostic only.
+                    /* Test59: PgUp RAW vs filtered threshold, diagnostic only.
                      * TP52: RAW travel >10 (early motion/noise marker).
-                     * TP53: RAW travel >75.
-                     * TP54: RAW travel >150.
+                     * TP53: RAW travel > effective trigger_level.
+                     * TP54: filtered travel (adcPre) > effective trigger_level.
                      * TP49 remains the actual filtered matrix press.
                      * No change to press/release decisions. */
                     if (pgup_raw_travel > 10)
                         LAT_RAW3_START();
                     else
                         LAT_RAW3_END();
-                    if (pgup_raw_travel > 75)
+                    if (pgup_raw_travel > trigger_level)
                         LAT_ADC_KEY_START();
                     else
                         LAT_ADC_KEY_END();
-                    if (pgup_raw_travel > 150)
+                    if (adcPre > trigger_level)
                         LAT_THRESHOLD_PRESS();
                     else
                         LAT_THRESHOLD_RELEASE();
