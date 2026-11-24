@@ -51,7 +51,7 @@ extern socd_policy_t g_policy;
  * LOGA Latency Debug GPIO
  *
  * TP47 PA5 : ADC Conversion
- * TP48 PA6 : Matrix Processing
+ * TP48 PA6 : PgDn ADC callback pulse
  * TP49 PA7 : Press / Release
  * TP50 PC4 : HID Report Update
  * TP51 PC5 : USB Report Submit
@@ -64,11 +64,11 @@ extern socd_policy_t g_policy;
 #define LAT_ADC_START()       palSetPad(GPIOA, 5)
 #define LAT_ADC_END()         palClearPad(GPIOA, 5)
 
-/* Test48: TP48 is PgDn RAW >5 early diagnostic (reset at RAW <=2). */
+/* Test50: TP48 pulses at PgDn MUX ADC callback, before filtering. */
 #define LAT_MATRIX_START()    ((void)0)
 #define LAT_MATRIX_END()      ((void)0)
-#define LAT_RAW5_START()      palSetPad(GPIOA, 6)
-#define LAT_RAW5_END()        palClearPad(GPIOA, 6)
+#define LAT_PGDN_SAMPLE_START()      palSetPad(GPIOA, 6)
+#define LAT_PGDN_SAMPLE_END()        palClearPad(GPIOA, 6)
 
 #define LAT_KEY_PRESS()       palSetPad(GPIOA, 7)
 #define LAT_KEY_RELEASE()     palClearPad(GPIOA, 7)
@@ -86,8 +86,8 @@ extern socd_policy_t g_policy;
 
 #define LAT_MATRIX_START()    ((void)0)
 #define LAT_MATRIX_END()      ((void)0)
-#define LAT_RAW5_START()      ((void)0)
-#define LAT_RAW5_END()        ((void)0)
+#define LAT_PGDN_SAMPLE_START()      ((void)0)
+#define LAT_PGDN_SAMPLE_END()        ((void)0)
 
 #define LAT_KEY_PRESS()       ((void)0)
 #define LAT_KEY_RELEASE()     ((void)0)
@@ -2428,6 +2428,11 @@ static void adccallback(ADCDriver *adcp)
 
     if (completed_channel < ADC_BUF_DEPTH)
     {
+        if (completed_channel == loga_test43_pgdn_mux_slot)
+        {
+            LAT_PGDN_SAMPLE_START();
+            LAT_PGDN_SAMPLE_END();
+        }
 #if LOGA_LATENCY_GPIO_DEBUG
         /* TP52 HIGH : Filter Start */
         LAT_FILTER_START();
@@ -3499,7 +3504,6 @@ if (!reset_checked)
                     static bool pgdn_raw_diag_pressed = false;
                     static bool pgdn_raw_50_diag_pressed = false;
                     static bool pgdn_raw_3_diag_pressed = false;
-                    static bool pgdn_raw_5_diag_pressed = false;
                     const int32_t raw_adc = (int32_t)adc_apply_digital_gain(
                         group, samples2[channel][group]);
                     const int32_t raw_delta = raw_adc - (int32_t)init;
@@ -3508,19 +3512,8 @@ if (!reset_checked)
                         raw_travel = raw_delta * TRAVEL_STEPS / range;
                     if (raw_travel > TRAVEL_STEPS)
                         raw_travel = TRAVEL_STEPS;
-                    /* Test48: TP48 HIGH for PgDn RAW travel >5, LOW <=2.
-                     * This is a noise-sensitive diagnostic, not proof of
-                     * mechanical motion. No effect on key decisions. */
-                    if (!pgdn_raw_5_diag_pressed && raw_travel > 5)
-                        pgdn_raw_5_diag_pressed = true;
-                    else if (pgdn_raw_5_diag_pressed && raw_travel <= 2)
-                        pgdn_raw_5_diag_pressed = false;
-                    if (pgdn_raw_5_diag_pressed)
-                        LAT_RAW5_START();
-                    else
-                        LAT_RAW5_END();
                     /* Test49 diagnostic only: TP52 marks RAW >30, reset <=20.
-                     * Together with TP48 >5, TP54 >75, TP53 >150,
+                     * Together with TP48 sample cadence, TP54 >75, TP53 >150,
                      * this captures the PgDn RAW travel timing curve.
                      * Key press thresholds and HID remain unchanged. */
                     if (!pgdn_raw_3_diag_pressed && raw_travel > 30)
