@@ -2088,7 +2088,8 @@ void irq_storm_gpt9_cb(GPTDriver *gptp)
  * GPT ticks. PgDn RAW press threshold remains 150.
  * Experimental: verify neighboring-key crosstalk before latency testing.
  */
-#define LOGA_TEST30_ADC_MUX_SETTLE_TICKS 10U
+/* Test51 A/B: 10 -> 8 GPT ticks; preserve all key thresholds and diagnostics. */
+#define LOGA_TEST30_ADC_MUX_SETTLE_TICKS 8U
 
 #ifdef ADC_v5
 void irq_storm_gpt9_cb(GPTDriver *gptp)
