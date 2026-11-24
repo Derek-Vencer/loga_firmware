@@ -2730,6 +2730,14 @@ if (!reset_checked)
 
             keyLocation = analogKeyRelocate[group][channel];
 
+            /* Test55: isolate defective physical Minus sensor (R1 C11).
+             * Keep ADC acquisition and all other key paths unchanged. */
+            if (keyLocation.rowA == 1U && keyLocation.colA == 11U)
+            {
+                matrix_temp[1] &= ~((matrix_row_t)1U << 11U);
+                continue;
+            }
+
 
             if (!matrix_key_location_valid(keyLocation)) {
                 continue;
