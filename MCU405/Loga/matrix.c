@@ -59,6 +59,12 @@ extern socd_policy_t g_policy;
 
 #define LOGA_LATENCY_GPIO_DEBUG 1
 
+/* Test57: PgUp, analogKeyRelocate[6][5] = matrix [2][14]. */
+#define LAT_TARGET_ROW 2U
+#define LAT_TARGET_COL 14U
+#define LAT_TARGET_GROUP 6U
+#define LAT_TARGET_CHANNEL 5U
+
 #if LOGA_LATENCY_GPIO_DEBUG
 
 #define LAT_ADC_START()       palSetPad(GPIOA, 5)
@@ -1672,11 +1678,11 @@ static inline adcsample_t adc_apply_digital_gain(
 }
 
 #if LOGA_LATENCY_GPIO_DEBUG
-static int32_t esc_raw_baseline = 0;
-static bool esc_raw_baseline_ready = false;
-static bool esc_raw_detected = false;
+static int32_t lat_target_raw_baseline = 0;
+static bool lat_target_raw_baseline_ready = false;
+static bool lat_target_raw_detected = false;
 
-#define ESC_RAW_CHANGE_THRESHOLD 5
+#define LAT_RAW_CHANGE_THRESHOLD 5
 #endif
 
 static void adc_filter_update_channel(uint8_t channel)
@@ -1719,37 +1725,37 @@ static void adc_filter_update_channel(uint8_t channel)
 			
 #if LOGA_LATENCY_GPIO_DEBUG
 
-				if (channel == 0U && group == 0U)
+				if (channel == LAT_TARGET_CHANNEL && group == LAT_TARGET_GROUP)
 				{
-						if (!esc_raw_baseline_ready)
+						if (!lat_target_raw_baseline_ready)
 						{
-								esc_raw_baseline = raw;
-								esc_raw_baseline_ready = true;
+								lat_target_raw_baseline = raw;
+								lat_target_raw_baseline_ready = true;
 						}
 
-						int32_t delta = raw - esc_raw_baseline;
+						int32_t delta = raw - lat_target_raw_baseline;
 
 						/*
 						 * TP53 HIGH:
-						 * ESC ADC RAW exceeds baseline by 20 counts.
+						 * Target ADC (after digital gain, before filter) exceeds baseline by 5 counts.
 						 *
 						 * TP53 LOW:
-						 * ESC ADC RAW returns within 10 counts.
+						 * Target ADC returns within 2 counts.
 						 */
-						if (delta > ESC_RAW_CHANGE_THRESHOLD)
+						if (delta > LAT_RAW_CHANGE_THRESHOLD)
 						{
-								if (!esc_raw_detected)
+								if (!lat_target_raw_detected)
 								{
 										palSetPad(GPIOB, 1);
-										esc_raw_detected = true;
+										lat_target_raw_detected = true;
 								}
 						}
-						else if (delta < 10)
+						else if (delta <= 2)
 						{
-								if (esc_raw_detected)
+								if (lat_target_raw_detected)
 								{
 										palClearPad(GPIOB, 1);
-										esc_raw_detected = false;
+										lat_target_raw_detected = false;
 								}
 						}
 				}
@@ -2263,15 +2269,15 @@ static void adccallback(ADCDriver *adcp)
     if (completed_channel < ADC_BUF_DEPTH)
     {
 #if LOGA_LATENCY_GPIO_DEBUG
-        /* TP52 HIGH : Filter Start */
-        LAT_FILTER_START();
+        /* TP52 HIGH: target channel filter execution start. */
+        if (completed_channel == LAT_TARGET_CHANNEL) { LAT_FILTER_START(); }
 #endif
 			
         adc_filter_update_channel(completed_channel);
 			
 #if LOGA_LATENCY_GPIO_DEBUG
-        /* TP52 LOW : Filter End */
-        LAT_FILTER_END();
+        /* TP52 LOW: target channel filter execution end. */
+        if (completed_channel == LAT_TARGET_CHANNEL) { LAT_FILTER_END(); }
 #endif
     }
 		
@@ -3303,7 +3309,7 @@ if (!reset_checked)
                         trigger_level)
                     {
 #if LOGA_LATENCY_GPIO_DEBUG
-												if (row == 0U && col == 0U)
+												if (row == LAT_TARGET_ROW && col == LAT_TARGET_COL)
 												{
 														palSetPad(GPIOB, 2);
 												}
@@ -3316,12 +3322,12 @@ if (!reset_checked)
                     adcPre <= release_level)
                 {
 #if LOGA_LATENCY_GPIO_DEBUG
-										if (row == 0U && col == 0U)
+										if (row == LAT_TARGET_ROW && col == LAT_TARGET_COL)
 										{
 												palClearPad(GPIOB, 2);
 
 												//palClearPad(GPIOB, 1);
-												//esc_raw_detected = false;
+												//lat_target_raw_detected = false;
 										}
 #endif
                     matrix_temp[row] &=
@@ -3337,7 +3343,7 @@ if (!reset_checked)
                  * ============================================ */
 #if LOGA_LATENCY_GPIO_DEBUG
 
-							if (row == 0U && col == 0U)
+							if (row == LAT_TARGET_ROW && col == LAT_TARGET_COL)
 							{
 									const bool debug_now_pressed =
 											(matrix_temp[row] & key_mask) != 0U;
