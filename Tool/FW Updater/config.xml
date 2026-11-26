@@ -1,0 +1,13 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<Configuration>
+  <PortType>1</PortType>
+  <COMPort>-1</COMPort>
+  <BoudRate>
+    <BoudRate>115200</BoudRate>
+  </BoudRate>
+  <CRC>
+    <CRC>false</CRC>
+  </CRC>
+  <AppAddress>08006000</AppAddress>
+  <AppDownloadFile>D:\Model\LOGA\Code\MCU\Firmware\v001502\Update\LOGA_V001502.bin</AppDownloadFile>
+</Configuration>

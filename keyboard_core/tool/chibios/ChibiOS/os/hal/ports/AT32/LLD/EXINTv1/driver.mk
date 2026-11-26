@@ -1,0 +1,2 @@
+PLATFORMSRC += $(CHIBIOS)/os/hal/ports/AT32/LLD/EXINTv1/at32_exint.c
+PLATFORMINC += $(CHIBIOS)/os/hal/ports/AT32/LLD/EXINTv1

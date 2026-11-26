@@ -1,0 +1,45 @@
+/*
+ * Copyright 2018 Jack Humbert <jack.humb@gmail.com>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+#pragma once
+
+//#include "quantum.h"
+
+#include <stdint.h>
+#include <stdbool.h>
+#include "gpio.h"
+
+void encoder_init(void);
+bool encoder_read(void);
+
+bool encoder_update_kb(uint8_t index, uint8_t clockwise);
+bool encoder_update_user(uint8_t index, uint8_t clockwise);
+
+#ifdef SPLIT_KEYBOARD
+void encoder_state_raw(uint8_t* slave_state);
+void encoder_update_raw(uint8_t* slave_state);
+#endif
+
+#ifndef ENCODER_DIRECTION_FLIP
+#    define ENCODER_CLOCKWISE 1
+#    define ENCODER_COUNTER_CLOCKWISE 0
+#    define ENCODER_BUTTON 2
+#else
+#    define ENCODER_CLOCKWISE 0
+#    define ENCODER_COUNTER_CLOCKWISE 1
+#    define ENCODER_BUTTON 2
+#endif

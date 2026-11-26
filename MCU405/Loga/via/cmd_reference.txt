@@ -1,0 +1,4 @@
+id_get_protocol_version			00 01 			// Get protocol_version
+id_bootloader_jump				0b 00			// Reset
+id_bootloader_jump				0b 01			// HID bootloader
+id_bootloader_jump				0b 02			// DFU bootloader

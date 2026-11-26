@@ -1,0 +1,351 @@
+#ifndef LED_FUNCTION_H_
+#define LED_FUNCTION_H_
+
+#include "print.h"
+
+void led_cb(void);
+void led_creatTask(void);
+void led_init(uint8_t channel);
+void uart_init(void);
+void setLightRunMode (uint8_t mode);
+void via_controlSet(uint8_t *data);
+void via_rapidValueSet(uint8_t * data);
+extern uint8_t LED_PresetModeIndex;
+void dynamaticLightingRangeUpdate(uint8_t *lamp_array_data);
+void dynamaticLightingMultiUpdate(uint8_t *lamp_array_data);
+void raw_hid_send(uint8_t *data, uint8_t length);
+
+uint32_t get_system_time_ticks(void);
+
+#define LedNumbers 119+1
+//#define LedNumbers 33+1
+//#define LedNumbers 2+1
+#ifdef minTriggerCheck
+	#define defaultBright 0.75f
+#else
+//#define defaultBright 0.35f
+#define defaultBright 0.5f
+#endif
+
+#define LED_DemoModes	10
+
+#define LED_PresetModes	18
+
+//typedef union {
+//  uint32_t raw;
+//  struct {
+//    uint8_t red;
+//    uint8_t green;
+//    uint8_t blue;
+//    uint8_t btight;
+//  };
+//} led_config_tapiFactory_Version
+
+enum {
+	keyMatrixMode_Normal = 0,
+	keyMatrixMode_InitialPostionCalc,
+	keyMatrixMode_TravelPostionCalc,
+};
+
+typedef struct {
+    uint16_t h;  // 0~360  (撠�� 0~360簞)
+    uint8_t s;   // 0~255
+    uint8_t v;   // 0~255
+} hsv_t;
+
+typedef struct {
+	uint8_t red;
+	uint8_t green;
+	uint8_t blue;
+} led_config_t;
+
+typedef struct {
+	uint8_t chipNo;
+	uint8_t postion;
+} ledDriver_Remap_t;
+
+typedef struct {
+	int8_t rowA;
+	int8_t colA;
+} analogKey_Config_t;
+
+typedef struct {
+	bool enable;
+	uint8_t colorMode;
+	led_config_t LED;
+	uint8_t brightness;
+	//uint8_t speed;
+	int16_t ranbowIndex;
+	int8_t bright;
+	bool direction;
+	float lastBrightTemp;
+} EffectrandonColor_t;
+
+typedef struct {
+	bool enable;
+	led_config_t color;
+	uint8_t row;
+	uint8_t col;
+} EffectProfile_t;
+
+typedef struct {
+	bool enable;
+	uint8_t Mode;
+	uint8_t Rainbow;
+	uint8_t Brightness;
+	uint8_t bright;
+	uint8_t Speed;
+	led_config_t LED;
+	uint8_t bbreathvolume;
+	uint8_t bFlashingVolume;
+	uint16_t TimerBase;
+} EffectMosArt_t;
+
+
+typedef struct {
+	bool enable;
+	uint8_t Brightness;
+	uint8_t bright;
+	//uint8_t speed;
+	led_config_t LED;
+	bool direction;
+	uint16_t timebase;
+} EffectRanbowFlow_t;
+
+
+typedef struct {
+	uint8_t runMode;
+	uint8_t effect;
+	bool enable;
+	uint8_t colorMode;
+	uint8_t mode;
+	uint8_t brightness;
+	uint8_t speed;
+	bool direction;
+	uint32_t timeStamp;
+	uint32_t interval;
+} EffectStatus_t;
+
+
+typedef struct {
+	uint8_t effect;
+	bool enable;
+	uint32_t interval;
+	uint8_t colorMode;
+	uint8_t mode;
+	led_config_t color;
+	uint8_t brightness;
+	uint8_t speed;
+	bool direction;
+} EffectStruct_t;
+
+
+
+enum effectTypes{
+	EffectIdle,
+	EffectTypeRandColor,
+	EffectTypeMosArt,
+	EffectTypeRainbowFlow,
+	EffectTypeColorBrith,
+	EffectTypeKeytest,
+	EffectTypeChangeProfile,
+	EffectTypeWheel,
+	EffectTypeReactive,
+	EffectTypeStarlight,
+	EffectTypeRipple,
+	EffectTypeOff,
+};
+
+enum mosArtModes{
+	mosArtStatic,
+	mosArtBreath,
+	mosArtFlash,
+	mosArtWave,
+};
+
+enum ranbowColors{
+	red,
+	orange,
+	yellow,
+	green,
+	blue,
+	indigo,
+	violet,
+	white,
+	dummy,
+	off,
+	offreal
+};
+
+enum colorModes{
+	single,
+	ranbow,
+};
+
+enum ledRunModes{
+	normalMode,
+	demoMode,
+	dynamticLightingMode,
+	lastRunMode,
+	testMode,
+	offMode,
+	volSpdMode,
+	powerOff,
+};
+
+enum ledDemoModeBuilderMode{
+	newDemo,
+	addDemoEffect,
+	newPreset,
+	addPresetEffect,
+};
+
+
+static const led_config_t rainbowColor[] = {
+    {255, 0, 0},
+    {192, 96, 0},
+    {255, 255, 0},
+    { 2, 255, 0},
+    { 2, 0, 255},
+    { 2, 255, 255},
+    {255, 0, 255},
+    {255, 255, 255},
+    {255, 0, 0},
+    {192, 96, 0},
+	{0, 0, 0}
+};
+
+
+//static const int8_t ledKeyMatrix[MATRIX_ROWS][MATRIX_COLS] = {
+//		 0, 1, 2, 3, 4, 5, 6, 7, 8, 9,10,11,12,13,14,15,-1,			//16
+//		16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,			//17
+//		33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,			//17
+//		50,51,52,53,54,55,56,57,58,59,60,61,62,-1,-1,-1,-1,			//13
+//		63,64,65,66,67,68,69,70,71,72,73,74,75,-1,-1,-1,-1,			//13
+//		76,77,78,79,80,81,82,83,84,85,86,-1,-1,-1,-1,-1,-1,			//11
+//
+//};
+
+//{ 14, 15, 15, 14, 13, 10 }; 6, col:15
+
+static const int8_t ledKeyMatrix[MATRIX_ROWS][MATRIX_COLS] =
+{
+    {
+        27, 28, 29, 30, 31,
+        32, 33, 34, 35, 36,
+        37, 38, 39, 40, -1
+    },
+
+    {
+        43, 44, 45, 46, 47,
+        48, 49, 50, 51, 52,
+        53, 54, 55, 56, 57
+    },
+
+    {
+        60, 61, 62, 63, 64,
+        65, 66, 67, 68, 69,
+        70, 71, 72, 73, 74
+    },
+
+    {
+        77, 78, 79, 80, 81,
+        82, 83, 84, 85, 86,
+        87, 88, 89, 90, -1
+    },
+
+    {
+         93,  94,  95,  96,  97,
+         98,  99, 100, 101, 102,
+        103, 104, 105,  -1,  -1
+    },
+
+    {
+        108, 109, 110, 111, 112,
+        113, 114, 115, 116, 117,
+         -1,  -1,  -1,  -1,  -1
+    }
+};
+
+static const int8_t ledRemap[LED_MATRIX_ROWS][LED_MATRIX_COLS] =
+{
+    {
+         0,  1,  2,  3,  4,  5,  6,  7,  8,  9,
+        10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
+        20, 21, 22, 23, 24, 25
+    }, /* 26 LEDs: 0-25 */
+
+    {
+        26, 27, -1, -1, 28, 29, 30, 31, -1, -1,
+        32, 33, 34, -1, -1, 35, 36, 37, 38, -1,
+        39, -1, -1, -1, 40, 41
+    }, /* 16 LEDs: 26-41 */
+
+    {
+        42, 43, 44, -1, 45, 46, 47, -1, 48, 49,
+        50, -1, 51, 52, 53, -1, 54, 55, -1, -1,
+        56, -1, -1, -1, 57, 58
+    }, /* 17 LEDs: 42-58 */
+
+    {
+        59, 60, 61, -1, 62, 63, 64, -1, 65, 66,
+        67, -1, 68, 69, 70, -1, 71, 72, -1, -1,
+        73, -1, -1, -1, 74, 75
+    }, /* 17 LEDs: 59-75 */
+
+    {
+        76, 77, -1, -1, 78, 79, 80, -1, 81, 82,
+        83, -1, 84, 85, 86, -1, 87, 88, -1, -1,
+        89, -1, -1, -1, 90, 91
+    }, /* 16 LEDs: 76-91 */
+
+    {
+         92, -1,  93, -1,  94,  95,  96,  97,  98, -1,
+         99,100, 101,102, 103, -1,  -1, 104,  -1, -1,
+        105, -1,  -1, -1,  -1, 106
+    }, /* 15 LEDs: 92-106 */
+
+    {
+        107, -1,108, -1,109, -1,110, -1, -1, -1,
+         -1,111, -1, -1, -1, -1,112,113,114, -1,
+         -1,115,116,117, -1,118
+    } /* 12 LEDs: 107-118 */
+};
+
+
+
+//static const ledDriver_Remap_t ledDriver_Remap[] = {
+//		{0 , 0},{0 , 1},{0 , 2},{0 , 3},{0 , 4},{0 , 5},{0 , 6},{0 , 7},{0 , 8},{0 , 9},{0 ,10},{0 ,11},{0 ,12},{0 ,13},{0 ,14},{0 ,15},{0 ,16},{0 ,17},{0 ,18},{0 ,19},
+//		{0 ,20},{0 ,21},{0 ,22},{0 ,23},{0 ,24},{0 ,25},{0 ,26},{0 ,27},{0 ,28},{0 ,29},{0 ,30},{0 ,31},{0 ,32},{0 ,33},{0 ,34},{0 ,35},{0 ,36},{0 ,37},{0 ,38},{0 ,39},
+//
+//		{ 1, 0},{ 1, 1},{ 1, 2},{ 1, 3},{ 1, 4},{ 1, 5},{ 1, 6},{ 1, 7},{ 1, 8},{ 1, 9},{ 1,10},{ 1,11},{ 1,12},{ 1,13},{ 1,14},{ 1,15},{ 1,16},{ 1,17},{ 1,18},{ 1,19},
+//		{ 1,20},{ 1,21},{ 1,22},{ 1,23},{ 1,24},{ 1,25},{ 1,26},{ 1,27},{ 1,28},{ 1,29},{ 1,30},{ 1,31},{ 1,32},{ 1,33},{ 1,34},{ 1,35},{ 1,36},{ 1,37},{ 1,38},{ 1,39},
+//
+//		{ 2, 0},{ 2, 1},{ 2, 2},{ 2, 3},{ 2, 4},{ 2, 5},{ 2, 6},{ 2, 7},{ 2, 8},{ 2, 9},{ 2,10},{ 2,11},{ 2,12},{ 2,13},{ 2,14},{ 2,15},{ 2,16},{ 2,17},{ 2,18},{ 2,19},
+//		{ 2,20},{ 2,21},{ 2,22},{ 2,23},{ 2,24},{ 2,25},{ 2,26},{ 2,27},{ 2,28},{ 2,29},{ 2,30},{ 2,31},{ 2,32},{ 2,33},{ 2,34},{ 2,35},{ 2,36},{ 2,37},{ 2,38},{ 2,39},
+//
+//};
+
+static const ledDriver_Remap_t ledDriver_Remap[] = {
+		{ 0, 6},{ 0, 7},{ 0, 8},{ 0, 9},{ 0,11},{ 0,10},{ 0,12},{ 0,13},{ 0,14},{ 0,15},{ 0,16},{ 0,17},{ 0,18},{ 0,19},{ 2,17},{ 2,16},{ 2,15},{ 2,14},{ 2,13},{ 2,12},
+		{ 2,11},{ 2,10},{ 2, 9},{ 2, 8},{ 2, 0},{ 2, 1},{ 0, 5},{ 0,20},{ 0,21},{ 0,22},{ 0,23},{ 0,24},{ 0,25},{ 0,26},{ 0,27},{ 0,28},{ 0,29},{ 2,21},{ 2,20},{ 2,19},
+
+		{ 2,18},{ 2, 2},{ 0, 4},{ 0,30},{ 0,31},{ 0,32},{ 0,33},{ 0,34},{ 0,35},{ 0,36},{ 0,37},{ 0,38},{ 0,39},{ 2,26},{ 2,25},{ 2,24},{ 2,23},{ 2,22},{ 2,3},{ 0, 3},
+		{ 1, 0},{ 1, 1},{ 1, 2},{ 1, 3},{ 1, 4},{ 1, 5},{ 1, 6},{ 1, 7},{ 1, 8},{ 1, 9},{ 2,31},{ 2,30},{ 2,29},{ 2,28},{ 2,27},{ 2, 4},{ 0, 2},{ 1,10},{ 1,11},{ 1,12},
+
+		{ 1,13},{ 1,14},{ 1,15},{ 1,16},{ 1,17},{ 1,18},{ 1,19},{ 2,35},{ 2,34},{ 2,33},{ 2,32},{ 2, 5},{ 0, 1},{ 1,20},{ 1,21},{ 1,22},{ 1,23},{ 1,24},{ 1,25},{ 1,26},
+		{ 1,27},{ 1,28},{ 1,29},{ 2,38},{ 2,37},{ 2,36},{ 2, 6},{ 0, 0},{ 1,30},{ 1,31},{ 1,32},{ 1,33},{ 1,34},{ 1,35},{ 1,36},{ 1,37},{ 1,38},{ 1,39},{ 2, 7},
+
+};
+
+
+
+
+
+//uint8_t analogBtnFill (uint8_t group,uint8_t location,led_config_t color, uint16_t bright);
+void ledAnalogMatrixzlocationTest(bool direction);
+bool setRemapLED(uint8_t row, uint8_t column, led_config_t color);
+bool setKeymapLED(uint8_t row, uint8_t column, led_config_t color);
+void led_updateFrameBufferSingle(uint8_t start, uint8_t end, led_config_t* led);
+void eeconfig_write_modtap(uint8_t idx, const mt_entry_t* in);
+#endif /* LED_FUNCTION_H_ */

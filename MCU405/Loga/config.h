@@ -1,0 +1,432 @@
+#ifndef CONFIG_H
+#define CONFIG_H
+#include "socd.h"
+#include <stdint.h>
+#define AT32F405RCT7
+
+/* USB Device descriptor parameter */
+#define VENDOR_ID       0x195d
+#define PRODUCT_ID      0x2100//0x2092
+#define DEVICE_VER      0x000F//15//0x000E
+#define DEVICE_VER_FIX  0x10 // 08
+
+/*
+ * Dead Zone 單位：0.01 mm
+ *
+ * 5   = 0.05 mm
+ * 400 = 4.00 mm
+ */
+#define DEAD_ZONE_MIN             5U
+#define DEAD_ZONE_MAX             400U
+
+#define DEAD_ZONE_TOP_DEFAULT     20U  /* 0.20 mm */
+#define DEAD_ZONE_BOTTOM_DEFAULT  30U  /* 0.30 mm */
+
+/* in python2: list(u"whatever".encode('utf-16-le')) */
+/*   at most 32 characters or the ugly hack in usb_main.c borks */
+#define MANUFACTURER "iOne Innovation"
+#define USBSTR_MANUFACTURER    'i', '\x00', 'O', '\x00', 'n', '\x00',  'e', '\x00'
+#define PRODUCT "LOGA ASURA 75TMR"
+#define USBSTR_PRODUCT         'L', '\x00', 'O', '\x00', 'G', '\x00', 'A', '\x00', ' ', '\x00', 'A', '\x00', 'S', '\x00', 'U', '\x00', 'R', '\x00', 'A', '\x00', ' ', '\x00', '7', '\x00', '5', '\x00', 'T', '\x00', 'M', '\x00', 'R', '\x00'
+#define DESCRIPTION "LOGA ASURA 75TMR"
+#define USBSTR_SERIAL 		   '0', '\x00', '1', '\x00', '2', '\x00', '3', '\x00'
+
+//#define minTriggerCheck
+#define DEFAULT_TRIGGER_LEVEL	150
+#define DEFAULT_RELEASE_LEVEL	10
+
+/* key matrix size */
+#define MATRIX_ROWS 6
+#define MATRIX_COLS 15
+
+#define LED_MATRIX_ROWS 7
+#define LED_MATRIX_COLS 26
+
+#define PROFILE_COUNT	4
+#define LAYERS_PER_PROFILE 3
+
+/* keymap in eeprom */
+#define FN_ACTIONS_COUNT 15
+#define KEYMAPS_COUNT LAYERS_PER_PROFILE * PROFILE_COUNT
+#define RAPID_TRIGGER_COUNT 24
+#define RAPID_TRIGGER_LEVELS 6
+
+#include "../../keyboard_core/common/matrix.h"
+#include "rappy_snappy.h"
+
+#define MATRIX_SIZE (matrix_rows() * matrix_cols())
+
+#define KEYS_COUNT (KEYMAPS_COUNT * MATRIX_SIZE)
+
+#define DYNAMIC_MACRO_COUNT 12
+#define DYNAMIC_MACRO_SIZE 48
+#define DYNAMIC_MACRO_EEPROM_STORAGE
+
+#define EECONFIG_Start (uint8_t *)(0)
+#define EECONFIG_ModelName (uint8_t *)(EECONFIG_Start)
+#define EECONFIG_SerialNo (uint32_t *)(EECONFIG_ModelName + 25)
+#define EECONFIG_kbColor (uint8_t *)(EECONFIG_SerialNo + 11)
+
+#define EECONFIG_KB_HUE   (uint8_t *)(EECONFIG_kbColor + 0)
+#define EECONFIG_KB_SAT   (uint8_t *)(EECONFIG_kbColor + 1)
+#define EECONFIG_KB_VAL   (uint8_t *)(EECONFIG_kbColor + 2)
+#define EECONFIG_KB_MAGIC (uint8_t *)(EECONFIG_kbColor + 3)
+#define EECONFIG_MAC_MODE             0x006F
+#define EECONFIG_POLLING_RATE         0x0070
+#define IS_SOCD_ON_ADD                0x0071
+#define TACHYON_MODE_ADD \
+    ((uint8_t *)0x0072)
+#define RAPID_KEY_ENABLE_ADDR \
+    ((uint8_t *)0x0073)
+#define EEPROM_FACTORY_INIT_FLAG_ADDR 0x0074
+#define KB_ENCODER_MODE_ADDR \
+    ((uint8_t *)0x0075)
+#define SOCD_SETTING_MAGIC_ADDR       ((uint8_t *)0x0076)
+#define SOCD_SETTING_MAGIC            0xA6
+/* RGB brightness is stored separately from the effect/color settings. */
+#define KB_COLOR_BRIGHTNESS_ADDR       ((uint8_t *)0x0077)
+#define KB_COLOR_BRIGHTNESS_MAGIC_ADDR ((uint8_t *)0x0078)
+#define KB_COLOR_SPEED_ADDR 					 ((uint8_t *)0x0079)
+#define KB_COLOR_BRIGHTNESS_MAGIC      0xB7
+#define KB_COLOR_RED_ADDR \
+    ((uint8_t *)0x007B)
+#define KB_COLOR_GREEN_ADDR \
+    ((uint8_t *)0x007C)
+#define KB_COLOR_BLUE_ADDR \
+    ((uint8_t *)0x007D)
+#define KB_COLOR_MODE_ADDR \
+    ((uint8_t *)0x007E)
+#define KB_COLOR_MAGIC_ADDR  0x007F
+#define KB_COLOR_MAGIC    0x7F
+#undef KB_COLOR_BRIGHTNESS_ADDR
+#define KB_COLOR_BRIGHTNESS_ADDR ((uint8_t *)KB_COLOR_MAGIC_ADDR)
+
+/*
+ * Per-effect RGB storage.  The legacy KB_COLOR_* bytes above hold only one
+ * shared colour, so they cannot retain independent colours for each effect.
+ * Keep this block below the ADC-gain page and below the usable EEPROM limit.
+ */
+#define KB_EFFECT_COLOR_SLOT_COUNT  16U
+#define KB_EFFECT_COLOR_SLOT_SIZE    3U
+#define KB_EFFECT_COLOR_BASE_ADDR \
+    ((uint8_t *)(uintptr_t)0xFF00U)
+#define KB_EFFECT_COLOR_MAGIC_ADDR \
+    ((uint8_t *)(uintptr_t)0xFF30U)
+#define KB_EFFECT_COLOR_MAGIC        0xC9U
+
+#define KEYMAP_SIZE (sizeof(uint16_t) * FN_ACTIONS_COUNT + sizeof(uint16_t) * KEYS_COUNT)
+
+#define EECONFIG_KEYMAP_OFFSET_CALIBRATION	(uint16_t *)(0x80)
+#define EECONFIG_KEYMAP_TRAVEL_CALIBRATION	(uint16_t *)(EECONFIG_KEYMAP_OFFSET_CALIBRATION + (ADC_NUM_CHANNELS*ADC_BUF_DEPTH*2))
+#define EECONFIG_KEYMAP_TRIGGER_LEVEL       (uint16_t *)(EECONFIG_KEYMAP_TRAVEL_CALIBRATION + (ADC_NUM_CHANNELS*ADC_BUF_DEPTH*2))
+#define EECONFIG_KEYMAP_RELEASE_LEVEL       (uint16_t *)(EECONFIG_KEYMAP_TRIGGER_LEVEL+4)
+
+#define EECONFIG_KEYMAP_IN_EEPROM 			(uint16_t *)(EECONFIG_KEYMAP_RELEASE_LEVEL+4)
+#define EECONFIG_END						(uint16_t *)(EECONFIG_KEYMAP_IN_EEPROM + KEYMAP_SIZE)
+
+#define EECONFIG_TRIGGER_LEVEL				(uint16_t *)(EECONFIG_END)
+#define EECONFIG_TRIGGER_END				(uint16_t *)(EECONFIG_TRIGGER_LEVEL + (KEYS_COUNT*2))
+
+#define EECONFIG_RELEASE_LEVEL				(uint16_t *)(EECONFIG_TRIGGER_END)
+#define EECONFIG_RELEASE_END				(uint16_t *)(EECONFIG_RELEASE_LEVEL + (KEYS_COUNT*2))
+
+#define EECONFIG_RAPID_TRIGGER				(uint16_t *)(EECONFIG_RELEASE_END)
+#define EECONFIG_RAPID_TRIGGER_END			(uint16_t *)(EECONFIG_RAPID_TRIGGER + (24*RAPID_TRIGGER_COUNT))
+
+/*
+ * Dynamic Macro EEPROM layout.
+ *
+ * config.h is force-included before dynamic_macro.h, therefore this file
+ * must not use sizeof(dynamic_macro_t).  v15.05 uses 48 keyrecord_t entries;
+ * the compiled dynamic_macro_t size is 388 bytes.
+ */
+#define DYNAMIC_MACRO_EEPROM_MAGIC_ADDR \
+    ((uint8_t *)(uintptr_t)(EECONFIG_RAPID_TRIGGER_END))
+
+#define DYNAMIC_MACRO_EEPROM_MAGIC_SIZE \
+    ((uint32_t)sizeof(uint16_t))
+
+#define DYNAMIC_MACRO_EEPROM_SLOT_SIZE \
+    ((uint32_t)388U)
+
+#define DYNAMIC_MACRO_EEPROM_TOTAL_SIZE \
+    (DYNAMIC_MACRO_EEPROM_SLOT_SIZE * (uint32_t)DYNAMIC_MACRO_COUNT)
+
+#define DYNAMIC_MACRO_EEPROM_BLOCK0_ADDR \
+    (DYNAMIC_MACRO_EEPROM_MAGIC_ADDR + DYNAMIC_MACRO_EEPROM_MAGIC_SIZE)
+
+#define DYNAMIC_MACRO_EEPROM_BLOCK0_ADDR_END \
+    (DYNAMIC_MACRO_EEPROM_BLOCK0_ADDR + DYNAMIC_MACRO_EEPROM_TOTAL_SIZE)
+
+/* SOCD */
+#define EECONFIG_SOCD_ADDR \
+    (DYNAMIC_MACRO_EEPROM_BLOCK0_ADDR_END)
+
+#define EECONFIG_SOCD_SIZE \
+    ((uint32_t)sizeof(socd_config_t) * (uint32_t)SOCD_SLOT_COUNT)
+
+#define EECONFIG_SOCD_ADDR_END \
+    (EECONFIG_SOCD_ADDR + EECONFIG_SOCD_SIZE)
+
+/* Mod-Tap */
+#define EECONFIG_MODTAP_ADDR \
+    (EECONFIG_SOCD_ADDR_END)
+
+#define EECONFIG_MODTAP_SIZE \
+    ((uint32_t)sizeof(mt_entry_t) * (uint32_t)MT_CAP_MAP)
+
+#define EECONFIG_MODTAP_ADDR_END \
+    (EECONFIG_MODTAP_ADDR + EECONFIG_MODTAP_SIZE)
+
+/* Rappy Snappy */
+#define EECONFIG_RAPPYSNAPPY_ADDR \
+    (EECONFIG_MODTAP_ADDR_END)
+
+#define EECONFIG_RAPPYSNAPPY_SIZE \
+    ((uint32_t)sizeof(rappy_snappy_pair_t) * \
+     (uint32_t)RAPPY_SNAPPY_PAIR_COUNT)
+
+#define EECONFIG_RAPPYSNAPPY_ADDR_END \
+    (EECONFIG_RAPPYSNAPPY_ADDR + EECONFIG_RAPPYSNAPPY_SIZE)
+
+/* Toggle Key */
+#define EECONFIG_TOGGLE_KEY_ADDR \
+    (EECONFIG_RAPPYSNAPPY_ADDR_END)
+
+#define EECONFIG_TOGGLE_KEY_SIZE \
+    ((uint32_t)sizeof(toggle_key_slot_t) * \
+     (uint32_t)toggle_key_pair_count)
+
+#define EECONFIG_TOGGLE_KEY_ADDR_END \
+    (EECONFIG_TOGGLE_KEY_ADDR + EECONFIG_TOGGLE_KEY_SIZE)
+
+/* Dead Zone */
+#define EECONFIG_DEAD_ZONE_ADDR \
+    ((uint16_t *)(uintptr_t)(EECONFIG_TOGGLE_KEY_ADDR_END))
+
+#define DEAD_ZONE_TOP_ADDR \
+    (EECONFIG_DEAD_ZONE_ADDR)
+
+#define DEAD_ZONE_BOTTOM_ADDR \
+    (EECONFIG_DEAD_ZONE_ADDR + 1)
+
+#define EECONFIG_DEAD_ZONE_ADDR_END \
+    (DEAD_ZONE_BOTTOM_ADDR + 1)
+
+/*
+ * ADC gain is deliberately stored in a dedicated EEPROM page.  Factory
+ * reset does not reference this address, so only the companion App can
+ * replace the saved port gains.
+ */
+#define EECONFIG_ADC_GAIN_MAGIC_ADDR ((uint8_t *)(uintptr_t)0xFF70U)
+#define EECONFIG_ADC_GAIN_DATA_ADDR  ((uint8_t *)(uintptr_t)0xFF71U)
+#define EECONFIG_ADC_GAIN_MAGIC      0xA7U
+
+/*
+ * New macro EEPROM region.
+ *
+ * config.h only defines the start address.
+ * Slot size and total region size are defined in macro_engine.h,
+ * after macro_config_t has been declared.
+ */
+#define EEPROM_MACRO_REGION_ADDR \
+    ((uint8_t *)(uintptr_t)(EECONFIG_TOGGLE_KEY_ADDR_END))
+
+// #define EECONFIG_KEYMAP_TRAVEL_2MM 	        (uint16_t*)(DYNAMIC_MACRO_EEPROM_BLOCK0_ADDR+2)
+
+
+//#define EECONFIG_KEYMAP_CHECKSUM   (uint16_t *)(EECONFIG_KEYMAP_IN_EEPROM)
+
+#define EXTRAKEY_ENABLE
+#define COMMAND_ENABLE
+#define ENCODER_ENABLE
+// #define CONSOLE_ENABLE // lyon see uprintf message
+#define LAMP_ARRAY_ENABLE
+#define MOUSE_ENABLE
+#define CONTROL_ENABLE // 
+#define RAW_ENABLE
+#define NKRO_ENABLE
+#define KEYMAP_IN_EEPROM_ENABLE
+
+#define ADC_NUM_CHANNELS   	7
+#define ADC_BUF_DEPTH      16
+
+/* Locking resynchronize hack */
+#define LOCKING_RESYNC_ENABLE
+
+/* key combination for command */
+#define IS_COMMAND() ( \
+    keyboard_report->mods == (MOD_BIT(KC_LSHIFT) | MOD_BIT(KC_RSHIFT)) \
+)
+
+#define ENCODERS_PAD_A { D2}
+#define ENCODERS_PAD_B { B13}
+#define ENCODERS_PAD_BTN { A15}
+
+
+#define ENCODER_RESOLUTION {2}
+
+#define TAP_HOLD_CAPS_DELAY 350
+#define TAP_CODE_DELAY 1
+
+#define EEPROM_DRIVER
+#define EEPROM_I2C
+#define EEPROM_USE_I2C
+
+//#define EXTERNAL_EEPROM_I2C_BASE_ADDRESS 0xA0
+#define EXTERNAL_EEPROM_I2C_BASE_ADDRESS 0b10101000		//non_OP
+//#define EXTERNAL_EEPROM_I2C_BASE_ADDRESS 0b10100000
+#define EXTERNAL_EEPROM_BYTE_COUNT 65536 - EXTERNAL_EEPROM_PAGE_SIZE
+#define EXTERNAL_EEPROM_PAGE_SIZE 128
+#define EXTERNAL_EEPROM_ADDRESS_SIZE 2
+#define EXTERNAL_EEPROM_WRITE_TIME 5
+#define EXTERNAL_EEPROM_WP_PIN B7
+
+#define AT32_I2C_USE_DMA TRUE
+#define I2C_DRIVER I2CD1
+#define I2C1_SCL_PIN B8
+#define I2C1_SDA_PIN B9
+#define I2C1_SCL_PAL_MODE 4
+#define I2C1_SDA_PAL_MODE 4
+#define I2C_START_RETRY_COUNT 10
+#define I2C_TRANSFER_TIMEOUT_MS 1000U
+#define I2C1_CLOCK_SPEED 400000 /* 400000 */ //
+
+//#define CRC_USE_DMA	TRUE
+
+// I2C ADJ
+#define I2C1_TIMINGR_PRESC 0U
+#define I2C1_TIMINGR_SCLDEL 7U
+#define I2C1_TIMINGR_SDADEL 0U
+
+//591Khz
+//#define I2C1_TIMINGR_SCLH 120U
+//#define I2C1_TIMINGR_SCLL 138U
+
+//1000Khz //
+#define I2C1_TIMINGR_SCLH 45U
+#define I2C1_TIMINGR_SCLL 50U
+
+
+// I2C ADJ
+//#define I2C1_TIMINGR_PRESC 2U
+//#define I2C1_TIMINGR_SCLDEL 4U
+//#define I2C1_TIMINGR_SDADEL 4U
+//
+////400k		//1.21ms
+////#define I2C1_TIMINGR_SCLH 50U
+////#define I2C1_TIMINGR_SCLL 60U
+//
+////800k
+////#define I2C1_TIMINGR_SCLH 25U
+////#define I2C1_TIMINGR_SCLL 25U
+//
+////1000k		//488uS
+//#define I2C1_TIMINGR_SCLH 18U
+//#define I2C1_TIMINGR_SCLL 18U
+
+//====
+
+
+
+
+// 400K
+//   #define I2C1_TIMINGR_SCLH   55U
+//   #define I2C1_TIMINGR_SCLL   55U
+
+// 368K
+//   #define I2C1_TIMINGR_SCLH   60U
+//   #define I2C1_TIMINGR_SCLL   100U
+
+// 368K v2
+//   #define I2C1_TIMINGR_SCLH   45U
+//   #define I2C1_TIMINGR_SCLL   90u
+
+// 368K v3
+
+
+//??K
+//  #define I2C1_TIMINGR_SCLH   43U
+//  #define I2C1_TIMINGR_SCLL   63U
+// END OF 400k ADJ
+
+
+
+
+//====
+
+
+//#define I2C1_TIMINGR_PRESC 15U
+//#define I2C1_TIMINGR_SCLDEL 4U
+//#define I2C1_TIMINGR_SDADEL 2U
+//
+//#define I2C1_TIMINGR_SCLH 15U
+//#define I2C1_TIMINGR_SCLL 21U
+
+//  .timingr          = AT32_TIMINGR_PRESC(15U) | AT32_TIMINGR_SCLDEL(4U) |
+//                      AT32_TIMINGR_SDADEL(2U) | AT32_TIMINGR_SCLH(15U) |
+//                      AT32_TIMINGR_SCLL(21U),
+
+
+
+
+/*
+ * Feature disable options
+ *  These options are also useful to firmware size reduction.
+ */
+
+/* disable debug print */
+//#define NO_DEBUG
+
+/* disable print */
+//#define NO_PRINT
+
+/* disable action features */
+//#define NO_ACTION_LAYER
+//#define NO_ACTION_TAPPING
+//#define NO_ACTION_ONESHOT
+//#define NO_ACTION_MACRO
+//#define NO_ACTION_FUNCTION
+
+
+
+#define SPI_LED_DRIVER			SPID2
+#define SPI_LED_SDB_PIN			B4
+#define SPI_LED_SCK_PIN			A9
+#define SPI_LED_MOSI_PIN		A10
+#define SPI_LED_MISO_PIN		A12
+//#define SPI_LED_MISO_PIN		C2
+
+//#define SPI_LED_CS1_PIN			F6
+//#define SPI_LED_CS1_PORT		GPIOF
+//#define SPI_LED_CS1_PAD			6U
+
+#define SPI_LED_CS1_PIN			A8
+#define SPI_LED_CS1_PORT		GPIOA
+#define SPI_LED_CS1_PAD			8U
+
+
+#define SPI_LED_CS2_PIN			A11
+#define SPI_LED_CS2_PORT		GPIOA
+#define SPI_LED_CS2_PAD			11U
+
+#define SPI_LED_CS3_PIN			F7
+#define SPI_LED_CS3_PORT		GPIOF
+#define SPI_LED_CS3_PAD			7U
+
+#define SPI_LED_SCK_PAL_MODE	5
+#define SPI_LED_MOSI_PAL_MODE	5
+#define SPI_LED_MISO_PAL_MODE	5
+
+//tapMod
+#define TAPPING_TERM 200  // ms嚗���矽
+
+#define PREVENT_STUCK_MODIFIERS
+// #define MATRIX_HAS_GHOST
+#endif
+
+uint16_t matrix_get_filtered_adc(uint8_t channel,uint8_t group);
+void adc_gain_load_from_eeprom(void);
+bool adc_gain_set(uint8_t port, uint8_t gain);
+uint8_t adc_gain_get(uint8_t port);
+

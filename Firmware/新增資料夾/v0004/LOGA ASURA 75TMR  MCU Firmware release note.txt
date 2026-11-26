@@ -1,0 +1,5 @@
+LOGA ASURA 75TMR  MCU Firmware release note
+========================================
+Version:0004
+Build date:2025-06-4
+Initial release
