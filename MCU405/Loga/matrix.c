@@ -1535,6 +1535,10 @@ static void adcerrorcallback(ADCDriver* adcp, adcerror_t err);
  */
 static adcsample_t adcFiltered[ADC_BUF_DEPTH][ADC_NUM_CHANNELS];
 static bool adcFilterReady[ADC_BUF_DEPTH];
+#ifdef ADC_v5
+static volatile uint32_t fast_release_seq[ADC_BUF_DEPTH];
+static adcsample_t fast_release_raw[ADC_BUF_DEPTH][ADC_NUM_CHANNELS];
+#endif
 
 #define HIGH_MODE_1
 
@@ -2131,6 +2135,9 @@ static void adccallback(ADCDriver *adcp)
     if (completed_channel < ADC_BUF_DEPTH)
     {
         adc_filter_update_channel(completed_channel);
+        for (uint8_t g = 0; g < ADC_NUM_CHANNELS; g++)
+            fast_release_raw[completed_channel][g] = samples2[completed_channel][g];
+        ++fast_release_seq[completed_channel];
     }
 
     chBSemSignalI(&adcCompleteSem);
@@ -2449,9 +2456,9 @@ if (!reset_checked)
                 (int32_t)init;
 
             /* Navigation-key offset applies only to normal scanning. */
+            int32_t nav_offset = 0;
             if (currentKeyMatrixMode == keyMatrixMode_Normal)
             {
-                int32_t nav_offset = 0;
 
                 if (keyLocation.rowA == 1U && keyLocation.colA == 14U)
                     nav_offset = LOGA_DEL_ADC_OFFSET;
@@ -3160,6 +3167,50 @@ if (!reset_checked)
                             );
                 }
 
+                bool fast_release = false;
+#ifdef ADC_v5
+                static uint8_t release_count[MATRIX_ROWS][MATRIX_COLS];
+                static uint32_t press_ms[MATRIX_ROWS][MATRIX_COLS];
+                static uint32_t last_seq[MATRIX_ROWS][MATRIX_COLS];
+                const uint32_t seq = fast_release_seq[channel];
+                if (!was_pressed || currentKeyMatrixMode != keyMatrixMode_Normal ||
+                    range <= 0 || (row == 2U && col == 14U))
+                {
+                    release_count[row][col] = 0U;
+                    press_ms[row][col] = timer_read32();
+                    last_seq[row][col] = seq;
+                }
+                else if (timer_elapsed32(press_ms[row][col]) < 8U)
+                {
+                    release_count[row][col] = 0U;
+                    last_seq[row][col] = seq;
+                }
+                else if (seq != last_seq[row][col])
+                {
+                    const int32_t raw_adc = (int32_t)adc_apply_digital_gain(
+                        group, fast_release_raw[channel][group]);
+                    const int32_t delta = raw_adc - (int32_t)init - nav_offset;
+                    int32_t raw_travel = delta > 0 ? delta * TRAVEL_STEPS / range : 0;
+                    if (raw_travel > TRAVEL_STEPS)
+                        raw_travel = TRAVEL_STEPS;
+                    const int32_t raw_release_level =
+                        (row == 3U && col == 13U) ? 20 : release_level;
+                    if (seq == fast_release_seq[channel])
+                    {
+                        if ((uint32_t)(seq - last_seq[row][col]) != 1U)
+                            release_count[row][col] = 0U;
+                        last_seq[row][col] = seq;
+                        if (raw_travel <= raw_release_level)
+                        {
+                            if (release_count[row][col] < 2U)
+                                ++release_count[row][col];
+                        }
+                        else
+                            release_count[row][col] = 0U;
+                        fast_release = release_count[row][col] >= 2U;
+                    }
+                }
+#endif
                 if (!was_pressed)
                 {
                     if (adcPre >
@@ -3170,7 +3221,7 @@ if (!reset_checked)
                     }
                 }
                 else if (
-                    adcPre <= release_level)
+                    fast_release || adcPre <= release_level)
                 {
                     matrix_temp[row] &=
                         ~key_mask;
