@@ -2251,7 +2251,10 @@ static void perform_factory_reset(void)
 #define LOGA_PGDN_PRESS_OFFSET       550
 #define LOGA_PGDN_RELEASE_OFFSET     550
 
+#define LOGA_RELEASE_PEAK_DROP         50
+
 static bool loga_release_rearm[MATRIX_ROWS][MATRIX_COLS];
+static int32_t loga_release_peak[MATRIX_ROWS][MATRIX_COLS];
 
 bool matrixAnalogScan(void)
 {
@@ -3185,8 +3188,24 @@ if (!reset_checked)
                         release_travel = TRAVEL_STEPS;
                 }
 
+                /* Early release requires a fall from the held-key peak.
+                 * Keep the original release path for shallow presses. */
+                const bool early_release_enabled =
+                    currentKeyMatrixMode == keyMatrixMode_Normal &&
+                    range > 0 && release_offset > press_offset;
+                if (was_pressed && early_release_enabled &&
+                    uncompensated_adc > loga_release_peak[row][col])
+                    loga_release_peak[row][col] = uncompensated_adc;
+
+                const bool early_release =
+                    early_release_enabled &&
+                    release_travel <= release_level &&
+                    loga_release_peak[row][col] - uncompensated_adc >=
+                        LOGA_RELEASE_PEAK_DROP;
+
                 if (!was_pressed)
                 {
+                    loga_release_peak[row][col] = uncompensated_adc;
                     if (loga_release_rearm[row][col])
                     {
                         /* Rearm only after the original release threshold. */
@@ -3198,9 +3217,11 @@ if (!reset_checked)
                         matrix_temp[row] |= key_mask;
                     }
                 }
-                else if (release_travel <= release_level)
+                else if (adcPre <= release_level || early_release ||
+                         (!early_release_enabled && release_travel <= release_level))
                 {
                     matrix_temp[row] &= ~key_mask;
+                    loga_release_peak[row][col] = 0;
                     loga_release_rearm[row][col] =
                         currentKeyMatrixMode == keyMatrixMode_Normal &&
                         adcPre > release_level;
