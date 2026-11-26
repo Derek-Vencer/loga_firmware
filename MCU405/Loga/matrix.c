@@ -2243,15 +2243,15 @@ static void perform_factory_reset(void)
 #endif // eepromClear
 
 #define LOGA_NORMAL_PRESS_OFFSET       0
-#define LOGA_NORMAL_RELEASE_OFFSET   550
+#define LOGA_NORMAL_RELEASE_OFFSET   750
 #define LOGA_DEL_PRESS_OFFSET        550
-#define LOGA_DEL_RELEASE_OFFSET      550
+#define LOGA_DEL_RELEASE_OFFSET      750
 #define LOGA_PGUP_PRESS_OFFSET       550
-#define LOGA_PGUP_RELEASE_OFFSET     550
+#define LOGA_PGUP_RELEASE_OFFSET     750
 #define LOGA_PGDN_PRESS_OFFSET       550
-#define LOGA_PGDN_RELEASE_OFFSET     550
-#define LOGA_UP_PRESS_OFFSET         550
-#define LOGA_UP_RELEASE_OFFSET       550
+#define LOGA_PGDN_RELEASE_OFFSET     750
+#define LOGA_UP_PRESS_OFFSET         650
+#define LOGA_UP_RELEASE_OFFSET       750
 
 #define LOGA_RELEASE_PEAK_DROP         50
 
