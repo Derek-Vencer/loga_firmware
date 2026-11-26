@@ -2242,9 +2242,16 @@ static void perform_factory_reset(void)
 }
 #endif // eepromClear
 
-#define LOGA_DEL_ADC_OFFSET    550
-#define LOGA_PGUP_ADC_OFFSET   550
-#define LOGA_PGDN_ADC_OFFSET   550
+#define LOGA_NORMAL_PRESS_OFFSET       0
+#define LOGA_NORMAL_RELEASE_OFFSET   550
+#define LOGA_DEL_PRESS_OFFSET        550
+#define LOGA_DEL_RELEASE_OFFSET      550
+#define LOGA_PGUP_PRESS_OFFSET       550
+#define LOGA_PGUP_RELEASE_OFFSET     550
+#define LOGA_PGDN_PRESS_OFFSET       550
+#define LOGA_PGDN_RELEASE_OFFSET     550
+
+static bool loga_release_rearm[MATRIX_ROWS][MATRIX_COLS];
 
 bool matrixAnalogScan(void)
 {
@@ -2448,21 +2455,29 @@ if (!reset_checked)
                 (int32_t)travel -
                 (int32_t)init;
 
-            /* Navigation-key offset applies only to normal scanning. */
+            const int32_t uncompensated_adc = adcCalc;
+            int32_t press_offset = LOGA_NORMAL_PRESS_OFFSET;
+            int32_t release_offset = LOGA_NORMAL_RELEASE_OFFSET;
+
+            /* Preserve existing navigation compensation for special paths. */
             if (currentKeyMatrixMode == keyMatrixMode_Normal)
             {
-                int32_t nav_offset = 0;
+                if (keyLocation.rowA == 1U && keyLocation.colA == 14U) {
+                    press_offset = LOGA_DEL_PRESS_OFFSET;
+                    release_offset = LOGA_DEL_RELEASE_OFFSET;
+                } else if (keyLocation.rowA == 2U && keyLocation.colA == 14U) {
+                    press_offset = LOGA_PGUP_PRESS_OFFSET;
+                    release_offset = LOGA_PGUP_RELEASE_OFFSET;
+                } else if (keyLocation.rowA == 3U && keyLocation.colA == 13U) {
+                    press_offset = LOGA_PGDN_PRESS_OFFSET;
+                    release_offset = LOGA_PGDN_RELEASE_OFFSET;
+                }
 
-                if (keyLocation.rowA == 1U && keyLocation.colA == 14U)
-                    nav_offset = LOGA_DEL_ADC_OFFSET;
-                else if (keyLocation.rowA == 2U && keyLocation.colA == 14U)
-                    nav_offset = LOGA_PGUP_ADC_OFFSET;
-                else if (keyLocation.rowA == 3U && keyLocation.colA == 13U)
-                    nav_offset = LOGA_PGDN_ADC_OFFSET;
-
-                if (nav_offset > 0)
-                    adcCalc = (adcCalc > nav_offset) ?
-                              (adcCalc - nav_offset) : 0;
+                if (press_offset > 0)
+                    adcCalc = adcCalc > press_offset ?
+                              adcCalc - press_offset : 0;
+            } else {
+                loga_release_rearm[keyLocation.rowA][keyLocation.colA] = false;
             }
 
             if (adcCalc < 0 || range <= 0) {
@@ -2813,6 +2828,7 @@ if (!reset_checked)
              * Normal keys continue through the original path.
              */
             if (dksKeyMatched) {
+                loga_release_rearm[keyLocation.rowA][keyLocation.colA] = false;
                 continue;
             }
 
@@ -3160,20 +3176,34 @@ if (!reset_checked)
                             );
                 }
 
+                int32_t release_travel = adcPre;
+                if (currentKeyMatrixMode == keyMatrixMode_Normal && range > 0)
+                {
+                    const int32_t delta = uncompensated_adc - release_offset;
+                    release_travel = delta > 0 ? delta * TRAVEL_STEPS / range : 0;
+                    if (release_travel > TRAVEL_STEPS)
+                        release_travel = TRAVEL_STEPS;
+                }
+
                 if (!was_pressed)
                 {
-                    if (adcPre >
-                        trigger_level)
+                    if (loga_release_rearm[row][col])
                     {
-                        matrix_temp[row] |=
-                            key_mask;
+                        /* Rearm only after the original release threshold. */
+                        if (adcPre <= release_level)
+                            loga_release_rearm[row][col] = false;
+                    }
+                    else if (adcPre > trigger_level)
+                    {
+                        matrix_temp[row] |= key_mask;
                     }
                 }
-                else if (
-                    adcPre <= release_level)
+                else if (release_travel <= release_level)
                 {
-                    matrix_temp[row] &=
-                        ~key_mask;
+                    matrix_temp[row] &= ~key_mask;
+                    loga_release_rearm[row][col] =
+                        currentKeyMatrixMode == keyMatrixMode_Normal &&
+                        adcPre > release_level;
                 }
 #ifndef NO_PRINT
                 {
