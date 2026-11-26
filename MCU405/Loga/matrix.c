@@ -2250,6 +2250,8 @@ static void perform_factory_reset(void)
 #define LOGA_PGUP_RELEASE_OFFSET     550
 #define LOGA_PGDN_PRESS_OFFSET       550
 #define LOGA_PGDN_RELEASE_OFFSET     550
+#define LOGA_UP_PRESS_OFFSET         550
+#define LOGA_UP_RELEASE_OFFSET       550
 
 #define LOGA_RELEASE_PEAK_DROP         50
 
@@ -2474,6 +2476,9 @@ if (!reset_checked)
                 } else if (keyLocation.rowA == 3U && keyLocation.colA == 13U) {
                     press_offset = LOGA_PGDN_PRESS_OFFSET;
                     release_offset = LOGA_PGDN_RELEASE_OFFSET;
+                } else if (keyLocation.rowA == 4U && keyLocation.colA == 12U) {
+                    press_offset = LOGA_UP_PRESS_OFFSET;
+                    release_offset = LOGA_UP_RELEASE_OFFSET;
                 }
 
                 if (press_offset > 0)
