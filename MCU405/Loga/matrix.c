@@ -2242,6 +2242,10 @@ static void perform_factory_reset(void)
 }
 #endif // eepromClear
 
+#define LOGA_DEL_ADC_OFFSET    550
+#define LOGA_PGUP_ADC_OFFSET   550
+#define LOGA_PGDN_ADC_OFFSET   550
+
 bool matrixAnalogScan(void)
 {
     int adcCalc, adcPre;
@@ -2443,6 +2447,23 @@ if (!reset_checked)
             int32_t range =
                 (int32_t)travel -
                 (int32_t)init;
+
+            /* Navigation-key offset applies only to normal scanning. */
+            if (currentKeyMatrixMode == keyMatrixMode_Normal)
+            {
+                int32_t nav_offset = 0;
+
+                if (keyLocation.rowA == 1U && keyLocation.colA == 14U)
+                    nav_offset = LOGA_DEL_ADC_OFFSET;
+                else if (keyLocation.rowA == 2U && keyLocation.colA == 14U)
+                    nav_offset = LOGA_PGUP_ADC_OFFSET;
+                else if (keyLocation.rowA == 3U && keyLocation.colA == 13U)
+                    nav_offset = LOGA_PGDN_ADC_OFFSET;
+
+                if (nav_offset > 0)
+                    adcCalc = (adcCalc > nav_offset) ?
+                              (adcCalc - nav_offset) : 0;
+            }
 
             if (adcCalc < 0 || range <= 0) {
                 adcPre = 0;
