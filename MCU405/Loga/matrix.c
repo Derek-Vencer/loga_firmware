@@ -2254,6 +2254,7 @@ static void perform_factory_reset(void)
 #define LOGA_UP_RELEASE_OFFSET       750
 
 #define LOGA_RELEASE_PEAK_DROP         50
+#define LOGA_GLOBAL_TRAVEL_OFFSET       0
 
 static bool loga_release_rearm[MATRIX_ROWS][MATRIX_COLS];
 static int32_t loga_release_peak[MATRIX_ROWS][MATRIX_COLS];
@@ -3182,6 +3183,29 @@ if (!reset_checked)
                                 row,
                                 col
                             );
+                }
+
+                /* Apply a signed travel offset after loading the configured
+                 * global or per-key thresholds. Zero preserves Test4. */
+                if (currentKeyMatrixMode == keyMatrixMode_Normal &&
+                    LOGA_GLOBAL_TRAVEL_OFFSET != 0)
+                {
+                    trigger_level += LOGA_GLOBAL_TRAVEL_OFFSET;
+                    release_level += LOGA_GLOBAL_TRAVEL_OFFSET;
+
+                    if (trigger_level < 0)
+                        trigger_level = 0;
+                    else if (trigger_level >= TRAVEL_STEPS)
+                        trigger_level = TRAVEL_STEPS - 1;
+
+                    if (release_level < 0)
+                        release_level = 0;
+                    else if (release_level >= TRAVEL_STEPS)
+                        release_level = TRAVEL_STEPS - 1;
+
+                    /* Keep release below the strict press threshold. */
+                    if (release_level > trigger_level)
+                        release_level = trigger_level;
                 }
 
                 int32_t release_travel = adcPre;
